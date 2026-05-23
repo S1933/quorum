@@ -1,6 +1,6 @@
 export class QuorumError extends Error {
   override readonly name: string = 'QuorumError';
-  constructor(message: string, readonly cause?: unknown) {
+  constructor(message: string, override readonly cause?: unknown) {
     super(message);
   }
 }

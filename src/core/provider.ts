@@ -1,11 +1,10 @@
-import type { AgentTask, AgentResult, ReviewTask, ReviewResult, ModelConfig, WorkspaceInfo } from './task.ts';
+import type { ReviewTask, ReviewResult, ModelConfig, WorkspaceInfo } from './task.ts';
 import type { Finding } from './finding.ts';
 import type { EventBus } from './events.ts';
 
 export type ProviderKind = 'http' | 'subprocess' | 'sdk';
 
 export interface ProviderCapabilities {
-  agent: boolean;
   review: boolean;
   streaming: boolean;
   tools: boolean;
@@ -36,8 +35,7 @@ export interface Provider {
 
   capabilities(): ProviderCapabilities;
 
-  execute?(task: AgentTask, ctx: ExecCtx): Promise<AgentResult>;
   review?(task: ReviewTask, ctx: ExecCtx): Promise<ReviewResult>;
-  stream?(task: AgentTask | ReviewTask, ctx: ExecCtx): AsyncIterable<ProviderEvent>;
+  stream?(task: ReviewTask, ctx: ExecCtx): AsyncIterable<ProviderEvent>;
   dispose?(): Promise<void>;
 }

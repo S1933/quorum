@@ -18,7 +18,10 @@ export async function loadConfigFromString(
     throw new ConfigError(`Failed to parse YAML: ${(err as Error).message}`, err);
   }
 
-  const interpolated = interpolateDeep(raw, { env: opts.env, lazy: true });
+  const interpolated = interpolateDeep(
+    raw,
+    opts.env ? { env: opts.env, lazy: true } : { lazy: true },
+  );
 
   const parsed = QuorumConfigSchema.safeParse(interpolated);
   if (!parsed.success) {
@@ -69,9 +72,6 @@ function validateCrossRefs(cfg: QuorumConfig): void {
     }
   }
 
-  if (cfg.defaults?.provider && !cfg.providers[cfg.defaults.provider]) {
-    errors.push(`defaults.provider "${cfg.defaults.provider}" not found in providers`);
-  }
   if (cfg.defaults?.pipeline && !cfg.pipelines[cfg.defaults.pipeline]) {
     errors.push(`defaults.pipeline "${cfg.defaults.pipeline}" not found in pipelines`);
   }

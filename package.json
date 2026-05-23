@@ -1,7 +1,7 @@
 {
   "name": "quorum",
   "version": "0.1.0",
-  "description": "Provider-agnostic orchestration runtime for AI coding agents and multi-model consensus review",
+  "description": "Provider-agnostic multi-model consensus review for AI-assisted code changes",
   "type": "module",
   "main": "src/index.ts",
   "bin": {

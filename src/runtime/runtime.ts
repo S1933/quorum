@@ -1,6 +1,6 @@
 import type { Persona } from '../core/persona.ts';
 import type { Provider } from '../core/provider.ts';
-import type { Pipeline, ReviewerRef } from '../core/pipeline.ts';
+import type { ConsensusConfig, Pipeline, ReviewerOverrides, ReviewerRef } from '../core/pipeline.ts';
 import type { QuorumConfig, ReviewerConfig, PersonaConfig, PipelineConfig } from '../config/schema.ts';
 import type { PluginCtx } from './plugin.ts';
 import { ProviderRegistry } from '../providers/registry.ts';
@@ -88,7 +88,8 @@ export async function createRuntime(opts: CreateRuntimeOptions): Promise<Runtime
 function toReviewerRef(id: string, cfg: ReviewerConfig | undefined): ReviewerRef {
   if (!cfg) throw new ConfigError(`Unknown reviewer "${id}"`);
   const ref: ReviewerRef = { id, personaId: cfg.persona, providerId: cfg.provider };
-  if (cfg.overrides) ref.overrides = cfg.overrides;
+  const overrides = toReviewerOverrides(cfg.overrides);
+  if (overrides) ref.overrides = overrides;
   return ref;
 }
 
@@ -105,7 +106,28 @@ function toPipeline(id: string, cfg: PipelineConfig): Pipeline {
     parallel: cfg.parallel,
     reviewers: cfg.reviewers,
   };
-  if (cfg.consensus) pipeline.consensus = cfg.consensus;
+  const consensus = toConsensusConfig(cfg.consensus);
+  if (consensus) pipeline.consensus = consensus;
   if (cfg.timeoutMs) pipeline.timeoutMs = cfg.timeoutMs;
   return pipeline;
+}
+
+function toReviewerOverrides(cfg: ReviewerConfig['overrides']): ReviewerOverrides | undefined {
+  if (!cfg) return undefined;
+  const out: ReviewerOverrides = {};
+  if (cfg.temperature !== undefined) out.temperature = cfg.temperature;
+  if (cfg.maxTokens !== undefined) out.maxTokens = cfg.maxTokens;
+  if (cfg.topP !== undefined) out.topP = cfg.topP;
+  if (cfg.model !== undefined) out.model = cfg.model;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function toConsensusConfig(cfg: PipelineConfig['consensus']): ConsensusConfig | undefined {
+  if (!cfg) return undefined;
+  const out: ConsensusConfig = { strategy: cfg.strategy };
+  for (const [key, value] of Object.entries(cfg)) {
+    if (key === 'strategy') continue;
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
 }

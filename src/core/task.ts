@@ -8,17 +8,10 @@ export interface WorkspaceInfo {
 }
 
 export interface ModelConfig {
-  model: string;
+  model?: string;
   temperature?: number;
   maxTokens?: number;
   topP?: number;
-}
-
-export interface AgentTask {
-  kind: 'agent';
-  id: string;
-  instruction: string;
-  workspace: WorkspaceInfo;
 }
 
 export interface ReviewTask {
@@ -34,12 +27,6 @@ export interface UsageInfo {
   inputTokens: number;
   outputTokens: number;
   costUsd?: number;
-}
-
-export interface AgentResult {
-  taskId: string;
-  output: string;
-  usage?: UsageInfo;
 }
 
 export interface ReviewResult {

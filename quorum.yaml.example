@@ -1,7 +1,6 @@
 version: 1
 
 defaults:
-  provider: openrouter-claude
   pipeline: default
 
 providers:

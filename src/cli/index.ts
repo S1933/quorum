@@ -44,8 +44,7 @@ function printHelp(): void {
   process.stdout.write(`quorum — multi-model consensus reviewer
 
 Usage:
-  quorum review [--pipeline <id>] [--base <ref>] [--config <path>] [--report <path>] [--no-color]
-  quorum agent <task...> [--provider <id>] [--config <path>]
+  quorum review [pipeline-id] [--pipeline <id>] [--base <ref>] [--config <path>] [--report <path>] [--no-color]
   quorum config [--config <path>]
   quorum help
 
@@ -64,9 +63,7 @@ async function main(): Promise<number> {
         printHelp();
         return 0;
       case 'review':
-        return await cmdReview(flags);
-      case 'agent':
-        return await cmdAgent(positional, flags);
+        return await cmdReview(positional, flags);
       case 'config':
         return await cmdConfig(flags);
       default:
@@ -83,10 +80,14 @@ async function main(): Promise<number> {
   }
 }
 
-async function cmdReview(flags: Record<string, string | boolean>): Promise<number> {
+async function cmdReview(positional: string[], flags: Record<string, string | boolean>): Promise<number> {
+  if (positional.length > 1) {
+    throw new ConfigError(`Unexpected review arguments: ${positional.slice(1).join(' ')}`);
+  }
   const configPath = typeof flags.config === 'string' ? flags.config : findConfigPath();
   const config = await loadConfigFromPath(configPath);
-  const pipelineId = (typeof flags.pipeline === 'string' && flags.pipeline) || config.defaults?.pipeline;
+  const pipelineId =
+    (typeof flags.pipeline === 'string' && flags.pipeline) || positional[0] || config.defaults?.pipeline;
   if (!pipelineId) throw new ConfigError('No pipeline specified and no defaults.pipeline configured');
 
   const root = await inferRepoRoot();
@@ -136,53 +137,6 @@ async function cmdReview(flags: Record<string, string | boolean>): Promise<numbe
   }
 }
 
-async function cmdAgent(positional: string[], flags: Record<string, string | boolean>): Promise<number> {
-  if (positional.length === 0) {
-    process.stderr.write('agent: missing task instruction\n');
-    return 2;
-  }
-  const configPath = typeof flags.config === 'string' ? flags.config : findConfigPath();
-  const config = await loadConfigFromPath(configPath);
-  const providerId =
-    (typeof flags.provider === 'string' && flags.provider) || config.defaults?.provider;
-  if (!providerId) throw new ConfigError('No provider specified and no defaults.provider configured');
-
-  const root = await inferRepoRoot().catch(() => process.cwd());
-  const pluginCtx = defaultPluginCtx(root);
-  const runtime = await createRuntime({ config, pluginCtx });
-
-  try {
-    const provider = await runtime.resolveProvider(providerId);
-    if (!provider.execute) {
-      throw new ConfigError(`Provider "${providerId}" does not support agent execution`);
-    }
-    const ac = new AbortController();
-    const onSig = () => ac.abort();
-    process.on('SIGINT', onSig);
-    process.on('SIGTERM', onSig);
-
-    try {
-      const instruction = positional.join(' ');
-      const result = await provider.execute(
-        { kind: 'agent', id: `agent-${Date.now()}`, instruction, workspace: { root } },
-        { bus: runtime.bus, signal: ac.signal, workspace: { root } },
-      );
-      process.stdout.write(`${result.output}\n`);
-      if (result.usage) {
-        process.stderr.write(
-          `\n[usage] in=${result.usage.inputTokens} out=${result.usage.outputTokens}\n`,
-        );
-      }
-      return 0;
-    } finally {
-      process.removeListener('SIGINT', onSig);
-      process.removeListener('SIGTERM', onSig);
-    }
-  } finally {
-    await runtime.dispose();
-  }
-}
-
 async function cmdConfig(flags: Record<string, string | boolean>): Promise<number> {
   const configPath = typeof flags.config === 'string' ? flags.config : findConfigPath();
   const config = await loadConfigFromPath(configPath);
@@ -196,13 +150,27 @@ function redactConfig(cfg: unknown): unknown {
   if (Array.isArray(cfg)) return cfg.map(redactConfig);
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(cfg as Record<string, unknown>)) {
-    if (/api[_-]?key|token|secret|password/i.test(k)) {
+    if (isSensitiveKey(k)) {
       out[k] = '***redacted***';
     } else {
       out[k] = redactConfig(v);
     }
   }
   return out;
+}
+
+function isSensitiveKey(key: string): boolean {
+  const k = key.toLowerCase().replace(/[\s-]/g, '_');
+  return (
+    k === 'apikey' ||
+    k === 'api_key' ||
+    k === 'token' ||
+    k.endsWith('_token') ||
+    k === 'secret' ||
+    k.endsWith('_secret') ||
+    k === 'password' ||
+    k.endsWith('_password')
+  );
 }
 
 function buildReviewInstruction(diff: string, files: string[]): string {

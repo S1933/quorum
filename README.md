@@ -1,27 +1,27 @@
 # Quorum
 
-Provider-agnostic orchestration runtime for AI coding agents and multi-model consensus review.
+Provider-agnostic multi-model consensus review for AI-assisted code changes.
 
-The differentiator: run the **same reviewer persona across multiple providers**, then aggregate findings with a consensus engine that surfaces which issues multiple independent models agreed on.
+The product focus: when an implementation is done in Claude Code, run a **parallel review meeting across multiple LLMs from multiple providers**, then aggregate findings with a consensus engine that surfaces which issues independent reviewers agreed on.
 
 ---
 
 ## How it works
 
-1. **Define providers** — OpenRouter (any model), local Claude Code SDK, or your own adapter.
+1. **Define reviewer providers** — OpenRouter (any model), local Claude Code SDK, or your own adapter.
 2. **Define personas** — a system prompt + role declaration (security, performance, architecture, …).
 3. **Bind reviewers** — `(persona, provider)` pairs. Same persona on two providers = one consensus signal.
-4. **Run a pipeline** — parallel or sequential reviewers execute against a diff or prompt. The consensus engine groups findings by file + line overlap and emits an agreement badge.
+4. **Run a review pipeline** — parallel reviewers critique the finished diff. The consensus engine groups findings by file + line overlap and emits an agreement badge.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Distribution: Claude Code plugin · CLI                       │
+│  Distribution: Claude Code review plugin · CLI                │
 ├──────────────────────────────────────────────────────────────┤
 │  UI: terminal renderer · markdown report · event subscribers  │
 ├──────────────────────────────────────────────────────────────┤
 │  Runtime: event bus · plugin lifecycle · config loader        │
 ├──────────────────────────────────────────────────────────────┤
-│  Pipelines: parallel/sequential executor · timeout · retry    │
+│  Pipelines: parallel/sequential review executor · timeout     │
 ├──────────────────────────────────────────────────────────────┤
 │  Reviewers (Persona+Provider binding)   Consensus engine      │
 ├──────────────────────────────────────────────────────────────┤
@@ -103,11 +103,11 @@ pipelines:
 # Review the current git diff against the default branch
 bun quorum review
 
-# Run a specific pipeline
-bun quorum review --pipeline consensus-security
+# Run a specific pipeline (short form)
+bun quorum review consensus-security
 
-# Delegate an agent task to the default provider
-bun quorum agent "refactor the auth module to use the new session API"
+# Equivalent explicit form
+bun quorum review --pipeline consensus-security
 
 # Show the loaded config (env: values redacted)
 bun quorum config
@@ -117,15 +117,22 @@ bun quorum config
 
 ## Claude Code plugin
 
-Quorum ships as a Claude Code plugin. Once installed, three slash commands are available inside Claude Code:
+Quorum ships as a Claude Code plugin. Once installed, two slash commands are available inside Claude Code:
 
 | Command | What it does |
 |---|---|
-| `/quorum-review` | Run the `default` pipeline on the current diff, render the consensus report inline |
-| `/quorum-agent <task>` | Delegate a task to the default agent provider, stream output |
+| `/quorum-review` | Run the configured default pipeline on the current diff and render the consensus report inline |
 | `/quorum-config` | Show the loaded `quorum.yaml` with secrets redacted |
 
-The plugin is a thin shell around the same CLI entry point — zero domain logic in the command files.
+Use `/quorum-review consensus-security` to run a named pipeline. The plugin is a thin shell around the same review CLI entry point — zero domain logic in the command files.
+
+For local development, load it directly:
+
+```bash
+claude --plugin-dir ./plugin
+```
+
+Then use `/quorum:quorum-review` or `/quorum:quorum-config` inside Claude Code.
 
 ---
 

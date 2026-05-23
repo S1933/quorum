@@ -2,7 +2,7 @@
 
 > Status: **draft v0.1** · scope: design, not implementation · last updated 2026-05-22
 
-Quorum is a provider-agnostic orchestration runtime for AI coding agents and reviewer pipelines. Its differentiator is **multi-model consensus review**: the same reviewer persona is run across multiple providers, and a consensus engine aggregates and deduplicates findings.
+Quorum is a provider-agnostic review runtime for AI-assisted code changes. Its differentiator is **multi-model consensus review**: when implementation is complete, the same reviewer persona is run across multiple providers, and a consensus engine aggregates and deduplicates findings like a team review meeting made only of LLM reviewers.
 
 This document defines the domain model, layer boundaries, interfaces, and V1 cut. It deliberately defers anything not load-bearing for the first working version.
 
@@ -26,12 +26,11 @@ The vocabulary the rest of the codebase enforces.
 
 | Concept | What it is | What it is *not* |
 |---|---|---|
-| **Provider** | A registered runtime that can execute prompts. Owns auth, transport, model dispatch. | A specific model. A reviewer. A persona. |
+| **Provider** | A registered runtime that can review prompts/diffs. Owns auth, transport, model dispatch. | A specific model. A reviewer. A persona. |
 | **Model** | A string identifier (e.g. `anthropic/claude-opus-4`) plus per-call parameters (temperature, max tokens). Lives inside provider config. | An object with behavior. It's data. |
 | **Persona** | A system prompt + role declaration + (optional) output schema hint. | Bound to a provider. |
 | **Reviewer** | `(Persona, ProviderRef, overrides)` — a persona *bound* to a provider for execution. | A persona. A provider. |
-| **AgentTask** | "Do this work." Free-form instruction + workspace context. Producer of code/diffs. | A review. |
-| **ReviewTask** | "Critique this." Diff, files, or prompt + persona-targeted instruction. Producer of `Finding[]`. | An agent task. |
+| **ReviewTask** | "Critique this." Diff, files, or prompt + persona-targeted instruction. Producer of `Finding[]`. | An implementation task. |
 | **Finding** | One issue: `{file, lineRange, severity, category, title, body, reviewer}`. | A whole review. |
 | **Pipeline** | A named, ordered or parallel set of `ReviewerRef`s with optional consensus config. | A reviewer. |
 | **Consensus** | Aggregation/dedup/contradiction-detection across `ReviewResult`s. | Voting infrastructure (deferred). |
@@ -76,20 +75,15 @@ export interface Provider {
 
   capabilities(): ProviderCapabilities;
 
-  // Optional: only required if capabilities.agent === true
-  execute?(task: AgentTask, ctx: ExecCtx): Promise<AgentResult>;
-
-  // Optional: only required if capabilities.review === true
   review?(task: ReviewTask, ctx: ExecCtx): Promise<ReviewResult>;
 
   // Optional: providers that natively stream emit events; orchestrator falls back to non-streaming.
-  stream?(task: AgentTask | ReviewTask, ctx: ExecCtx): AsyncIterable<ProviderEvent>;
+  stream?(task: ReviewTask, ctx: ExecCtx): AsyncIterable<ProviderEvent>;
 
   dispose?(): Promise<void>;
 }
 
 export interface ProviderCapabilities {
-  agent: boolean;          // can it execute open-ended agent tasks?
   review: boolean;         // can it produce structured findings?
   streaming: boolean;
   tools: boolean;          // function/tool calling
@@ -109,7 +103,7 @@ export interface ExecCtx {
 
 **Design choices:**
 
-- `execute` and `review` are optional. Not every provider needs to support both. Ollama might be agent-only; a reviewer-tuned model might be review-only. Capabilities advertise the truth; the orchestrator filters.
+- `review` is the load-bearing provider method. Providers may wrap HTTP APIs, local CLIs, or SDKs, but Quorum only asks them for structured review findings.
 - `kind` exposes the *shape* of the adapter (HTTP, subprocess, SDK) so the runtime can apply shape-specific concerns (subprocess providers get spawn budgets; HTTP providers get rate-limit handling).
 - `stream` is optional with a non-streaming fallback. Forces no provider to invent fake streaming.
 - `ExecCtx` carries the event bus by reference — providers emit events, they don't return them. Decouples observability from return values.
@@ -161,7 +155,6 @@ YAML, validated via zod, env interpolation via `env:VAR` and `${VAR}`.
 version: 1
 
 defaults:
-  provider: openrouter-claude
   pipeline: default
 
 providers:
@@ -327,11 +320,10 @@ UI renderers and the markdown report writer are *both* event subscribers. They n
 
 ## 10. Claude Code plugin layer
 
-V1 distribution. Lives under `.claude/plugin/`.
+V1 distribution. Lives under `plugin/`.
 
 **Slash commands (initial):**
 - `/quorum-review` — Run the `default` pipeline on the current diff (`git diff` vs default branch). Renders the consensus report inline.
-- `/quorum-agent <task>` — Delegate a task to the default *agent* provider; stream output.
 - `/quorum-config` — Show the loaded `quorum.yaml`, with `env:` redacted.
 
 **Optional surfaces (V1.x):**
@@ -346,13 +338,12 @@ V1 distribution. Lives under `.claude/plugin/`.
 
 ```
 quorum-claude-code/
-├── .claude/
-│   └── plugin/
-│       ├── plugin.json
-│       └── commands/
-│           ├── quorum-review.md
-│           ├── quorum-agent.md
-│           └── quorum-config.md
+├── plugin/
+│   ├── .claude-plugin/
+│   │   └── plugin.json
+│   └── commands/
+│       ├── quorum-review.md
+│       └── quorum-config.md
 ├── src/
 │   ├── core/                # types, schemas, errors. No I/O.
 │   │   ├── provider.ts
@@ -416,11 +407,11 @@ Six milestones, each independently shippable.
 | # | Milestone | Definition of done |
 |---|---|---|
 | M1 | **Core types + config loader** | `quorum.yaml.example` parses, zod validates, env interpolation works, tests pass. No providers wired. |
-| M2 | **OpenRouter provider** | `quorum agent "hello"` round-trips through OpenRouter, prints token usage. |
-| M3 | **Claude Code provider** | Same agent task runs against Claude Code SDK locally. Validates the abstraction across HTTP vs SDK shapes. |
+| M2 | **OpenRouter provider** | A review request round-trips through OpenRouter and returns structured findings plus token usage. |
+| M3 | **Claude Code provider** | The same review task runs against Claude Code locally. Validates the abstraction across HTTP vs subprocess shapes. |
 | M4 | **Parallel pipeline + overlap-v1 consensus** | `quorum review` on a diff runs 2 reviewers in parallel, prints grouped findings with "N agreed" badges. |
 | M5 | **Terminal + markdown renderers** | Both renderers subscribe to events, produce live terminal output, and write a final `.quorum/last-review.md`. |
-| M6 | **Claude Code plugin shell** | `/quorum-review` and `/quorum-agent` slash commands work end-to-end inside Claude Code. |
+| M6 | **Claude Code plugin shell** | `/quorum-review` works end-to-end inside Claude Code after an implementation is complete. |
 
 Each milestone gates on the prior one. No provider work before M1's config loader is solid — fixing config-parsing bugs after providers exist is much more expensive.
 
@@ -454,7 +445,7 @@ Explicit deferrals — capture here so they don't sneak in.
 - Cost-optimizing smart router.
 - Persistent memory across reviews.
 - GitHub Action / CI integration (planned for V1.x but not V1).
-- Codex, Aider, Cursor Agent, Gemini CLI, Continue.dev, LiteLLM providers (planned post-V1).
+- Codex CLI, Aider, Cursor, Gemini CLI, Continue.dev, LiteLLM review providers (planned post-V1).
 
 ---
 

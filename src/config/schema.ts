@@ -49,7 +49,6 @@ export const ProviderConfigSchema = z
 
 export const DefaultsSchema = z
   .object({
-    provider: NonEmpty.optional(),
     pipeline: NonEmpty.optional(),
   })
   .strict();

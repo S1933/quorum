@@ -1,5 +1,5 @@
 import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provider.ts';
-import type { AgentTask, AgentResult, ReviewTask, ReviewResult } from '../../core/task.ts';
+import type { ReviewTask, ReviewResult } from '../../core/task.ts';
 import type { ProviderFactory } from '../registry.ts';
 import type { PluginCtx } from '../../runtime/plugin.ts';
 import { ProviderRuntimeError } from '../../core/errors.ts';
@@ -19,7 +19,6 @@ class ClaudeCodeProvider implements Provider {
 
   capabilities(): ProviderCapabilities {
     return {
-      agent: true,
       review: true,
       streaming: false,
       tools: true,
@@ -75,11 +74,6 @@ class ClaudeCodeProvider implements Provider {
       clearTimeout(timer);
       signal.removeEventListener('abort', onAbort);
     }
-  }
-
-  async execute(task: AgentTask, ctx: ExecCtx): Promise<AgentResult> {
-    const output = await this.runOnce(task.instruction, null, ctx.signal);
-    return { taskId: task.id, output };
   }
 
   async review(task: ReviewTask, ctx: ExecCtx): Promise<ReviewResult> {

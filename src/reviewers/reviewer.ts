@@ -51,7 +51,8 @@ export function bindReviewer(
 
 function overridesToModelConfig(o?: ReviewerOverrides): ModelConfig | undefined {
   if (!o) return undefined;
-  const out: ModelConfig = { model: o.model ?? '' };
+  const out: ModelConfig = {};
+  if (o.model !== undefined) out.model = o.model;
   if (o.temperature !== undefined) out.temperature = o.temperature;
   if (o.maxTokens !== undefined) out.maxTokens = o.maxTokens;
   if (o.topP !== undefined) out.topP = o.topP;
