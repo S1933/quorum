@@ -191,32 +191,6 @@ flowchart LR
   G --> Badge["2 reviewers agreed"]
 ```
 
-## Project Layout
-
-```text
-src/
-  cli/          Bun CLI entrypoint
-  config/       YAML loading, schema validation, env interpolation
-  consensus/    overlap-v1 strategy
-  core/         pure domain types and contracts
-  pipelines/    review execution
-  providers/    OpenRouter, Claude Code, and OpenCode Go adapters
-  reviewers/    persona/provider binding
-  runtime/      event bus, plugin lifecycle, workspace probing
-  ui/           terminal and Markdown output
-tests/          Bun test suite
-plugin/         Claude Code plugin commands
-```
-
-## Develop
-
-```bash
-bun run typecheck
-bun test
-```
-
-CI runs both commands on every pull request and every push to `main`.
-
 ## Roadmap
 
 - More provider adapters, including local model runtimes
