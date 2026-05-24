@@ -14,7 +14,7 @@ This document defines the domain model, layer boundaries, interfaces, and V1 cut
 2. **Personas are portable.** A persona (system prompt + role) is decoupled from any provider. The same `paranoid-security` persona running on two different providers is the unit of consensus.
 3. **Core has no I/O.** `core/` defines types and pure logic. All network, filesystem, and subprocess work lives in `providers/` or `runtime/`.
 4. **Event-driven, not callback soup.** A single event bus carries lifecycle events. UIs subscribe; they do not poll.
-5. **V1 ships with two providers, not five.** One HTTP-shaped, one subprocess/SDK-shaped. That validates the abstraction without surface-area sprawl.
+5. **Provider variety validates the seam.** Quorum ships HTTP and local subprocess adapters, but they all satisfy the same review-focused provider interface.
 6. **No premature consensus.** V1 consensus = group findings by file+line overlap and emit an "N agreed" badge. Embedding-based semantic dedup and trust scoring are roadmap, not V1.
 7. **Claude Code plugin is a *distribution*, not the *runtime*.** The core is a Bun library + CLI; the plugin is a thin slash-command adapter.
 
@@ -45,7 +45,7 @@ Three-tier hierarchy: **Provider → Reviewer → Pipeline.** Personas hang off 
 ┌──────────────────────────────────────────────────────────────┐
 │  Distribution: Claude Code plugin · CLI · (future: web UI)   │
 ├──────────────────────────────────────────────────────────────┤
-│  UI: terminal renderer · markdown report · event subscribers │
+│  UI: terminal renderer · markdown/json reports               │
 ├──────────────────────────────────────────────────────────────┤
 │  Runtime: event bus · plugin lifecycle · config loader       │
 ├──────────────────────────────────────────────────────────────┤
@@ -53,7 +53,7 @@ Three-tier hierarchy: **Provider → Reviewer → Pipeline.** Personas hang off 
 ├──────────────────────────────────────────────────────────────┤
 │  Reviewers (Persona+Provider binding)   Consensus engine     │
 ├──────────────────────────────────────────────────────────────┤
-│  Provider adapters: openrouter · claude-code · (ollama …)    │
+│  Provider adapters: openrouter · claude-code · opencode · ollama │
 ├──────────────────────────────────────────────────────────────┤
 │  Core: types, schemas, pure logic — no I/O                   │
 └──────────────────────────────────────────────────────────────┘
@@ -314,7 +314,7 @@ export interface EventBus {
 }
 ```
 
-UI renderers and the markdown report writer are *both* event subscribers. They never call into the pipeline directly. This is the seam that future surfaces (web UI, JSON logs, OTel exporter) plug into.
+The terminal renderer subscribes to runtime events for live progress. Markdown and JSON reports render the final `PipelineResult`, keeping report generation deterministic and easy to test.
 
 ---
 
@@ -359,15 +359,22 @@ quorum/
 │   │   │   ├── index.ts
 │   │   │   ├── client.ts
 │   │   │   └── schema.ts
-│   │   └── claude-code/
-│   │       ├── index.ts
-│   │       └── schema.ts
+│   │   ├── claude-code/
+│   │   │   ├── index.ts
+│   │   │   └── schema.ts
+│   │   ├── opencode-go/
+│   │   │   ├── index.ts
+│   │   │   └── schema.ts
+│   │   ├── ollama/
+│   │   │   ├── index.ts
+│   │   │   ├── client.ts
+│   │   │   └── schema.ts
+│   │   └── subprocess.ts
 │   ├── reviewers/
 │   │   ├── reviewer.ts     # binding logic
 │   │   └── builtin/        # ships with security/performance/architecture personas
 │   ├── pipelines/
-│   │   ├── executor.ts
-│   │   └── parallel.ts
+│   │   └── executor.ts
 │   ├── consensus/
 │   │   ├── registry.ts
 │   │   └── overlap-v1.ts
@@ -381,14 +388,13 @@ quorum/
 │   │   └── workspace.ts
 │   ├── ui/
 │   │   ├── terminal.ts
-│   │   └── markdown.ts
+│   │   ├── markdown.ts
+│   │   └── json.ts
 │   └── cli/
 │       └── index.ts        # bun entrypoint; reused by Claude Code commands
 ├── tests/
 ├── docs/
-│   ├── ARCHITECTURE.md     # this doc
-│   ├── PROVIDERS.md        # provider-author guide
-│   └── adr/
+│   └── ARCHITECTURE.md     # this doc
 ├── quorum.yaml.example
 ├── bunfig.toml
 ├── package.json

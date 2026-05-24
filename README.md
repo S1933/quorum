@@ -138,10 +138,6 @@ pipelines:
 
 For a complete example with several reviewers, see [`quorum.yaml.example`](quorum.yaml.example).
 
-Use `model:` or reviewer `overrides.model` to pass `--model` to OpenCode. Use `command_style: run` for newer OpenCode CLIs that prefer `opencode run --model`.
-
-For Ollama, run `ollama serve` locally and set `type: ollama` with the local model name. Supported fields: `model`, `base_url`, `temperature`, `max_tokens`, `top_p`, and `keep_alive`.
-
 ## Use The CLI
 
 ```bash
@@ -214,25 +210,10 @@ flowchart LR
 
 ## Roadmap
 
-Current implementation status:
-
-- Shipped: Bun CLI with `review`, `config`, pipeline selection, base-ref selection, and Markdown report output
-- Shipped: provider adapters for OpenRouter, Claude Code, OpenCode Go, and Ollama
-- Shipped: YAML config validation, env interpolation, reviewer model overrides, and redacted config output
-- Shipped: parallel and sequential pipelines with timeout handling and partial-failure reporting
-- Shipped: `overlap-v1` consensus with file, line-range, category, and `requireAgreement` grouping
-- Shipped: terminal renderer, `.quorum/last-review.md`, Claude Code slash-command wrappers, and untracked-file diff support
-- Shipped: machine-readable JSON output for scripts, CI, and editor integrations
-
-Next:
-
 - Harden packaging and installation for the standalone `quorum` binary
 - Add a CI-native review command with predictable exit-code policy and PR annotation support
 - Improve provider diagnostics for missing binaries, bad credentials, malformed model output, and timeouts
 - Add compatibility checks against real Claude Code, OpenCode, Ollama, and OpenRouter versions
-
-Later:
-
 - Semantic deduplication beyond file and line overlap
 - Contradiction detection between reviewers
 - Per-reviewer trust, calibration, and weighted voting

@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .quorum/
+.claude/
 *.log
 .env
 .env.local
