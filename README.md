@@ -95,6 +95,10 @@ providers:
     api_key: env:OPENROUTER_API_KEY
     model: anthropic/claude-opus-4
 
+  claude-local:
+    type: claude-code
+    model: sonnet
+
   opencode-local:
     type: opencode-go
     command_style: prompt
@@ -109,10 +113,14 @@ reviewers:
     persona: security
     provider: openrouter-claude
 
+  sec-claude-local:
+    persona: security
+    provider: claude-local
+
 pipelines:
   default:
     parallel: true
-    reviewers: [sec-opus]
+    reviewers: [sec-opus, sec-claude-local]
     consensus:
       strategy: overlap-v1
 ```
