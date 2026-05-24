@@ -76,7 +76,7 @@ function printHelp(io: CliIo): void {
   io.stdout.write(`quorum — multi-model consensus reviewer
 
 Usage:
-  quorum review [pipeline-id] [--pipeline <id>] [--base <ref>] [--config <path>] [--report <path>] [--no-color]
+  quorum review [pipeline-id] [--pipeline <id>] [--base <ref>] [--config <path>] [--report <path>] [--no-color] [--no-preview]
   quorum config [--config <path>]
   quorum help
 
@@ -151,6 +151,7 @@ async function cmdReview(
   const renderer = new TerminalRenderer({
     stream: io.stdout,
     color: flags['no-color'] !== true,
+    showTokens: flags['no-preview'] !== true,
   });
   const detach = renderer.attach(runtime.bus);
 

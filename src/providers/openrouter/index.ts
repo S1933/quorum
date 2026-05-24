@@ -35,12 +35,20 @@ class OpenRouterProvider implements Provider {
       { role: 'user', content: task.instruction },
     ];
 
-    const res = await this.client.chat(
+    const chunks: string[] = [];
+    for await (const chunk of this.client.chatStream(
       reviewRequest(this.cfg, ctx, messages),
       ctx.signal,
-    );
+    )) {
+      chunks.push(chunk);
+      ctx.bus.emit({
+        type: 'reviewer.event',
+        reviewerId: task.reviewerId,
+        event: { type: 'token', text: chunk },
+      });
+    }
 
-    const raw = res.choices[0]?.message.content ?? '';
+    const raw = chunks.join('');
     const findings = parseFindings(raw, task.reviewerId);
 
     for (const finding of findings) {
@@ -51,26 +59,13 @@ class OpenRouterProvider implements Provider {
       });
     }
 
-    const usage = res.usage
-      ? { inputTokens: res.usage.prompt_tokens, outputTokens: res.usage.completion_tokens }
-      : undefined;
-
-    if (usage) {
-      ctx.bus.emit({
-        type: 'reviewer.event',
-        reviewerId: task.reviewerId,
-        event: { type: 'usage', inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
-      });
-    }
-
-    const base = {
+    return {
       taskId: task.id,
       reviewerId: task.reviewerId,
       findings,
       rawOutput: raw,
       durationMs: Date.now() - started,
     };
-    return usage ? { ...base, usage } : base;
   }
 
   async *stream(task: ReviewTask, ctx: ExecCtx) {

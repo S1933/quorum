@@ -69,6 +69,7 @@ describe('cli', () => {
     expect(runtime.lastPipelineId).toBe('default');
     expect(runtime.lastReviewerIds).toEqual(['fake-reviewer']);
     expect(io.stdoutText()).toContain('pipeline default');
+    expect(io.stdoutText()).toContain('[fake-reviewer] {"findings"');
     expect(io.stdoutText()).toContain(`report: ${reportPath}`);
 
     const report = await Bun.file(reportPath).text();
@@ -158,7 +159,12 @@ function reviewer(id: string): BoundReviewer {
     id,
     persona: { id: 'fake', description: 'Fake persona', system: 'Review.' },
     provider: fakeProvider(),
-    async run(task): Promise<ReviewResult> {
+    async run(task, ctx): Promise<ReviewResult> {
+      ctx.bus.emit({
+        type: 'reviewer.event',
+        reviewerId: id,
+        event: { type: 'token', text: '{"findings":[{"title":"Fake finding"}]}' },
+      });
       return {
         taskId: task.id,
         reviewerId: id,

@@ -28,6 +28,8 @@ export class TerminalRenderer {
   private readonly stream: WriteStreamLike;
   private readonly color: boolean;
   private readonly showTokens: boolean;
+  private readonly previews = new Map<string, string>();
+  private readonly lastPreviewAt = new Map<string, number>();
 
   constructor(opts: TerminalRendererOptions) {
     this.stream = opts.stream;
@@ -51,7 +53,7 @@ export class TerminalRenderer {
     unsubs.push(
       bus.on('reviewer.event', (e) => {
         if (e.event.type === 'token' && this.showTokens) {
-          this.stream.write(e.event.text);
+          this.renderPreview(e.reviewerId, e.event.text);
         } else if (e.event.type === 'finding') {
           this.line(`${this.c('dim', '   ·')} ${e.reviewerId}: ${this.severityIcon(e.event.finding.severity)} ${e.event.finding.title} ${this.c('dim', `(${e.event.finding.file}:${e.event.finding.lineRange.start})`)}`);
         } else if (e.event.type === 'log') {
@@ -128,6 +130,23 @@ export class TerminalRenderer {
       case 'low':      return this.c('cyan', '●');
       case 'info':     return this.c('gray', '·');
     }
+  }
+
+  private renderPreview(reviewerId: string, chunk: string): void {
+    const next = `${this.previews.get(reviewerId) ?? ''}${chunk}`;
+    this.previews.set(reviewerId, next);
+
+    const now = Date.now();
+    const last = this.lastPreviewAt.get(reviewerId) ?? 0;
+    if (now - last < 500 && next.length < 240) return;
+    this.lastPreviewAt.set(reviewerId, now);
+
+    const preview = next
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(-220);
+    if (!preview) return;
+    this.line(`${this.c('gray', `   [${reviewerId}]`)} ${preview}`);
   }
 
   private c(name: keyof typeof COLORS, text: string): string {

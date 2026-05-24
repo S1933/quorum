@@ -29,7 +29,7 @@ class ClaudeCodeProvider implements Provider {
     };
   }
 
-  private async runOnce(prompt: string, system: string | null, signal: AbortSignal): Promise<string> {
+  private async runOnce(prompt: string, system: string | null, ctx: ExecCtx): Promise<string> {
     const args = ['--print', '--model', this.cfg.model, ...this.cfg.extra_args];
     if (system) args.push('--append-system-prompt', system);
 
@@ -48,17 +48,17 @@ class ClaudeCodeProvider implements Provider {
     writer.end();
 
     const onAbort = () => proc.kill();
-    if (signal.aborted) {
+    if (ctx.signal.aborted) {
       proc.kill();
       throw new DOMException('Aborted', 'AbortError');
     }
-    signal.addEventListener('abort', onAbort, { once: true });
+    ctx.signal.addEventListener('abort', onAbort, { once: true });
 
     const timer = setTimeout(() => proc.kill(), this.cfg.timeout_ms);
 
     try {
       const [stdout, stderr, exitCode] = await Promise.all([
-        new Response(proc.stdout).text(),
+        readPreviewedStdout(proc.stdout, ctx),
         new Response(proc.stderr).text(),
         proc.exited,
       ]);
@@ -72,14 +72,14 @@ class ClaudeCodeProvider implements Provider {
       return stdout;
     } finally {
       clearTimeout(timer);
-      signal.removeEventListener('abort', onAbort);
+      ctx.signal.removeEventListener('abort', onAbort);
     }
   }
 
   async review(task: ReviewTask, ctx: ExecCtx): Promise<ReviewResult> {
     const started = Date.now();
     const system = `${task.systemPrompt}\n\n${REVIEW_OUTPUT_INSTRUCTIONS}`;
-    const raw = await this.runOnce(task.instruction, system, ctx.signal);
+    const raw = await this.runOnce(task.instruction, system, ctx);
     const findings = parseFindings(raw, task.reviewerId);
 
     for (const finding of findings) {
@@ -98,6 +98,25 @@ class ClaudeCodeProvider implements Provider {
       durationMs: Date.now() - started,
     };
   }
+}
+
+async function readPreviewedStdout(stream: ReadableStream<Uint8Array>, ctx: ExecCtx): Promise<string> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let out = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    out += chunk;
+    ctx.bus.emit({
+      type: 'reviewer.event',
+      reviewerId: ctx.reviewerId ?? 'unknown',
+      event: { type: 'token', text: chunk },
+    });
+  }
+  out += decoder.decode();
+  return out;
 }
 
 export const claudeCodeFactory: ProviderFactory = {
