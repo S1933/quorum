@@ -205,11 +205,30 @@ flowchart LR
 
 ## Roadmap
 
-- More provider adapters, including local model runtimes
+Current implementation status:
+
+- Shipped: Bun CLI with `review`, `config`, pipeline selection, base-ref selection, and Markdown report output
+- Shipped: provider adapters for OpenRouter, Claude Code, OpenCode Go, and Ollama
+- Shipped: YAML config validation, env interpolation, reviewer model overrides, and redacted config output
+- Shipped: parallel and sequential pipelines with timeout handling and partial-failure reporting
+- Shipped: `overlap-v1` consensus with file, line-range, category, and `requireAgreement` grouping
+- Shipped: terminal renderer, `.quorum/last-review.md`, Claude Code slash-command wrappers, and untracked-file diff support
+
+Next:
+
+- Harden packaging and installation for the standalone `quorum` binary
+- Add machine-readable JSON output for scripts, CI, and editor integrations
+- Add a CI-native review command with predictable exit-code policy and PR annotation support
+- Improve provider diagnostics for missing binaries, bad credentials, malformed model output, and timeouts
+- Add compatibility checks against real Claude Code, OpenCode, Ollama, and OpenRouter versions
+
+Later:
+
 - Semantic deduplication beyond file and line overlap
 - Contradiction detection between reviewers
-- Per-reviewer trust and calibration
-- CI-native review command
-- Web dashboard
+- Per-reviewer trust, calibration, and weighted voting
+- External provider plugin loading and a provider-author guide
+- Additional providers such as Codex CLI, Gemini CLI, Aider, Continue.dev, and LiteLLM
+- Review history, interactive triage, and a web dashboard
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deeper design notes.
