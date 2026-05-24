@@ -337,7 +337,7 @@ V1 distribution. Lives under `plugin/`.
 ## 11. Folder structure
 
 ```
-quorum-claude-code/
+quorum/
 ├── plugin/
 │   ├── .claude-plugin/
 │   │   └── plugin.json

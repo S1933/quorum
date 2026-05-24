@@ -14,7 +14,7 @@ afterAll(async () => {
 
 describe('claude-code provider', () => {
   test('streams stdout preview tokens while collecting review output', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'quorum-claude-code-'));
+    const root = await mkdtemp(join(tmpdir(), 'quorum-'));
     tmpRoots.push(root);
     const binary = join(root, 'claude');
     await Bun.write(binary, '#!/bin/sh\nprintf \'{"findings":\'\nsleep 0.01\nprintf \'[]}\'\n');

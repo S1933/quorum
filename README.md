@@ -1,6 +1,6 @@
 # Quorum
 
-[![CI](https://github.com/S1933/quorum-claude/actions/workflows/ci.yml/badge.svg)](https://github.com/S1933/quorum-claude/actions/workflows/ci.yml)
+[![CI](https://github.com/S1933/quorum/actions/workflows/ci.yml/badge.svg)](https://github.com/S1933/quorum/actions/workflows/ci.yml)
 [![Bun](https://img.shields.io/badge/runtime-Bun-000?logo=bun&logoColor=white)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Claude Code Plugin](https://img.shields.io/badge/Claude%20Code-plugin-6b46c1)](#claude-code-plugin)
@@ -74,8 +74,8 @@ flowchart TD
 ## Install
 
 ```bash
-git clone https://github.com/S1933/quorum-claude.git
-cd quorum-claude
+git clone https://github.com/S1933/quorum.git
+cd quorum
 bun install
 ```
 
@@ -171,7 +171,7 @@ In JSON mode, stdout contains only the JSON document. Pass `--report <path>` to 
 Install from the Claude Code plugin marketplace:
 
 ```bash
-claude plugin marketplace add S1933/quorum-claude
+claude plugin marketplace add S1933/quorum
 claude plugin install quorum@quorum-plugins
 ```
 
