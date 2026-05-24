@@ -14,6 +14,7 @@ export interface ChatRequest {
   top_p?: number;
   response_format?: { type: 'json_object' };
   stream?: boolean;
+  stream_options?: { include_usage?: boolean };
 }
 
 export interface ChatUsage {
@@ -33,6 +34,10 @@ export interface ChatResponse {
   choices: ChatChoice[];
   usage?: ChatUsage;
 }
+
+export type ChatStreamEvent =
+  | { type: 'token'; text: string }
+  | { type: 'usage'; usage: ChatUsage };
 
 export class OpenRouterClient {
   constructor(
@@ -77,7 +82,7 @@ export class OpenRouterClient {
     }
   }
 
-  async *chatStream(req: ChatRequest, signal: AbortSignal): AsyncIterable<string> {
+  async *chatStream(req: ChatRequest, signal: AbortSignal): AsyncIterable<ChatStreamEvent> {
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.cfg.api_key}`,
       'Content-Type': 'application/json',
@@ -117,9 +122,13 @@ export class OpenRouterClient {
         const payload = trimmed.slice(5).trim();
         if (payload === '[DONE]') return;
         try {
-          const parsed = JSON.parse(payload) as { choices?: Array<{ delta?: { content?: string } }> };
+          const parsed = JSON.parse(payload) as {
+            choices?: Array<{ delta?: { content?: string } }>;
+            usage?: ChatUsage | null;
+          };
           const delta = parsed.choices?.[0]?.delta?.content;
-          if (delta) yield delta;
+          if (delta) yield { type: 'token', text: delta };
+          if (parsed.usage) yield { type: 'usage', usage: parsed.usage };
         } catch {
           // ignore malformed chunks
         }

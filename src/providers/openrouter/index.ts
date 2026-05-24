@@ -1,5 +1,5 @@
 import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provider.ts';
-import type { ReviewTask, ReviewResult } from '../../core/task.ts';
+import type { ReviewTask, ReviewResult, UsageInfo } from '../../core/task.ts';
 import type { ProviderFactory } from '../registry.ts';
 import { ProviderRuntimeError } from '../../core/errors.ts';
 import { OpenRouterConfigSchema, type OpenRouterConfig } from './schema.ts';
@@ -36,16 +36,29 @@ class OpenRouterProvider implements Provider {
     ];
 
     const chunks: string[] = [];
-    for await (const chunk of this.client.chatStream(
+    let usage: UsageInfo | undefined;
+    for await (const event of this.client.chatStream(
       reviewRequest(this.cfg, ctx, messages),
       ctx.signal,
     )) {
-      chunks.push(chunk);
-      ctx.bus.emit({
-        type: 'reviewer.event',
-        reviewerId: task.reviewerId,
-        event: { type: 'token', text: chunk },
-      });
+      if (event.type === 'token') {
+        chunks.push(event.text);
+        ctx.bus.emit({
+          type: 'reviewer.event',
+          reviewerId: task.reviewerId,
+          event: { type: 'token', text: event.text },
+        });
+      } else {
+        usage = {
+          inputTokens: event.usage.prompt_tokens,
+          outputTokens: event.usage.completion_tokens,
+        };
+        ctx.bus.emit({
+          type: 'reviewer.event',
+          reviewerId: task.reviewerId,
+          event: { type: 'usage', inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+        });
+      }
     }
 
     const raw = chunks.join('');
@@ -59,13 +72,14 @@ class OpenRouterProvider implements Provider {
       });
     }
 
-    return {
+    const result = {
       taskId: task.id,
       reviewerId: task.reviewerId,
       findings,
       rawOutput: raw,
       durationMs: Date.now() - started,
     };
+    return usage ? { ...result, usage } : result;
   }
 
   async *stream(task: ReviewTask, ctx: ExecCtx) {
@@ -75,11 +89,11 @@ class OpenRouterProvider implements Provider {
     ];
 
     try {
-      for await (const chunk of this.client.chatStream(
+      for await (const event of this.client.chatStream(
         chatRequest(this.cfg, ctx, messages),
         ctx.signal,
       )) {
-        yield { type: 'token' as const, text: chunk };
+        if (event.type === 'token') yield { type: 'token' as const, text: event.text };
       }
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
@@ -114,6 +128,7 @@ function reviewRequest(
   return {
     ...chatRequest(cfg, ctx, messages),
     response_format: { type: 'json_object' },
+    stream_options: { include_usage: true },
   };
 }
 
