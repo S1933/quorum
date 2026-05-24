@@ -61,6 +61,7 @@ flowchart TD
 - YAML config with `env:VAR` and `${VAR}` secret interpolation
 - Consensus grouping by file, line range, and category
 - Terminal output and Markdown report rendering
+- Machine-readable JSON output for scripts, CI, and editor integrations
 - Claude Code slash commands
 
 ## Requirements
@@ -155,7 +156,15 @@ bun quorum review --pipeline consensus-security
 
 # Print loaded config with secrets redacted
 bun quorum config
+
+# Print a clean JSON review report to stdout
+bun quorum review --json
+
+# Equivalent explicit format flag
+bun quorum review --format json
 ```
+
+In JSON mode, stdout contains only the JSON document. Pass `--report <path>` if you also want a Markdown report file.
 
 ## Claude Code Plugin
 
@@ -213,11 +222,11 @@ Current implementation status:
 - Shipped: parallel and sequential pipelines with timeout handling and partial-failure reporting
 - Shipped: `overlap-v1` consensus with file, line-range, category, and `requireAgreement` grouping
 - Shipped: terminal renderer, `.quorum/last-review.md`, Claude Code slash-command wrappers, and untracked-file diff support
+- Shipped: machine-readable JSON output for scripts, CI, and editor integrations
 
 Next:
 
 - Harden packaging and installation for the standalone `quorum` binary
-- Add machine-readable JSON output for scripts, CI, and editor integrations
 - Add a CI-native review command with predictable exit-code policy and PR annotation support
 - Improve provider diagnostics for missing binaries, bad credentials, malformed model output, and timeouts
 - Add compatibility checks against real Claude Code, OpenCode, Ollama, and OpenRouter versions

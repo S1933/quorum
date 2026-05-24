@@ -8,6 +8,7 @@ import { probeWorkspace, inferRepoRoot } from '../runtime/workspace.ts';
 import { PipelineExecutor } from '../pipelines/executor.ts';
 import { TerminalRenderer } from '../ui/terminal.ts';
 import { renderMarkdownReport } from '../ui/markdown.ts';
+import { renderJsonReport } from '../ui/json.ts';
 import { QuorumError, ConfigError } from '../core/errors.ts';
 import type { WorkspaceInfo } from '../core/task.ts';
 import type { WriteStreamLike } from '../ui/terminal.ts';
@@ -76,7 +77,7 @@ function printHelp(io: CliIo): void {
   io.stdout.write(`quorum — multi-model consensus reviewer
 
 Usage:
-  quorum review [pipeline-id] [--pipeline <id>] [--base <ref>] [--config <path>] [--report <path>] [--no-color] [--no-preview]
+  quorum review [pipeline-id] [--pipeline <id>] [--base <ref>] [--config <path>] [--report <path>] [--format text|json] [--json] [--no-color] [--no-preview]
   quorum config [--config <path>]
   quorum help
 
@@ -127,6 +128,7 @@ async function cmdReview(
   }
   const configPath = typeof flags.config === 'string' ? flags.config : deps.findConfigPath();
   const config = await deps.loadConfigFromPath(configPath);
+  const format = reviewOutputFormat(flags);
   const pipelineId =
     (typeof flags.pipeline === 'string' && flags.pipeline) || positional[0] || config.defaults?.pipeline;
   if (!pipelineId) throw new ConfigError('No pipeline specified and no defaults.pipeline configured');
@@ -148,12 +150,14 @@ async function cmdReview(
   const pipeline = runtime.resolvePipeline(pipelineId);
   const reviewers = await runtime.resolveReviewers(pipeline.reviewers);
 
-  const renderer = new TerminalRenderer({
-    stream: io.stdout,
-    color: flags['no-color'] !== true,
-    showTokens: flags['no-preview'] !== true,
-  });
-  const detach = renderer.attach(runtime.bus);
+  const detach =
+    format === 'text'
+      ? new TerminalRenderer({
+          stream: io.stdout,
+          color: flags['no-color'] !== true,
+          showTokens: flags['no-preview'] !== true,
+        }).attach(runtime.bus)
+      : () => undefined;
 
   const executor = new PipelineExecutor();
   const instruction = buildReviewInstruction(workspace.diff, workspace.files ?? []);
@@ -169,9 +173,16 @@ async function cmdReview(
       consensus: runtime.consensus,
     });
 
-    const reportPath = typeof flags.report === 'string' ? flags.report : `${root}/.quorum/last-review.md`;
-    await writeReport(reportPath, renderMarkdownReport(result));
-    io.stdout.write(`\nreport: ${reportPath}\n`);
+    if (format === 'json') {
+      if (typeof flags.report === 'string') {
+        await writeReport(flags.report, renderMarkdownReport(result));
+      }
+      io.stdout.write(renderJsonReport(result));
+    } else {
+      const reportPath = typeof flags.report === 'string' ? flags.report : `${root}/.quorum/last-review.md`;
+      await writeReport(reportPath, renderMarkdownReport(result));
+      io.stdout.write(`\nreport: ${reportPath}\n`);
+    }
     return result.errors.length > 0 && result.reviews.length === 0 ? 1 : 0;
   } finally {
     detach();
@@ -217,6 +228,13 @@ function isSensitiveKey(key: string): boolean {
     k === 'password' ||
     k.endsWith('_password')
   );
+}
+
+function reviewOutputFormat(flags: Record<string, string | boolean>): 'text' | 'json' {
+  if (flags.json === true) return 'json';
+  if (flags.format === undefined) return 'text';
+  if (flags.format === 'text' || flags.format === 'json') return flags.format;
+  throw new ConfigError(`Unsupported review format "${String(flags.format)}"; expected "text" or "json"`);
 }
 
 function buildReviewInstruction(diff: string, files: string[]): string {

@@ -76,6 +76,45 @@ describe('cli', () => {
     expect(report).toContain('# Quorum review — default');
     expect(report).toContain('Fake finding');
   });
+
+  test('review prints machine-readable JSON without terminal progress output', async () => {
+    const io = captureIo();
+    const runtime = fakeRuntime();
+
+    const code = await main(
+      ['review', '--config', '/repo/quorum.yaml', '--json'],
+      deps({
+        loadConfigFromPath: async () => config(),
+        inferRepoRoot: async () => '/repo',
+        probeWorkspace: async () => ({
+          root: '/repo',
+          baseRef: 'main',
+          diff: 'diff --git a/src/app.ts b/src/app.ts\n+++ b/src/app.ts\n@@ -1 +1,2 @@\n+change',
+          files: ['src/app.ts'],
+        }),
+        createRuntime: async () => runtime,
+        now: () => 123,
+      }),
+      io,
+    );
+
+    expect(code).toBe(0);
+    const printed = JSON.parse(io.stdoutText());
+    expect(printed.schemaVersion).toBe(1);
+    expect(printed.pipeline).toEqual({
+      id: 'default',
+      durationMs: expect.any(Number),
+      reviewCount: 1,
+      errorCount: 0,
+    });
+    expect(printed.reviews[0].reviewerId).toBe('fake-reviewer');
+    expect(printed.reviews[0].findings[0].title).toBe('Fake finding');
+    expect(printed.consensus.unique[0].file).toBe('src/app.ts');
+    expect(printed.errors).toEqual([]);
+    expect(io.stdoutText()).not.toContain('pipeline default');
+    expect(io.stdoutText()).not.toContain('report:');
+    expect(io.stderrText()).toBe('');
+  });
 });
 
 function config(): QuorumConfig {
