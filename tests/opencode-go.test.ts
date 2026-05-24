@@ -8,16 +8,6 @@ import { openCodeGoFactory } from '../src/providers/opencode-go/index.ts';
 
 const tmpRoots: string[] = [];
 
-const bus: EventBus = {
-  emit() {},
-  on() {
-    return () => {};
-  },
-  onAny() {
-    return () => {};
-  },
-};
-
 afterAll(async () => {
   await Promise.all(tmpRoots.map((root) => rm(root, { recursive: true, force: true })));
 });
@@ -27,8 +17,10 @@ describe('opencode-go provider', () => {
     const root = await mkdtemp(join(tmpdir(), 'quorum-opencode-'));
     tmpRoots.push(root);
     const binary = join(root, 'opencode');
-    await Bun.write(binary, '#!/bin/sh\nprintf \'{"findings":[]}\'\n');
+    await Bun.write(binary, '#!/bin/sh\nprintf \'{"findings":\'\nsleep 0.01\nprintf \'[]}\'\n');
     await chmod(binary, 0o755);
+    const events: unknown[] = [];
+    const bus = captureBus(events);
 
     const provider = await openCodeGoFactory.create(
       'opencode-local',
@@ -61,6 +53,7 @@ describe('opencode-go provider', () => {
 
     expect(result.findings).toEqual([]);
     expect(result.rawOutput).toBe('{"findings":[]}');
+    expect(tokenText(events)).toBe('{"findings":[]}');
   });
 
   test('passes model overrides to the prompt-style CLI', async () => {
@@ -95,7 +88,7 @@ describe('opencode-go provider', () => {
     };
 
     await provider.review!(task, {
-      bus,
+      bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
       modelOverride: { model: 'anthropic/claude-sonnet-4' },
@@ -136,9 +129,31 @@ describe('opencode-go provider', () => {
     };
 
     await expect(provider.review!(task, {
-      bus,
+      bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
     })).rejects.toThrow('opencode timed out after 10ms');
   });
 });
+
+function captureBus(events: unknown[] = []): EventBus {
+  return {
+    emit(e) {
+      events.push(e);
+    },
+    on() {
+      return () => {};
+    },
+    onAny() {
+      return () => {};
+    },
+  };
+}
+
+function tokenText(events: unknown[]): string {
+  return events
+    .map((event) => event as { event?: { type?: string; text?: string } })
+    .filter((event) => event.event?.type === 'token')
+    .map((event) => event.event?.text ?? '')
+    .join('');
+}
