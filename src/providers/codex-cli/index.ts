@@ -65,11 +65,11 @@ class CodexCliProvider implements Provider {
     writer.end();
 
     const onAbort = () => proc.kill();
+    ctx.signal.addEventListener('abort', onAbort, { once: true });
     if (ctx.signal.aborted) {
-      proc.kill();
+      onAbort();
       throw new DOMException('Aborted', 'AbortError');
     }
-    ctx.signal.addEventListener('abort', onAbort, { once: true });
 
     let timedOut = false;
     const timer = setTimeout(() => {

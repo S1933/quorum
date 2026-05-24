@@ -28,6 +28,8 @@ describe('codex-cli provider', () => {
         type: 'codex-cli',
         binary,
         model: 'gpt-5-codex',
+        sandbox: 'read-only',
+        approval_policy: 'never',
         extra_args: [],
         timeout_ms: 5_000,
       },
@@ -103,6 +105,61 @@ describe('codex-cli provider', () => {
     });
 
     expect(runtime.providers.list()).toContain('codex-cli');
+  });
+
+  test('rejects unsafe codex extra args', async () => {
+    const runtime = await createRuntime({
+      config: {
+        version: 1,
+        providers: {
+          'codex-local': {
+            type: 'codex-cli',
+            extra_args: ['--add-dir', '/tmp'],
+          },
+        },
+        personas: {
+          security: { description: 'Security', system: 'Review security.' },
+        },
+        reviewers: {
+          sec: { persona: 'security', provider: 'codex-local' },
+        },
+        pipelines: {
+          default: { parallel: true, reviewers: ['sec'] },
+        },
+      },
+      pluginCtx: { workspaceRoot: '.', env: {} },
+    });
+
+    await expect(runtime.resolveProvider('codex-local')).rejects.toThrow('Invalid enum value');
+  });
+
+  test('rejects full host access without approvals', async () => {
+    const runtime = await createRuntime({
+      config: {
+        version: 1,
+        providers: {
+          'codex-local': {
+            type: 'codex-cli',
+            sandbox: 'danger-full-access',
+            approval_policy: 'never',
+          },
+        },
+        personas: {
+          security: { description: 'Security', system: 'Review security.' },
+        },
+        reviewers: {
+          sec: { persona: 'security', provider: 'codex-local' },
+        },
+        pipelines: {
+          default: { parallel: true, reviewers: ['sec'] },
+        },
+      },
+      pluginCtx: { workspaceRoot: '.', env: {} },
+    });
+
+    await expect(runtime.resolveProvider('codex-local')).rejects.toThrow(
+      'danger-full-access requires approval_policy other than never',
+    );
   });
 });
 
