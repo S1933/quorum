@@ -164,7 +164,7 @@ bun quorum review --json
 bun quorum review --format json
 ```
 
-In JSON mode, stdout contains only the JSON document. Pass `--report <path>` if you also want a Markdown report file.
+In JSON mode, stdout contains only the JSON document. Pass `--report <path>` to write the same JSON document to a file.
 
 ## Claude Code Plugin
 

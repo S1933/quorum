@@ -115,6 +115,36 @@ describe('cli', () => {
     expect(io.stdoutText()).not.toContain('report:');
     expect(io.stderrText()).toBe('');
   });
+
+  test('review writes JSON to report path when JSON output is selected', async () => {
+    const io = captureIo();
+    const tmp = await mkdtemp(join(tmpdir(), 'quorum-cli-json-test-'));
+    const reportPath = join(tmp, 'review.json');
+
+    const code = await main(
+      ['review', '--config', '/repo/quorum.yaml', '--json', '--report', reportPath],
+      deps({
+        loadConfigFromPath: async () => config(),
+        inferRepoRoot: async () => '/repo',
+        probeWorkspace: async () => ({
+          root: '/repo',
+          baseRef: 'main',
+          diff: 'diff --git a/src/app.ts b/src/app.ts\n+++ b/src/app.ts\n@@ -1 +1,2 @@\n+change',
+          files: ['src/app.ts'],
+        }),
+        createRuntime: async () => fakeRuntime(),
+        now: () => 123,
+      }),
+      io,
+    );
+
+    expect(code).toBe(0);
+    const stdoutJson = JSON.parse(io.stdoutText());
+    const reportJson = JSON.parse(await Bun.file(reportPath).text());
+    expect(reportJson).toEqual(stdoutJson);
+    expect(reportJson.schemaVersion).toBe(1);
+    expect(reportJson.reviews[0].findings[0].title).toBe('Fake finding');
+  });
 });
 
 function config(): QuorumConfig {

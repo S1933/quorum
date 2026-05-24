@@ -174,10 +174,11 @@ async function cmdReview(
     });
 
     if (format === 'json') {
+      const json = renderJsonReport(result);
       if (typeof flags.report === 'string') {
-        await writeReport(flags.report, renderMarkdownReport(result));
+        await writeReport(flags.report, json);
       }
-      io.stdout.write(renderJsonReport(result));
+      io.stdout.write(json);
     } else {
       const reportPath = typeof flags.report === 'string' ? flags.report : `${root}/.quorum/last-review.md`;
       await writeReport(reportPath, renderMarkdownReport(result));
