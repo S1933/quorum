@@ -55,7 +55,7 @@ flowchart TD
 
 ## Features
 
-- Provider adapters: OpenRouter and local Claude Code
+- Provider adapters: OpenRouter, local Claude Code, and OpenCode Go
 - Portable personas independent from provider choice
 - Parallel or sequential review pipelines
 - YAML config with `env:VAR` and `${VAR}` secret interpolation
@@ -95,6 +95,10 @@ providers:
     api_key: env:OPENROUTER_API_KEY
     model: anthropic/claude-opus-4
 
+  opencode-local:
+    type: opencode-go
+    command_style: prompt
+
 personas:
   security:
     description: Security review
@@ -114,6 +118,8 @@ pipelines:
 ```
 
 For a complete example with several reviewers, see [`quorum.yaml.example`](quorum.yaml.example).
+
+Use `model:` or reviewer `overrides.model` to pass `--model` to OpenCode. Use `command_style: run` for newer OpenCode CLIs that prefer `opencode run --model`.
 
 ## Use The CLI
 
@@ -186,7 +192,7 @@ src/
   consensus/    overlap-v1 strategy
   core/         pure domain types and contracts
   pipelines/    review execution
-  providers/    OpenRouter and Claude Code adapters
+  providers/    OpenRouter, Claude Code, and OpenCode Go adapters
   reviewers/    persona/provider binding
   runtime/      event bus, plugin lifecycle, workspace probing
   ui/           terminal and Markdown output

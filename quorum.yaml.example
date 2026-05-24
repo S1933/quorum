@@ -20,6 +20,10 @@ providers:
     type: claude-code
     model: claude-opus-4-7
 
+  opencode-local:
+    type: opencode-go
+    command_style: prompt
+
 personas:
   security:
     description: Adversarial security review
@@ -44,6 +48,7 @@ reviewers:
   sec-gpt:   { persona: security,     provider: openrouter-gpt }
   perf-opus: { persona: performance,  provider: openrouter-claude }
   arch-opus: { persona: architecture, provider: openrouter-claude }
+  sec-open:  { persona: security,     provider: opencode-local }
 
 pipelines:
   default:
