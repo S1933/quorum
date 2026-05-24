@@ -30,8 +30,30 @@ class OllamaProvider implements Provider {
 
   async review(task: ReviewTask, ctx: ExecCtx): Promise<ReviewResult> {
     const started = Date.now();
-    const res = await this.client.chat(reviewRequest(this.cfg, ctx, messagesFor(task)), ctx.signal);
-    const raw = res.message?.content?.trim() ?? '';
+    const chunks: string[] = [];
+    let usage: UsageInfo | undefined;
+    for await (const event of this.client.chatStream(reviewRequest(this.cfg, ctx, messagesFor(task)), ctx.signal)) {
+      if (event.type === 'token') {
+        chunks.push(event.text);
+        ctx.bus.emit({
+          type: 'reviewer.event',
+          reviewerId: task.reviewerId,
+          event: { type: 'token', text: event.text },
+        });
+      } else {
+        usage = {
+          inputTokens: event.prompt_eval_count,
+          outputTokens: event.eval_count,
+        };
+        ctx.bus.emit({
+          type: 'reviewer.event',
+          reviewerId: task.reviewerId,
+          event: { type: 'usage', inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+        });
+      }
+    }
+
+    const raw = chunks.join('').trim();
     if (!raw) {
       throw new ProviderRuntimeError(this.id, 'Ollama returned no message content');
     }
@@ -45,7 +67,6 @@ class OllamaProvider implements Provider {
       });
     }
 
-    const usage = toUsage(res);
     const result = {
       taskId: task.id,
       reviewerId: task.reviewerId,
@@ -118,16 +139,6 @@ function toOptions(cfg: OllamaConfig, ctx: ExecCtx): NonNullable<OllamaChatReque
   if (maxTokens !== undefined) options.num_predict = maxTokens;
   if (topP !== undefined) options.top_p = topP;
   return options;
-}
-
-function toUsage(res: { prompt_eval_count?: number; eval_count?: number }): UsageInfo | undefined {
-  if (typeof res.prompt_eval_count !== 'number' || typeof res.eval_count !== 'number') {
-    return undefined;
-  }
-  return {
-    inputTokens: res.prompt_eval_count,
-    outputTokens: res.eval_count,
-  };
 }
 
 export const ollamaFactory: ProviderFactory = {

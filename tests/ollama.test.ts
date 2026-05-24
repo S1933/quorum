@@ -6,16 +6,6 @@ import { createRuntime } from '../src/runtime/runtime.ts';
 
 const originalFetch = globalThis.fetch;
 
-const bus: EventBus = {
-  emit() {},
-  on() {
-    return () => {};
-  },
-  onAny() {
-    return () => {};
-  },
-};
-
 afterEach(() => {
   globalThis.fetch = originalFetch;
 });
@@ -25,12 +15,14 @@ describe('ollama provider', () => {
     let requestBody: unknown;
     globalThis.fetch = (async (_input, init) => {
       requestBody = JSON.parse(String(init?.body));
-      return Response.json({
-        message: { role: 'assistant', content: '{"findings":[]}' },
-        prompt_eval_count: 7,
-        eval_count: 2,
-      });
+      return streamResponse([
+        { message: { role: 'assistant', content: '{"findings":' }, done: false },
+        { message: { role: 'assistant', content: '[]}' }, done: false },
+        { done: true, prompt_eval_count: 7, eval_count: 2 },
+      ]);
     }) as typeof fetch;
+    const events: unknown[] = [];
+    const bus = captureBus(events);
 
     const provider = await ollamaFactory.create(
       'ollama-local',
@@ -64,7 +56,7 @@ describe('ollama provider', () => {
     expect(requestBody).toMatchObject({
       model: 'llama3.1',
       format: 'json',
-      stream: false,
+      stream: true,
       keep_alive: '5m',
       options: {
         temperature: 0.2,
@@ -75,13 +67,23 @@ describe('ollama provider', () => {
     expect(result.findings).toEqual([]);
     expect(result.rawOutput).toBe('{"findings":[]}');
     expect(result.usage).toEqual({ inputTokens: 7, outputTokens: 2 });
+    expect(events).toContainEqual({
+      type: 'reviewer.event',
+      reviewerId: 'security-ollama',
+      event: { type: 'token', text: '{"findings":' },
+    });
+    expect(events).toContainEqual({
+      type: 'reviewer.event',
+      reviewerId: 'security-ollama',
+      event: { type: 'token', text: '[]}' },
+    });
   });
 
   test('model overrides replace configured model and sampling options', async () => {
     let requestBody: unknown;
     globalThis.fetch = (async (_input, init) => {
       requestBody = JSON.parse(String(init?.body));
-      return Response.json({ message: { content: '{"findings":[]}' } });
+      return streamResponse([{ message: { content: '{"findings":[]}' }, done: true }]);
     }) as typeof fetch;
 
     const provider = await ollamaFactory.create(
@@ -105,7 +107,7 @@ describe('ollama provider', () => {
         workspace: { root: '/tmp/quorum' },
       },
       {
-        bus,
+        bus: captureBus(),
         signal: new AbortController().signal,
         workspace: { root: '/tmp/quorum' },
         modelOverride: { model: 'qwen2.5-coder', temperature: 0.1, maxTokens: 256 },
@@ -114,6 +116,7 @@ describe('ollama provider', () => {
 
     expect(requestBody).toMatchObject({
       model: 'qwen2.5-coder',
+      stream: true,
       options: {
         temperature: 0.1,
         num_predict: 256,
@@ -158,3 +161,32 @@ describe('ollama provider', () => {
     await runtime.dispose();
   });
 });
+
+function captureBus(events: unknown[] = []): EventBus {
+  return {
+    emit(e) {
+      events.push(e);
+    },
+    on() {
+      return () => {};
+    },
+    onAny() {
+      return () => {};
+    },
+  };
+}
+
+function streamResponse(lines: unknown[]): Response {
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        const enc = new TextEncoder();
+        for (const line of lines) {
+          controller.enqueue(enc.encode(`${JSON.stringify(line)}\n`));
+        }
+        controller.close();
+      },
+    }),
+    { status: 200 },
+  );
+}

@@ -2,6 +2,7 @@
 name: quorum-review
 description: Run the configured Quorum review pipeline against the current diff and render the consensus report.
 argument-hint: "[pipeline-id] [--base <ref>]"
+allowed-tools: Bash(git rev-parse:*), Bash(command -v:*), Bash(test:*), Bash(bun run:*), Bash(quorum review:*), Bash(cat:*)
 ---
 
 Run the Quorum CLI against the user's current project configuration.
@@ -19,8 +20,12 @@ Steps:
 4. Invoke:
    - `bun run "$QUORUM_CLI" review $ARGUMENTS --config "$TARGET_ROOT/quorum.yaml"` when using a `.ts` CLI path.
    - `quorum review $ARGUMENTS --config "$TARGET_ROOT/quorum.yaml"` when using the installed binary.
-5. Stream stdout/stderr from the CLI as it runs. Do not paraphrase - let the terminal renderer write directly.
-6. When the run completes, surface the report path (`.quorum/last-review.md`).
+5. Run the CLI in a single Bash command so stdout/stderr are captured together.
+6. Do not summarize, classify, rewrite, or paraphrase the findings.
+7. Final response format:
+   - First, a fenced `text` block containing the exact CLI stdout/stderr.
+   - Then, if `.quorum/last-review.md` exists, a `## Report` heading followed by the exact report markdown.
+   - No extra success banner, no "Summary", no rewritten "Critical issues" section.
 
 Failure modes to surface:
 - Missing `quorum.yaml`: tell the user where to put it, point at `quorum.yaml.example`.
