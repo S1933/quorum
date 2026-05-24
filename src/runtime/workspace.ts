@@ -37,7 +37,9 @@ async function refExists(root: string, ref: string): Promise<boolean> {
 
 async function gitDiff(root: string, baseRef: string | undefined): Promise<string | undefined> {
   if (baseRef) {
-    const branchDiff = await runGitDiff(root, ['diff', baseRef]);
+    const mergeBase = await getMergeBase(root, baseRef);
+    if (!mergeBase) return undefined;
+    const branchDiff = await runGitDiff(root, ['diff', mergeBase]);
     return branchDiff === null ? undefined : branchDiff || undefined;
   }
 
@@ -51,6 +53,17 @@ async function gitDiff(root: string, baseRef: string | undefined): Promise<strin
   if (worktreeDiff) chunks.push(worktreeDiff);
 
   return chunks.length > 0 ? chunks.join('\n') : undefined;
+}
+
+async function getMergeBase(root: string, baseRef: string): Promise<string | undefined> {
+  const proc = Bun.spawn({
+    cmd: ['git', 'merge-base', baseRef, 'HEAD'],
+    cwd: root,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+  return code === 0 ? out.trim() : undefined;
 }
 
 async function runGitDiff(root: string, args: string[]): Promise<string | null> {
