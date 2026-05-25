@@ -36,14 +36,17 @@ class CodexCliProvider implements Provider {
       'exec',
       '--sandbox',
       this.cfg.sandbox,
-      '--ask-for-approval',
-      this.cfg.approval_policy,
       '--color',
       'never',
       '-C',
       cwd,
       ...this.cfg.extra_args,
     ];
+
+    // Codex ≥ 0.133.0 removed --ask-for-approval; use the bypass flag for non-interactive runs
+    if (this.cfg.approval_policy === 'never') {
+      args.push('--dangerously-bypass-approvals-and-sandbox');
+    }
 
     if (model) args.push('--model', model);
     args.push('-');
