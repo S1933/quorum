@@ -272,9 +272,6 @@ async function cmdInit(
     return 0;
   }
 
-  const providers = await promptInitProviders(flags, deps, io);
-  const personas = await promptInitPersonas(flags, deps, io);
-  const model = await promptInitModel(flags, providers, deps, io);
   const root = await deps.inferRepoRoot();
   const configPath = resolveConfigPath(root, flags.config, deps);
   assertPathInside(root, configPath);
@@ -284,6 +281,10 @@ async function cmdInit(
       throw new ConfigError(`Config file already exists: ${configPath}. Pass --force to overwrite.`);
     }
   }
+
+  const providers = await promptInitProviders(flags, deps, io);
+  const personas = await promptInitPersonas(flags, deps, io);
+  const model = await promptInitModel(flags, providers, deps, io);
 
   const initOpts: InitConfigOptions = {};
   if (providers) initOpts.providers = providers;
