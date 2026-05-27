@@ -60,7 +60,11 @@ class ClaudeCodeProvider implements Provider {
     }
     ctx.signal.addEventListener('abort', onAbort, { once: true });
 
-    const timer = setTimeout(() => proc.kill(), this.cfg.timeout_ms);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      proc.kill();
+    }, this.cfg.timeout_ms);
 
     try {
       const [stdout, stderr, exitCode] = await Promise.all([
@@ -76,6 +80,13 @@ class ClaudeCodeProvider implements Provider {
         new Response(proc.stderr).text(),
         proc.exited,
       ]);
+
+      if (timedOut) {
+        throw new ProviderRuntimeError(
+          this.id,
+          `claude timed out after ${this.cfg.timeout_ms}ms`,
+        );
+      }
 
       if (exitCode !== 0) {
         throw new ProviderRuntimeError(

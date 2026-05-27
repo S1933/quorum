@@ -71,6 +71,34 @@ describe('claude-code provider', () => {
 
     await expect(runtime.resolveProvider('claude-local')).rejects.toThrow('extra_args.0');
   });
+
+  test('classifies timeouts distinctly from exit-code failures', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'quorum-'));
+    tmpRoots.push(root);
+    const binary = join(root, 'claude');
+    await Bun.write(binary, '#!/bin/sh\nsleep 3\nexit 0\n');
+    await chmod(binary, 0o755);
+
+    const provider = await claudeCodeFactory.create(
+      'claude-local',
+      {
+        type: 'claude-code',
+        model: 'sonnet',
+        binary,
+        extra_args: [],
+        timeout_ms: 100,
+      },
+      { workspaceRoot: root, env: {} },
+    );
+
+    await expect(
+      provider.review!(task(root), {
+        bus: { emit() {}, on() { return () => {}; }, onAny() { return () => {}; } },
+        signal: new AbortController().signal,
+        workspace: { root },
+      }),
+    ).rejects.toThrow(/timed out/);
+  });
 });
 
 function task(root: string): ReviewTask {
