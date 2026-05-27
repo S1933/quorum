@@ -8,6 +8,7 @@ import { readPreviewedStdout } from '../subprocess.ts';
 import { OpenCodeGoConfigSchema, type OpenCodeGoConfig } from './schema.ts';
 
 const PROVIDER_TYPE = 'opencode-go';
+const STDIN_PROMPT = 'Read the review instructions from stdin and return only the requested output.';
 
 class OpenCodeGoProvider implements Provider {
   readonly kind = 'subprocess' as const;
@@ -30,18 +31,18 @@ class OpenCodeGoProvider implements Provider {
     };
   }
 
-  private args(prompt: string, ctx: ExecCtx): string[] {
+  private args(ctx: ExecCtx): string[] {
     const model = ctx.modelOverride?.model ?? this.cfg.model;
     const args =
       this.cfg.command_style === 'run'
         ? ['run', ...this.cfg.extra_args]
-        : ['-p', prompt, ...this.cfg.extra_args];
+        : ['-p', STDIN_PROMPT, ...this.cfg.extra_args];
 
     if (this.cfg.command_style === 'run') {
       if (model) args.push('--model', model);
       if (this.cfg.output_format === 'json') args.push('--format', 'json');
       if (this.cfg.quiet) args.push('--log-level', 'ERROR');
-      args.push(prompt);
+      args.push(STDIN_PROMPT);
       return args;
     }
 
@@ -54,11 +55,16 @@ class OpenCodeGoProvider implements Provider {
   private async runOnce(prompt: string, ctx: ExecCtx, reviewerId: string): Promise<string> {
     const cwd = this.cfg.cwd ?? this.pluginCtx.workspaceRoot;
     const proc = Bun.spawn({
-      cmd: [this.cfg.binary, ...this.args(prompt, ctx)],
+      cmd: [this.cfg.binary, ...this.args(ctx)],
       cwd,
+      stdin: 'pipe',
       stdout: 'pipe',
       stderr: 'pipe',
     });
+
+    const writer = proc.stdin as unknown as { write: (s: string) => void; end: () => void };
+    writer.write(prompt);
+    writer.end();
 
     const onAbort = () => proc.kill();
     if (ctx.signal.aborted) {

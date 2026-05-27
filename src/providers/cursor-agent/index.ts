@@ -8,6 +8,7 @@ import { readPreviewedStdout } from '../subprocess.ts';
 import { CursorAgentConfigSchema, type CursorAgentConfig } from './schema.ts';
 
 const PROVIDER_TYPE = 'cursor-agent';
+const STDIN_PROMPT = 'Read the review instructions from stdin and return only the requested output.';
 
 class CursorAgentProvider implements Provider {
   readonly kind = 'subprocess' as const;
@@ -30,11 +31,11 @@ class CursorAgentProvider implements Provider {
     };
   }
 
-  private args(prompt: string, ctx: ExecCtx): string[] {
+  private args(ctx: ExecCtx): string[] {
     const model = ctx.modelOverride?.model ?? this.cfg.model;
     const args = [
       '--print',
-      prompt,
+      STDIN_PROMPT,
       '--output-format',
       this.cfg.output_format,
       ...this.cfg.extra_args,
@@ -46,15 +47,20 @@ class CursorAgentProvider implements Provider {
   private async runOnce(prompt: string, ctx: ExecCtx, reviewerId: string): Promise<string> {
     const cwd = this.cfg.cwd ?? this.pluginCtx.workspaceRoot;
     const proc = Bun.spawn({
-      cmd: [this.cfg.binary, ...this.args(prompt, ctx)],
+      cmd: [this.cfg.binary, ...this.args(ctx)],
       cwd,
       env: {
         ...this.pluginCtx.env,
         ...(this.cfg.api_key ? { CURSOR_API_KEY: this.cfg.api_key } : {}),
       },
+      stdin: 'pipe',
       stdout: 'pipe',
       stderr: 'pipe',
     });
+
+    const writer = proc.stdin as unknown as { write: (s: string) => void; end: () => void };
+    writer.write(prompt);
+    writer.end();
 
     const onAbort = () => proc.kill();
     if (ctx.signal.aborted) {

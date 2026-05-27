@@ -51,7 +51,8 @@ describe('kilo-code provider', () => {
     tmpRoots.push(root);
     const binary = join(root, 'kilo');
     const argsFile = join(root, 'args.txt');
-    await Bun.write(binary, `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\nprintf '{"findings":[]}'\n`);
+    const stdinFile = join(root, 'stdin.txt');
+    await Bun.write(binary, `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\ncat > '${stdinFile}'\nprintf '{"findings":[]}'\n`);
     await chmod(binary, 0o755);
 
     const reviewTask = task(root);
@@ -79,6 +80,7 @@ describe('kilo-code provider', () => {
     });
 
     const args = await Bun.file(argsFile).text();
+    const stdin = await Bun.file(stdinFile).text();
     expect(args).toContain('run\n');
     expect(args).toContain('--thinking');
     expect(args).toContain('--model\nanthropic/claude-sonnet-4-20250514');
@@ -86,7 +88,8 @@ describe('kilo-code provider', () => {
     expect(args).toContain('--variant\nhigh');
     expect(args).toContain('--format\njson');
     expect(args).toContain('\n--\n');
-    expect(args).toContain(reviewTask.instruction);
+    expect(args).not.toContain(reviewTask.instruction);
+    expect(stdin).toContain(reviewTask.instruction);
   });
 
   test('runtime registers kilo-code as a built-in provider', async () => {

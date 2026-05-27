@@ -8,6 +8,7 @@ import { readPreviewedStdout } from '../subprocess.ts';
 import { KiloCodeConfigSchema, type KiloCodeConfig } from './schema.ts';
 
 const PROVIDER_TYPE = 'kilo-code';
+const STDIN_PROMPT = 'Read the review instructions from stdin and return only the requested output.';
 
 class KiloCodeProvider implements Provider {
   readonly kind = 'subprocess' as const;
@@ -30,7 +31,7 @@ class KiloCodeProvider implements Provider {
     };
   }
 
-  private args(prompt: string, ctx: ExecCtx): string[] {
+  private args(ctx: ExecCtx): string[] {
     const model = ctx.modelOverride?.model ?? this.cfg.model;
     const args = ['run', ...this.cfg.extra_args];
 
@@ -38,18 +39,23 @@ class KiloCodeProvider implements Provider {
     if (this.cfg.agent) args.push('--agent', this.cfg.agent);
     if (this.cfg.variant) args.push('--variant', this.cfg.variant);
     if (this.cfg.format === 'json') args.push('--format', 'json');
-    args.push('--', prompt);
+    args.push('--', STDIN_PROMPT);
     return args;
   }
 
   private async runOnce(prompt: string, ctx: ExecCtx, reviewerId: string): Promise<string> {
     const cwd = this.cfg.cwd ?? this.pluginCtx.workspaceRoot;
     const proc = Bun.spawn({
-      cmd: [this.cfg.binary, ...this.args(prompt, ctx)],
+      cmd: [this.cfg.binary, ...this.args(ctx)],
       cwd,
+      stdin: 'pipe',
       stdout: 'pipe',
       stderr: 'pipe',
     });
+
+    const writer = proc.stdin as unknown as { write: (s: string) => void; end: () => void };
+    writer.write(prompt);
+    writer.end();
 
     const onAbort = () => proc.kill();
     if (ctx.signal.aborted) {

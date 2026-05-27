@@ -46,15 +46,16 @@ describe('cursor-agent provider', () => {
     expect(tokenText(events)).toBe('{"findings":[]}\n');
   });
 
-  test('passes model overrides and prompt as one print argument', async () => {
+  test('passes model overrides and prompt through stdin', async () => {
     const root = await mkdtemp(join(tmpdir(), 'quorum-cursor-'));
     tmpRoots.push(root);
     const binary = join(root, 'cursor-agent');
     const argsFile = join(root, 'args.txt');
+    const stdinFile = join(root, 'stdin.txt');
     const envFile = join(root, 'env.txt');
     await Bun.write(
       binary,
-      `#!/bin/sh\nfor arg in "$@"; do printf '%s\\0' "$arg"; done > '${argsFile}'\nprintf '%s' "$CURSOR_API_KEY" > '${envFile}'\nprintf '{"findings":[]}'\n`,
+      `#!/bin/sh\nfor arg in "$@"; do printf '%s\\0' "$arg"; done > '${argsFile}'\ncat > '${stdinFile}'\nprintf '%s' "$CURSOR_API_KEY" > '${envFile}'\nprintf '{"findings":[]}'\n`,
     );
     await chmod(binary, 0o755);
 
@@ -82,8 +83,10 @@ describe('cursor-agent provider', () => {
     });
 
     const args = (await Bun.file(argsFile).text()).split('\0').filter(Boolean);
+    const stdin = await Bun.file(stdinFile).text();
     expect(args).toContain('--print');
-    expect(args.some((arg) => arg.includes(reviewTask.instruction))).toBe(true);
+    expect(args.some((arg) => arg.includes(reviewTask.instruction))).toBe(false);
+    expect(stdin).toContain(reviewTask.instruction);
     expect(args).toContain('--output-format');
     expect(args).toContain('json');
     expect(args).toContain('--model');

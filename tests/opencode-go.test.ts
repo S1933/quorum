@@ -61,7 +61,8 @@ describe('opencode-go provider', () => {
     tmpRoots.push(root);
     const binary = join(root, 'opencode');
     const argsFile = join(root, 'args.txt');
-    await Bun.write(binary, `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\nprintf '{"findings":[]}'\n`);
+    const stdinFile = join(root, 'stdin.txt');
+    await Bun.write(binary, `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\ncat > '${stdinFile}'\nprintf '{"findings":[]}'\n`);
     await chmod(binary, 0o755);
 
     const provider = await openCodeGoFactory.create(
@@ -83,7 +84,7 @@ describe('opencode-go provider', () => {
       id: 'task-1',
       reviewerId: 'security-open',
       systemPrompt: 'Review security issues.',
-      instruction: 'Review this diff.',
+      instruction: 'Review this diff.\n--dangerous\n$(touch /tmp/should-not-run)',
       workspace: { root },
     };
 
@@ -95,7 +96,10 @@ describe('opencode-go provider', () => {
     });
 
     const args = await Bun.file(argsFile).text();
+    const stdin = await Bun.file(stdinFile).text();
     expect(args).toContain('--model\nanthropic/claude-sonnet-4');
+    expect(args).not.toContain(task.instruction);
+    expect(stdin).toContain(task.instruction);
   });
 
   test('reports timeout errors distinctly from process failures', async () => {
