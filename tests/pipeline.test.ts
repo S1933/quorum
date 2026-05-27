@@ -3,7 +3,7 @@ import type { QuorumEvent } from '../src/core/events.ts';
 import type { Finding } from '../src/core/finding.ts';
 import type { Pipeline } from '../src/core/pipeline.ts';
 import type { Provider } from '../src/core/provider.ts';
-import type { ReviewResult, ReviewTask } from '../src/core/task.ts';
+import type { ReviewResult } from '../src/core/task.ts';
 import { overlapV1 } from '../src/consensus/overlap-v1.ts';
 import { ConsensusRegistry } from '../src/consensus/registry.ts';
 import { PipelineExecutor } from '../src/pipelines/executor.ts';

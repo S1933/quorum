@@ -1,6 +1,5 @@
 import type { Finding, FindingGroup } from '../core/finding.ts';
-import type { ReviewResult } from '../core/task.ts';
-import type { ConsensusResult, ConsensusConfig } from '../core/pipeline.ts';
+import type { ConsensusResult } from '../core/pipeline.ts';
 import { severityRank } from '../core/finding.ts';
 import type { ConsensusStrategy } from './registry.ts';
 
