@@ -37,7 +37,8 @@ export interface ChatResponse {
 
 export type ChatStreamEvent =
   | { type: 'token'; text: string }
-  | { type: 'usage'; usage: ChatUsage };
+  | { type: 'usage'; usage: ChatUsage }
+  | { type: 'chunk_parse_error'; raw: string };
 
 export class OpenRouterClient {
   constructor(
@@ -130,7 +131,7 @@ export class OpenRouterClient {
           if (delta) yield { type: 'token', text: delta };
           if (parsed.usage) yield { type: 'usage', usage: parsed.usage };
         } catch {
-          // ignore malformed chunks
+          yield { type: 'chunk_parse_error', raw: payload };
         }
       }
     }

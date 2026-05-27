@@ -40,6 +40,12 @@ class OllamaProvider implements Provider {
           reviewerId: task.reviewerId,
           event: { type: 'token', text: event.text },
         });
+      } else if (event.type === 'chunk_parse_error') {
+        ctx.bus.emit({
+          type: 'reviewer.event',
+          reviewerId: task.reviewerId,
+          event: { type: 'log', level: 'warn', msg: `skipped malformed chunk: ${event.raw}` },
+        });
       } else {
         usage = {
           inputTokens: event.prompt_eval_count,
@@ -82,6 +88,8 @@ class OllamaProvider implements Provider {
       for await (const event of this.client.chatStream(chatRequest(this.cfg, ctx, messagesFor(task)), ctx.signal)) {
         if (event.type === 'token') {
           yield { type: 'token' as const, text: event.text };
+        } else if (event.type === 'chunk_parse_error') {
+          yield { type: 'log' as const, level: 'warn' as const, msg: `skipped malformed chunk: ${event.raw}` };
         } else {
           yield {
             type: 'usage' as const,

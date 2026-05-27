@@ -30,7 +30,8 @@ export interface OllamaChatResponse {
 
 export type OllamaStreamEvent =
   | { type: 'token'; text: string }
-  | { type: 'usage'; prompt_eval_count: number; eval_count: number };
+  | { type: 'usage'; prompt_eval_count: number; eval_count: number }
+  | { type: 'chunk_parse_error'; raw: string };
 
 export class OllamaClient {
   constructor(
@@ -119,7 +120,7 @@ function parseStreamLine(line: string): OllamaStreamEvent | null {
       };
     }
   } catch {
-    return null;
+    return { type: 'chunk_parse_error', raw: trimmed.slice(0, 200) };
   }
   return null;
 }
