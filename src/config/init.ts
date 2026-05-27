@@ -22,6 +22,7 @@ export interface PersonaTemplate {
 
 export interface InitConfigOptions {
   provider?: string | boolean;
+  providers?: string[];
   model?: string;
   personas?: string | boolean;
   personaTemplates?: Record<string, PersonaTemplate>;
@@ -30,12 +31,13 @@ export interface InitConfigOptions {
 export interface InitConfigResult {
   yaml: string;
   provider: InitProvider;
+  providers: InitProvider[];
   personas: string[];
 }
 
 type ProviderInitConfig = { type: string } & Record<string, unknown>;
 
-const INIT_PROVIDERS: InitProvider[] = [
+export const INIT_PROVIDERS: readonly InitProvider[] = [
   'claude-code',
   'openrouter',
   'codex-cli',
@@ -47,15 +49,27 @@ const INIT_PROVIDERS: InitProvider[] = [
   'ollama',
 ];
 
+export function defaultInitModel(provider: InitProvider): string {
+  return defaultModel(provider);
+}
+
 export async function createInitConfig(opts: InitConfigOptions = {}): Promise<InitConfigResult> {
-  const provider = initProvider(opts.provider);
-  const model = typeof opts.model === 'string' ? opts.model : defaultModel(provider);
+  const providers = initProviders(opts.providers ?? opts.provider);
+  if (providers.length > 1 && typeof opts.model === 'string') {
+    throw new ConfigError('Cannot use --model with multiple providers; each provider uses its default model');
+  }
   const personaTemplates = opts.personaTemplates ?? await loadInitPersonaTemplates();
   const personas = initPersonas(opts.personas, personaTemplates);
-  const config = buildInitConfig({ provider, model, personas, personaTemplates });
+  const config = buildInitConfig({
+    providers,
+    ...(opts.model !== undefined ? { model: opts.model } : {}),
+    personas,
+    personaTemplates,
+  });
   return {
     yaml: stringifyYaml(config, { lineWidth: 0 }),
-    provider,
+    provider: providers[0]!,
+    providers,
     personas,
   };
 }
@@ -77,6 +91,22 @@ function initProvider(value: string | boolean | undefined): InitProvider {
   throw new ConfigError(
     `Unsupported init provider "${provider}"; expected one of ${INIT_PROVIDERS.join(', ')}`,
   );
+}
+
+function initProviders(value: string[] | string | boolean | undefined): InitProvider[] {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return ['claude-code'];
+    return [...new Set(value.map(initProvider))];
+  }
+  if (typeof value === 'string' && value.includes(',')) {
+    const providers = value
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (providers.length === 0) throw new ConfigError('At least one provider is required');
+    return [...new Set(providers.map(initProvider))];
+  }
+  return [initProvider(value)];
 }
 
 function initPersonas(
@@ -102,18 +132,32 @@ function initPersonas(
 }
 
 function buildInitConfig(opts: {
-  provider: InitProvider;
-  model: string;
+  providers: InitProvider[];
+  model?: string;
   personas: string[];
   personaTemplates: Record<string, PersonaTemplate>;
 }): QuorumConfig {
-  const provider = providerId(opts.provider);
+  const multiProvider = opts.providers.length > 1;
+  const reviewerEntries = opts.personas.flatMap((persona) =>
+    opts.providers.map((provider) => {
+      return [
+        reviewerId(persona, multiProvider ? provider : undefined),
+        {
+          persona,
+          provider: providerId(provider),
+        },
+      ] as const;
+    }),
+  );
   return {
     version: 1,
     defaults: { pipeline: 'default' },
-    providers: {
-      [provider]: providerConfig(opts.provider, opts.model),
-    },
+    providers: Object.fromEntries(
+      opts.providers.map((provider) => [
+        providerId(provider),
+        providerConfig(provider, opts.model ?? defaultModel(provider)),
+      ]),
+    ),
     personas: Object.fromEntries(
       opts.personas.map((persona) => {
         const template = opts.personaTemplates[persona]!;
@@ -126,19 +170,11 @@ function buildInitConfig(opts: {
         ];
       }),
     ),
-    reviewers: Object.fromEntries(
-      opts.personas.map((persona) => [
-        reviewerId(persona),
-        {
-          persona,
-          provider,
-        },
-      ]),
-    ),
+    reviewers: Object.fromEntries(reviewerEntries),
     pipelines: {
       default: {
         parallel: true,
-        reviewers: opts.personas.map(reviewerId),
+        reviewers: reviewerEntries.map(([id]) => id),
         consensus: { strategy: 'overlap-v1' },
       },
     },
@@ -204,7 +240,8 @@ function providerId(provider: InitProvider): string {
   }
 }
 
-function reviewerId(persona: string): string {
+function reviewerId(persona: string, provider?: InitProvider): string {
+  if (provider) return `${reviewerId(persona)}-${provider.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   switch (persona) {
     case 'security':
       return 'sec-reviewer';

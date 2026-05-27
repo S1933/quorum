@@ -72,10 +72,14 @@ describe('cli', () => {
     expect(runtime.lastReviewerIds).toEqual(['fake-reviewer']);
     expect(io.stdoutText()).toContain('pipeline default');
     expect(io.stdoutText()).toContain('[fake-reviewer] {"findings"');
+    expect(io.stdoutText()).toContain('── Findings by priority ──');
+    expect(io.stdoutText()).toContain('Priority: medium');
     expect(io.stdoutText()).toContain(`report: ${reportPath}`);
 
     const report = await Bun.file(reportPath).text();
     expect(report).toContain('# Quorum review — default');
+    expect(report).toContain('## Findings by priority');
+    expect(report).toContain('### Priority: medium');
     expect(report).toContain('Fake finding');
   });
 
@@ -214,6 +218,192 @@ describe('cli', () => {
     expect(cfg.pipelines.default?.reviewers).toEqual(['sec-reviewer', 'perf-reviewer']);
   });
 
+  test('init supports multiple providers', async () => {
+    const io = captureIo();
+    const tmp = await mkdtemp(join(tmpdir(), 'quorum-cli-init-test-'));
+    const configPath = join(tmp, 'quorum.yaml');
+
+    const code = await main(
+      [
+        'init',
+        '--config',
+        configPath,
+        '--provider',
+        'claude-code,ollama',
+        '--personas',
+        'security,performance',
+      ],
+      deps({ inferRepoRoot: async () => tmp }),
+      io,
+    );
+
+    expect(code).toBe(0);
+    expect(io.stdoutText()).toContain('Providers: claude-code, ollama');
+    const cfg = await loadConfigFromPath(configPath);
+    expect(Object.keys(cfg.providers)).toEqual(['claude-code-local', 'ollama-local']);
+    expect(cfg.providers['ollama-local']).toEqual({
+      type: 'ollama',
+      model: 'llama3.1',
+      base_url: 'http://localhost:11434',
+    });
+    expect(Object.keys(cfg.reviewers)).toEqual([
+      'sec-reviewer-claude-code',
+      'sec-reviewer-ollama',
+      'perf-reviewer-claude-code',
+      'perf-reviewer-ollama',
+    ]);
+    expect(cfg.pipelines.default?.reviewers).toEqual([
+      'sec-reviewer-claude-code',
+      'sec-reviewer-ollama',
+      'perf-reviewer-claude-code',
+      'perf-reviewer-ollama',
+    ]);
+  });
+
+  test('init rejects a single model override with multiple providers', async () => {
+    const io = captureIo();
+    const tmp = await mkdtemp(join(tmpdir(), 'quorum-cli-init-test-'));
+    const configPath = join(tmp, 'quorum.yaml');
+
+    const code = await main(
+      [
+        'init',
+        '--config',
+        configPath,
+        '--provider',
+        'claude-code,ollama',
+        '--model',
+        'custom-model',
+      ],
+      deps({ inferRepoRoot: async () => tmp }),
+      io,
+    );
+
+    expect(code).toBe(1);
+    expect(io.stderrText()).toContain('Cannot use --model with multiple providers');
+    expect(await Bun.file(configPath).exists()).toBe(false);
+  });
+
+  test('init prompts interactively for providers, personas, and model', async () => {
+    const io = captureIo();
+    const tmp = await mkdtemp(join(tmpdir(), 'quorum-cli-init-test-'));
+    const configPath = join(tmp, 'quorum.yaml');
+    const selections = [['opencode-go'], ['security', 'performance']];
+
+    const code = await main(
+      ['init', '--config', configPath],
+      deps({
+        inferRepoRoot: async () => tmp,
+        isInteractive: () => true,
+        selectMany: async (question) => {
+          io.stdout.write(`${question}\n`);
+          return selections.shift() ?? [];
+        },
+        prompt: async () => 'anthropic/claude-sonnet-4',
+      }),
+      io,
+    );
+
+    expect(code).toBe(0);
+    expect(io.stdoutText()).toContain('Select provider(s) to configure first');
+    expect(io.stdoutText()).toContain('Select persona(s) to enable');
+    expect(io.stdoutText()).toContain('Providers: opencode-go');
+    expect(io.stdoutText()).toContain('Personas: security, performance');
+    const cfg = await loadConfigFromPath(configPath);
+    expect(cfg.providers['opencode-local']).toEqual({
+      type: 'opencode-go',
+      model: 'anthropic/claude-sonnet-4',
+      command_style: 'prompt',
+    });
+    expect(Object.keys(cfg.personas)).toEqual(['security', 'performance']);
+  });
+
+  test('init interactive prompts accept all and default choices', async () => {
+    const io = captureIo();
+    const tmp = await mkdtemp(join(tmpdir(), 'quorum-cli-init-test-'));
+    const configPath = join(tmp, 'quorum.yaml');
+    const selections = [['claude-code'], ['security', 'backend-senior', 'architecture', 'performance']];
+
+    const code = await main(
+      ['init', '--config', configPath],
+      deps({
+        inferRepoRoot: async () => tmp,
+        isInteractive: () => true,
+        selectMany: async () => selections.shift() ?? [],
+        prompt: async () => '',
+      }),
+      io,
+    );
+
+    expect(code).toBe(0);
+    const cfg = await loadConfigFromPath(configPath);
+    expect(Object.keys(cfg.providers)).toEqual(['claude-code-local']);
+    expect(cfg.providers['claude-code-local']?.model).toBe('claude-opus-4-7');
+    expect(Object.keys(cfg.personas)).toEqual([
+      'security',
+      'backend-senior',
+      'architecture',
+      'performance',
+    ]);
+  });
+
+  test('init help prints usage without resolving the repository', async () => {
+    const io = captureIo();
+
+    const code = await main(
+      ['init', '--help'],
+      deps({
+        inferRepoRoot: async () => {
+          throw new Error('should not resolve repository');
+        },
+      }),
+      io,
+    );
+
+    expect(code).toBe(0);
+    expect(io.stdoutText()).toContain('quorum init — create a starter quorum.yaml');
+    expect(io.stdoutText()).toContain('--list-providers');
+    expect(io.stderrText()).toBe('');
+  });
+
+  test('init lists supported providers without writing a config', async () => {
+    const io = captureIo();
+
+    const code = await main(
+      ['init', '--list-providers'],
+      deps({
+        inferRepoRoot: async () => {
+          throw new Error('should not resolve repository');
+        },
+      }),
+      io,
+    );
+
+    expect(code).toBe(0);
+    expect(io.stdoutText()).toContain('claude-code\tdefault model: claude-opus-4-7');
+    expect(io.stdoutText()).toContain('ollama\tdefault model: llama3.1');
+    expect(io.stderrText()).toBe('');
+  });
+
+  test('init lists supported personas without writing a config', async () => {
+    const io = captureIo();
+
+    const code = await main(
+      ['init', '--list-personas'],
+      deps({
+        inferRepoRoot: async () => {
+          throw new Error('should not resolve repository');
+        },
+      }),
+      io,
+    );
+
+    expect(code).toBe(0);
+    expect(io.stdoutText()).toContain('security\tAdversarial security review');
+    expect(io.stdoutText()).toContain('performance\tPerformance and scalability review');
+    expect(io.stderrText()).toBe('');
+  });
+
   test('init refuses to overwrite an existing config without force', async () => {
     const io = captureIo();
     const tmp = await mkdtemp(join(tmpdir(), 'quorum-cli-init-test-'));
@@ -318,6 +508,9 @@ function deps(overrides: Partial<CliDeps>): CliDeps {
     inferRepoRoot: async () => '/repo',
     probeWorkspace: async () => ({ root: '/repo' }),
     createRuntime: async () => fakeRuntime(),
+    isInteractive: () => false,
+    prompt: async () => '',
+    selectMany: async (_question, _choices, defaults) => defaults,
     now: () => 1,
     ...overrides,
   };

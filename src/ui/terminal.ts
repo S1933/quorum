@@ -1,6 +1,7 @@
 import type { EventBus } from '../core/events.ts';
-import type { Finding } from '../core/finding.ts';
-import { severityRank } from '../core/finding.ts';
+import type { Finding, Severity } from '../core/finding.ts';
+
+const PRIORITIES: readonly Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
 
 const COLORS = {
   reset: '\x1b[0m',
@@ -80,7 +81,7 @@ export class TerminalRenderer {
     unsubs.push(
       bus.on('pipeline.finished', (e) => {
         this.line('');
-        this.line(this.c('bold', '── Consensus ──'));
+        this.line(this.c('bold', '── Findings by priority ──'));
         this.renderConsensus(e.result.consensus.groups, e.result.consensus.unique);
         this.line('');
         this.line(this.c('dim', `pipeline ${e.result.pipelineId} done in ${e.result.durationMs}ms (${e.result.reviews.length} reviews, ${e.result.errors.length} errors)`));
@@ -100,23 +101,24 @@ export class TerminalRenderer {
       this.line(this.c('green', '  no findings'));
       return;
     }
-    const sortedGroups = [...groups].sort(
-      (a, b) =>
-        severityRank(b.representative.severity) - severityRank(a.representative.severity) ||
-        b.reviewers.length - a.reviewers.length,
-    );
-    for (const g of sortedGroups) {
-      const f = g.representative;
-      const badge = this.c('magenta', `[${g.reviewers.length} agreed]`);
-      this.line(`${this.severityIcon(f.severity)} ${this.c('bold', f.title)} ${badge} ${this.c('dim', `(${f.file}:${f.lineRange.start}-${f.lineRange.end})`)}`);
-      if (f.body) this.line(`   ${f.body.replace(/\n/g, '\n   ')}`);
-      this.line(this.c('dim', `   reviewers: ${g.reviewers.join(', ')}`));
-    }
-    if (unique.length > 0) {
+
+    for (const priority of PRIORITIES) {
+      const priorityGroups = groups
+        .filter((g) => g.representative.severity === priority)
+        .sort((a, b) => b.reviewers.length - a.reviewers.length);
+      const priorityUnique = unique.filter((f) => f.severity === priority);
+      if (priorityGroups.length === 0 && priorityUnique.length === 0) continue;
+
       this.line('');
-      this.line(this.c('dim', '── Single-reviewer findings ──'));
-      const sorted = [...unique].sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
-      for (const f of sorted) {
+      this.line(this.c('bold', `Priority: ${priority}`));
+      for (const g of priorityGroups) {
+        const f = g.representative;
+        const badge = this.c('magenta', `[${g.reviewers.length} agreed]`);
+        this.line(`${this.severityIcon(f.severity)} ${this.c('bold', f.title)} ${badge} ${this.c('dim', `(${f.file}:${f.lineRange.start}-${f.lineRange.end})`)}`);
+        if (f.body) this.line(`   ${f.body.replace(/\n/g, '\n   ')}`);
+        this.line(this.c('dim', `   reviewers: ${g.reviewers.join(', ')}`));
+      }
+      for (const f of priorityUnique) {
         this.line(`${this.severityIcon(f.severity)} ${f.title} ${this.c('dim', `(${f.file}:${f.lineRange.start}, ${f.reviewer})`)}`);
       }
     }

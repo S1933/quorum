@@ -1,6 +1,7 @@
 import type { PipelineResult } from '../core/pipeline.ts';
-import type { Finding } from '../core/finding.ts';
-import { severityRank } from '../core/finding.ts';
+import type { Finding, FindingGroup, Severity } from '../core/finding.ts';
+
+const PRIORITIES: readonly Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
 
 export function renderMarkdownReport(result: PipelineResult): string {
   const out: string[] = [];
@@ -15,34 +16,8 @@ export function renderMarkdownReport(result: PipelineResult): string {
     out.push('');
   }
 
-  out.push('## Consensus findings');
-  const groups = [...result.consensus.groups].sort(
-    (a, b) =>
-      severityRank(b.representative.severity) - severityRank(a.representative.severity) ||
-      b.reviewers.length - a.reviewers.length,
-  );
-  if (groups.length === 0) {
-    out.push('_No findings raised by multiple reviewers._');
-  } else {
-    for (const g of groups) {
-      const f = g.representative;
-      out.push(`### [${g.reviewers.length} agreed] ${escapeMd(f.title)}`);
-      out.push(`- **File:** \`${f.file}:${f.lineRange.start}-${f.lineRange.end}\``);
-      out.push(`- **Severity:** ${f.severity}`);
-      out.push(`- **Category:** ${f.category}`);
-      out.push(`- **Reviewers:** ${g.reviewers.join(', ')}`);
-      out.push('');
-      if (f.body) out.push(escapeMd(f.body));
-      out.push('');
-    }
-  }
-
-  const unique = result.consensus.unique;
-  if (unique.length > 0) {
-    out.push('## Single-reviewer findings');
-    const sorted = [...unique].sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
-    for (const f of sorted) renderFinding(out, f);
-  }
+  out.push('## Findings by priority');
+  renderPriorityFindings(out, result.consensus.groups, result.consensus.unique);
 
   out.push('');
   out.push('---');
@@ -50,8 +25,38 @@ export function renderMarkdownReport(result: PipelineResult): string {
   return out.join('\n');
 }
 
+function renderPriorityFindings(out: string[], groups: FindingGroup[], unique: Finding[]): void {
+  if (groups.length === 0 && unique.length === 0) {
+    out.push('_No findings._');
+    return;
+  }
+
+  for (const priority of PRIORITIES) {
+    const priorityGroups = groups
+      .filter((g) => g.representative.severity === priority)
+      .sort((a, b) => b.reviewers.length - a.reviewers.length);
+    const priorityUnique = unique.filter((f) => f.severity === priority);
+    if (priorityGroups.length === 0 && priorityUnique.length === 0) continue;
+
+    out.push(`### Priority: ${priority}`);
+    for (const g of priorityGroups) renderGroup(out, g);
+    for (const f of priorityUnique) renderFinding(out, f);
+  }
+}
+
+function renderGroup(out: string[], g: FindingGroup): void {
+  const f = g.representative;
+  out.push(`#### [${g.reviewers.length} agreed] ${escapeMd(f.title)}`);
+  out.push(`- **File:** \`${f.file}:${f.lineRange.start}-${f.lineRange.end}\``);
+  out.push(`- **Category:** ${f.category}`);
+  out.push(`- **Reviewers:** ${g.reviewers.join(', ')}`);
+  out.push('');
+  if (f.body) out.push(escapeMd(f.body));
+  out.push('');
+}
+
 function renderFinding(out: string[], f: Finding): void {
-  out.push(`### ${escapeMd(f.title)} — ${f.severity}`);
+  out.push(`#### ${escapeMd(f.title)}`);
   out.push(`- **File:** \`${f.file}:${f.lineRange.start}-${f.lineRange.end}\``);
   out.push(`- **Category:** ${f.category}`);
   out.push(`- **Reviewer:** ${f.reviewer}`);
