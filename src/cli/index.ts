@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { mkdir } from 'node:fs/promises';
-import { relative, resolve } from 'node:path';
+import { relative, resolve, dirname } from 'node:path';
 import { loadConfigFromPath, findConfigPath } from '../config/loader.ts';
 import type { QuorumConfig } from '../config/schema.ts';
 import {
@@ -452,10 +452,8 @@ function buildReviewInstruction(diff: string, files: string[]): string {
 }
 
 async function writeReport(path: string, content: string): Promise<void> {
-  const dir = path.slice(0, path.lastIndexOf('/'));
-  if (dir) {
-    await mkdir(dir, { recursive: true });
-  }
+  const dir = dirname(resolve(path));
+  await mkdir(dir, { recursive: true });
   await Bun.write(path, content);
 }
 
