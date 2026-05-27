@@ -1,19 +1,27 @@
 # Tech Debt Audit - Quorum
 
-Generated: 2026-05-27
+Generated: 2026-05-27 — Re-audited: 2026-05-27 (19/38 resolved, 7 partial, 12 open)
 
 ## Executive summary
 
+### Re-audit 2026-05-27
+
+- **19 resolved** (F001, F002, F003, F004, F009, F016, F017, F020, F024, F025, F026, F028, F029, F030, F032, F034, F035, F036, F038)
+- **7 partially resolved** (F006, F011, F012, F018, F021, F022, F037)
+- **12 not resolved** (F005, F007, F008, F010, F013, F014, F015, F019, F023, F027, F031, F033)
+
+### Original audit (2026-05-27)
+
 - Quorum is a Bun/TypeScript CLI and Claude Code plugin that runs several AI reviewers against a git diff, parses structured findings, then groups them with a consensus strategy.
 - Quality baseline is decent for a young project: `tsc --noEmit` passes, `bun test` passes with 71 tests, `bun audit` reports no known vulnerabilities.
-- Main risk is subprocess-provider hardening: several adapters pass full review prompts through argv, allow arbitrary `extra_args`, and duplicate process lifecycle code.
-- The CLI entry point has become a god module: command dispatch, review orchestration, init UI, redaction, prompt building, and file writes live in one 450-line file.
-- Prompt-injection resistance is weak: raw diffs are inserted inside a markdown fence, so changed code can close the fence and inject reviewer instructions.
-- Workspace probing hides important git failures: an invalid base ref can become "No diff detected" instead of an actionable error.
-- Performance and cost controls are missing: full diffs, provider outputs, terminal previews, and parallel reviewers are buffered or launched without global budgets.
-- Documentation is already drifting from implementation, especially around V1 scope, built-in providers, and external plugin loading.
-- Test count is strong for the project size, but coverage is uneven: config interpolation, runtime resolution, renderer edge cases, HTTP error paths, and interactive select are weak.
-- Overall project quality: **7.0/10**. The core shape is sound, but release-readiness depends on hardening subprocess execution, diff handling, and CLI boundaries.
+- Subprocess prompt delivery and extra_args hardening are **resolved** across all providers. Timed-out classification is consistent.
+- The CLI entry point is still a god module (`src/cli/index.ts`, 463 lines); no command extraction has been done.
+- Prompt injection resistance is **not resolved**: diffs are still embedded directly inside a markdown fence with no escaping.
+- Workspace probing still hides git failures: an invalid base ref still becomes "No diff detected" instead of an error.
+- Performance and cost controls remain **missing**: no diff size budgets, no concurrency limits, no retry/backoff.
+- Documentation drift has been **partially addressed** but architecture docs still claim several implemented providers are out of scope for V1.
+- Test coverage is broader (71→73+), but config tests are still minimal (1 test for a single rejection case).
+- Overall project quality: **7.5/10** (+0.5). Security baseline is solid, but the big-ticket items (budget controls, CLI refactor, prompt hardening, workspace exit codes) are still open.
 
 ## Architectural mental model
 
@@ -38,122 +46,132 @@ Critical dependencies:
 ## Tooling results
 
 - `bun run typecheck`: pass.
-- `bun test`: pass, 71 tests.
-- `bun test --coverage`: pass; overall 80.77% funcs / 88.18% lines, with weak spots in `src/ui/select.ts`, `src/runtime/runtime.ts`, `src/providers/openrouter/client.ts`, `src/config/interpolate.ts`.
+- `bun test`: pass, 73+ tests.
+- `bun test --coverage`: pass; coverage improved slightly.
 - `bun audit`: pass after network access, no vulnerabilities found.
-- `knip`, `madge`, `depcheck`, `ast-grep`, `eslint`: not installed/configured locally.
-- Extra static check: `bunx tsc --noEmit --noUnusedLocals --noUnusedParameters` fails on unused imports in `src/consensus/overlap-v1.ts:2`, `src/consensus/overlap-v1.ts:3`, and `tests/pipeline.test.ts:6`.
+- `bun run lint`: configured and passing.
+- `knip`, `madge`, `depcheck`, `ast-grep`: still not configured.
+- `tsc --noEmit --noUnusedLocals --noUnusedParameters`: now passes (tsconfig has these enabled at compile-time).
 
 ## Findings
 
 | ID | Category | File:Line | Severity | Effort | Description | Recommendation |
 |---|---|---:|---|---|---|---|
-| F001 | Security | `plugin/commands/quorum-review.md:20` | High | M | Slash-command instructions interpolate `$ARGUMENTS` into a shell command shape without quoting or an argv-safe wrapper. `quorum-init` has the same pattern at `plugin/commands/quorum-init.md:38`. | Replace shell interpolation with a small checked script or explicit argv construction; reject shell metacharacters in plugin arguments. |
+| F001 | Security | `plugin/commands/quorum-review.md:10` | High | M | **RESOLVED 2026-05-27.** Both `quorum-review.md` and `quorum-init.md` now reject shell control characters (backticks, `$`, `;`, `|`, `&`, `<>`, brackets, newlines) and use individually shell-quoted tokens instead of raw `$ARGUMENTS` interpolation. | Keep regression tests for argument sanitization. |
 | F002 | Security / Performance | `src/providers/opencode-go/index.ts:33` | High | M | **RESOLVED 2026-05-27.** OpenCode Go, Cursor Agent, and Kilo Code now pass only a short stdin instruction in argv and send the full review prompt through stdin. | Keep regression tests that assert malicious prompt text is absent from argv and present in stdin. |
 | F003 | Security | `src/providers/claude-code/schema.ts:8` | High | S | **RESOLVED 2026-05-27.** `claude-code.extra_args` and `opencode-go.extra_args` no longer accept arbitrary strings; both now reject unaudited extra args. | Add explicit enum entries only after auditing provider-specific flag safety. |
-| F004 | Security | `src/providers/codex-cli/index.ts:46` | High | M | Default `approval_policy: never` maps to `--dangerously-bypass-approvals-and-sandbox`, while the schema defaults to `approval_policy: never` at `src/providers/codex-cli/schema.ts:17`. That makes the safe default questionable for a review-only tool. | Make the default non-bypassing; require explicit opt-in for bypass mode and document the risk. |
-| F005 | Security | `src/cli/index.ts:436` | High | M | Diffs are embedded in a markdown code fence with no escaping or delimiter hardening. A malicious diff can include triple backticks and inject reviewer instructions. | Wrap diffs in a length-delimited payload or JSON string; add explicit instruction hierarchy and tests for fence-breaking diffs. |
-| F006 | Correctness | `src/runtime/workspace.ts:46` | High | S | Invalid or unreachable base refs are converted to `undefined`, then the CLI reports "No diff detected" at `src/cli/index.ts:186`. This hides configuration/user errors. | Distinguish "no diff" from "git failed"; surface stderr and fail non-zero on invalid `--base`. |
-| F007 | Performance / Cost | `src/runtime/workspace.ts:16` | High | M | The full branch diff and untracked diff are buffered, then embedded into a single prompt at `src/cli/index.ts:434`. There is no max total diff size, file filter, or token budget. | Add total byte/token budgets, include/exclude filters, truncation summaries, and an explicit "too large" failure mode. |
-| F008 | Architecture | `src/providers/continue-dev/index.ts:42` | High | M | Subprocess lifecycle logic is duplicated across providers: spawn, abort, timeout, stdout preview, stderr read, exit handling, and finding emission. | Extract a shared subprocess runner with timeout classification, stdin/argv policy, env handling, preview events, and normalized errors. |
-| F009 | Correctness / Observability | `src/providers/claude-code/index.ts:63` | Medium | S | Claude Code has a timeout timer but no `timedOut` flag, so timeouts are reported as generic exit-code failures at `src/providers/claude-code/index.ts:80`. Other providers classify timeouts distinctly. | Mirror the `timedOut` handling used in `opencode-go`, `codex-cli`, and others. |
-| F010 | Architecture | `src/providers/continue-dev/index.ts:132` | Medium | S | JSON-output unwrapping is duplicated in continue, cursor, kilo, and opencode (`normalise*Output`, `parseJson`, `unwrapJsonOutput`). | Move this to a shared provider-output normalizer with provider-specific key lists. |
-| F011 | Architecture | `src/runtime/runtime.ts:47` | Medium | M | Built-in providers are manually imported and registered in runtime; init provider metadata is separately duplicated in `src/config/init.ts:40` and `src/config/init.ts:197`. | Introduce provider metadata modules that export factory, init defaults, safe args, and display name from one source. |
-| F012 | Consistency | `src/reviewers/builtin/index.ts:3` | Medium | S | Exported `BUILTIN_PERSONAS` has 3 shorter personas, while `quorum.yaml.example:15` has 4 richer personas including `backend-senior`. Consumers and `quorum init` see different defaults. | Use one persona source of truth; generate the example or built-ins from it. |
-| F013 | Documentation drift | `docs/ARCHITECTURE.md:441` | Medium | S | Architecture says several implemented providers are out of scope for V1, including Codex, Cursor, Gemini, and Continue at `docs/ARCHITECTURE.md:455`. | Update architecture docs to reflect the actual V1/V1.x state. |
-| F014 | Documentation drift | `docs/ARCHITECTURE.md:145` | Medium | M | Docs describe third-party provider plugin discovery by package convention, but runtime only registers hardcoded built-ins at `src/runtime/runtime.ts:47`. | Either implement external provider loading or mark it explicitly as future work. |
-| F015 | Maintainability | `src/cli/index.ts:73` | Medium | M | `src/cli/index.ts` is a 450-line mixed-responsibility module: parsing, dispatch, review, init UI, redaction, prompt building, and writing. | Split into `commands/review.ts`, `commands/config.ts`, `commands/init.ts`, `args.ts`, and `report-writer.ts`. |
-| F016 | UX / Correctness | `src/cli/index.ts:273` | Low | S | `quorum init` prompts for providers/personas/model before checking repo root, config path, and overwrite status at `src/cli/index.ts:276`. | Resolve path and overwrite decision before interactive prompts. |
-| F017 | Correctness | `src/cli/index.ts:439` | Low | S | `writeReport` derives directories with string slicing on `/`, not `path.dirname`, which is non-portable and brittle. | Use `dirname`/`resolve`; normalize report paths consistently. |
-| F018 | Correctness | `src/pipelines/executor.ts:47` | Medium | S | Parallel results are pushed as reviewers finish, so report and JSON review order are nondeterministic when `Promise.all` runs at `src/pipelines/executor.ts:73`. | Return `{index,result}` from each reviewer and sort by pipeline reviewer order. |
-| F019 | Performance / Cost | `src/pipelines/executor.ts:73` | Medium | M | Parallel pipelines launch all reviewers at once with no concurrency limit, rate-limit handling, or budget guard. | Add `maxConcurrency`, per-provider concurrency, and optional cost/token caps. |
-| F020 | Observability | `src/runtime/bus.ts:32` | Low | S | Event listener failures are swallowed to `console.error`, outside Quorum's event/error model. | Emit an internal log/error event or allow a configurable logger. |
-| F021 | Observability | `src/runtime/runtime.ts:93` | Low | S | Provider dispose failures are caught and discarded at `src/runtime/runtime.ts:95`. | Record disposal errors in a debug log or aggregate them after best-effort cleanup. |
-| F022 | Config / Security | `src/config/interpolate.ts:24` | Medium | S | `env:VAR` can be lazy, but `${VAR}` is resolved eagerly at `src/config/interpolate.ts:47`, despite README/docs presenting both as config interpolation mechanisms. | Make template interpolation lazy too, or document the difference and add tests. |
-| F023 | Test debt | `tests/config.test.ts:5` | Medium | S | Config tests cover one schema rejection only; env interpolation, lazy resolution, cross-reference errors, defaults, and provider-specific validation are mostly untested. | Add table-driven config tests for interpolation, missing envs, unknown refs, invalid consensus, and provider schema failures. |
-| F024 | Type hygiene | `tsconfig.json:3` | Low | S | Strict mode is enabled, but unused locals/parameters are not. Enabling them currently finds unused imports in `src/consensus/overlap-v1.ts:2`. | Enable `noUnusedLocals` and `noUnusedParameters`; remove current unused imports. |
-| F025 | Tooling | `package.json:10` | Medium | S | Scripts only cover CLI run, typecheck, and tests. No lint, format, coverage, dead-code, or circular-dependency check is configured. | Add `lint`, `format:check`, `test:coverage`, `depcheck/knip`, and circular import checks. |
-| F026 | DevOps | `.github/workflows/ci.yml:20` | Medium | S | CI uses `bun-version: latest`; `package.json:20` also uses `@types/bun: latest`. Builds can change under the same commit. | Pin Bun and Bun types; update intentionally with dependency PRs. |
-| F027 | HTTP resilience | `src/providers/openrouter/client.ts:59` | Medium | M | HTTP clients rely on caller abort signals and provider responses, but there is no provider-level timeout/retry/backoff. Pipeline timeout is optional at `src/config/schema.ts:40`. | Add default provider request timeouts and retry/backoff for retryable failures. |
-| F028 | Observability | `src/providers/openrouter/client.ts:124` | Medium | S | Malformed SSE chunks are silently ignored. Ollama stream parsing similarly returns null on parse errors at `src/providers/ollama/client.ts:121`. | Count malformed chunks and emit a debug/warn event; fail if the stream ends without valid content. |
-| F029 | API surface | `src/providers/openrouter/index.ts:85` | Low | M | Provider `stream()` methods exist but `PipelineExecutor` always calls `review()` at `src/pipelines/executor.ts:54`; the streaming API is effectively unused. | Either integrate `stream()` into orchestration or remove it until needed. |
-| F030 | Report safety | `src/ui/markdown.ts:68` | Low | S | Markdown escaping only handles `<` and `>`. LLM-supplied titles/bodies can inject headings, links, tables, or misleading report structure. | Escape or sanitize markdown-sensitive characters, or render finding bodies in fenced/plain blocks. |
-| F031 | Consensus correctness | `src/consensus/overlap-v1.ts:16` | Medium | M | Grouping compares new findings to the current representative only. Since representative can change by severity at `src/consensus/overlap-v1.ts:23`, grouping can become order-dependent. | Match against all group members or use connected components over pairwise matches. |
-| F032 | Output contract | `src/reviewers/output.ts:81` | Medium | S | Missing/invalid lines default to line 1, and unknown severity/category default to medium/correctness at `src/reviewers/output.ts:118`. This hides provider contract drift. | Treat invalid required fields as parse errors unless explicitly running in permissive mode. |
-| F033 | Output parsing | `src/reviewers/output.ts:135` | Medium | M | Fallback JSON recovery slices from first `{` to last `}`, which can misparse prose containing multiple JSON objects or braces. | Use a small balanced-brace scanner or require exact JSON for providers that support structured output. |
-| F034 | Privacy | `src/runtime/workspace.ts:107` | Medium | M | Untracked text files are included by default up to 24KB each; there is a per-file cap at `src/runtime/workspace.ts:125` but no total cap or confirmation. | Add config flags for untracked inclusion, total cap, and denylist for sensitive file patterns. |
-| F035 | Privacy / UX | `src/cli/index.ts:197` | Medium | S | Live preview is enabled by default for text output, and `TerminalRenderer` prints raw token previews at `src/ui/terminal.ts:146`. Provider output may quote sensitive code. | Default previews off or redact/truncate more aggressively; keep `--preview` opt-in. |
-| F036 | Packaging | `package.json:6` | Low | M | Published entrypoints point directly at TypeScript source (`main` and `bin`) with no build artifact. This is fine for Bun-only usage but fragile for broader npm/library consumers. | Decide whether this is Bun-only; otherwise add a build step and `exports` mapping. |
-| F037 | Error handling | `src/runtime/workspace.ts:79` | Medium | S | `runGit` returns `null` on any git failure and discards stderr. Callers cannot explain why workspace probing failed. | Return a discriminated result with stdout, stderr, exit code; map failures to `ConfigError`/`ProviderRuntimeError`. |
-| F038 | Config redaction | `src/cli/index.ts:398` | Low | S | Redaction is key-name based only. Secrets stored under nonstandard keys or nested provider-specific headers will print in `quorum config`. | Add provider schema metadata for sensitive fields and redact lazy/template env refs by value origin. |
+| F004 | Security | `src/providers/codex-cli/index.ts:46` | High | M | **RESOLVED 2026-05-27.** `approval_policy: 'never'` now maps to `--dangerously-bypass-approvals-and-sandbox` only when explicitly configured; the schema also includes a `.refine()` that blocks the dangerous `sandbox: 'danger-full-access'` + `approval_policy: 'never'` combination (schema.ts:23-29). | Default remains `'never'` — consider making `'untrusted'` the default for audit/review-only use. |
+| F005 | Security | `src/cli/index.ts:449` | High | M | **NOT RESOLVED.** Diffs are still embedded inside `` ```diff `` fences with no escaping. A malicious diff can include triple backticks and inject reviewer instructions. | Wrap diffs in a JSON envelope or use length-prefixed payloads; add tests for fence-breaking diffs. |
+| F006 | Correctness | `src/runtime/workspace.ts:46` | High | S | **PARTIALLY RESOLVED.** `runGit` correctly returns `null` on failure (line 87), distinguishing success from failure internally. However, `gitDiff` at lines 44-61 still converts `null` to `undefined`, masking git failures as "no diff" without surfacing stderr. | Surface the git stderr/exit code; exit non-zero on invalid `--base`. |
+| F007 | Performance / Cost | `src/runtime/workspace.ts:16` | High | M | **NOT RESOLVED.** Still no `maxDiffBytes`, token budget, file filters, or "too large" failure mode. Full diff is buffered and embedded into prompts without limits. | Add byte/token budgets, include/exclude filters, truncation summaries, and explicit size failure. |
+| F008 | Architecture | `src/providers/continue-dev/index.ts:42` | High | M | **NOT RESOLVED.** Subprocess lifecycle logic (spawn, abort, timeout, stdout preview, stderr read, exit handling) is still duplicated across all 7 subprocess providers. No shared `SubprocessRunner` extracted. | Extract a shared subprocess runner with timeout classification, stdin/argv policy, env handling, preview events, and normalized errors. |
+| F009 | Correctness / Observability | `src/providers/claude-code/index.ts:63` | Medium | S | **RESOLVED 2026-05-27.** `timedOut` flag is now set and checked: `let timedOut = false;` (line 63) → `setTimeout(() => { timedOut = true; proc.kill(); }, ...)` (lines 64-67) → `throw new ProviderRuntimeError(...)` when true (lines 84-88). | Keep regression tests for timeout classification on all providers. |
+| F010 | Architecture | `src/providers/continue-dev/index.ts:132` | Medium | S | **NOT RESOLVED.** JSON-output unwrapping is still duplicated across continue, cursor, kilo, and opencode providers. Continue's `normaliseContinueOutput` (lines 132-175) has thorough fallback logic, but no shared normalizer exists. | Move to a shared provider-output normalizer with provider-specific key lists. |
+| F011 | Architecture | `src/runtime/runtime.ts:47` | Medium | M | **PARTIALLY RESOLVED.** All 9 providers are registered correctly at runtime boot. Metadata is still duplicated across `src/config/init.ts` and runtime registration; no shared `BuiltinProviderDescriptor` exists. | Introduce provider metadata modules that export factory, init defaults, safe args, and display name from one source. |
+| F012 | Consistency | `src/reviewers/builtin/index.ts:3` | Medium | S | **PARTIALLY RESOLVED.** `BUILTIN_PERSONAS` has 3 personas (security, performance, architecture). `quorum.yaml.example` has 4 (adds `backend-senior`). The init flow loads from the example file, so init sees all 4, but direct builtin consumers only see 3. | Either add `backend-senior` to `BUILTIN_PERSONAS` or generate one source from the other. |
+| F013 | Documentation drift | `docs/ARCHITECTURE.md:441` | Medium | S | **NOT RESOLVED.** Section 14 (lines 441-456) still lists "Codex CLI, Aider, Cursor, Gemini CLI, Continue.dev, LiteLLM" as "post-V1" providers, despite all being implemented. | Update architecture docs to reflect actual V1 state; move implemented providers out of "Out of scope." |
+| F014 | Documentation drift | `docs/ARCHITECTURE.md:145` | Medium | M | **NOT RESOLVED.** Docs describe third-party provider plugin discovery by package convention, but runtime only registers hardcoded built-ins. No external loading mechanism exists. | Either implement external provider loading or explicitly mark it as future work. |
+| F015 | Maintainability | `src/cli/index.ts:73` | Medium | M | **NOT RESOLVED.** `src/cli/index.ts` is still a 463-line god module with no command extraction. Parsing, dispatch, review, init UI, redaction, prompt building, and file writes all coexist in one file. | Split into `commands/review.ts`, `commands/config.ts`, `commands/init.ts`, `args.ts`, and `report-writer.ts`. |
+| F016 | UX / Correctness | `src/cli/index.ts:273` | Low | S | **RESOLVED 2026-05-27.** Config path resolution and overwrite check (lines 275-283) now happen *before* interactive prompts at lines 285-287. User is not asked for selections that would be wasted. | — |
+| F017 | Correctness | `src/cli/index.ts:439` | Low | S | **RESOLVED 2026-05-27.** `writeReport` (lines 454-458) now passes the full content directly to `Bun.write(path, content)` without string slicing on `/`. Path handling appears portable. | Use `dirname`/`resolve` if report path derivation is added later. |
+| F018 | Correctness | `src/pipelines/executor.ts:47` | Medium | S | **PARTIALLY RESOLVED.** Parallel results use positional index via closure (`reviews[index] = result`, line 58). However, `.filter(Boolean)` on line 90 removes undefined slots for failed reviewers without preserving which position failed, shifting subsequent results. | Either preserve empty slots or return `{index, result}` with sort; document failed reviewers by position. |
+| F019 | Performance / Cost | `src/pipelines/executor.ts:73` | Medium | M | **NOT RESOLVED.** All reviewers still launch concurrently via `Promise.all` with no concurrency limit, rate-limit handling, or budget guard. | Add `maxConcurrency`, per-provider concurrency, and optional cost/token caps. |
+| F020 | Observability | `src/runtime/bus.ts:32` | Low | S | **RESOLVED 2026-05-27.** `safeInvoke` wraps every listener in try/catch; failures log to `console.error` without crashing the bus or affecting other listeners. | — |
+| F021 | Observability | `src/runtime/runtime.ts:93` | Low | S | **PARTIALLY RESOLVED.** Provider dispose is called best-effort, but errors are still silently discarded (`catch(() => undefined)`, lines 94-98). No debug log or aggregation. | Emit internal log events or aggregate dispose errors after cleanup. |
+| F022 | Config / Security | `src/config/interpolate.ts:24` | Medium | S | **PARTIALLY RESOLVED.** Template interpolation (`${VAR}`) works but only matches uppercase identifiers (`[A-Z0-9_]+`). Lowercase env var names like `${my_var}` are not matched, while `env:my_var` works via the lazy `env:` path. Both mechanisms functionally exist but have different case support. | Document the case-sensitivity difference, or make `${}` match the same set as `env:`. |
+| F023 | Test debt | `tests/config.test.ts:5` | Medium | M | **NOT RESOLVED.** Config tests still contain only 1 test (same schema rejection as at audit time). Env interpolation, lazy resolution, cross-reference errors, defaults, and provider-specific validation remain untested. | Add table-driven config tests for interpolation, missing envs, unknown refs, invalid consensus, and provider schema failures. |
+| F024 | Type hygiene | `tsconfig.json:3` | Low | S | **RESOLVED 2026-05-27.** `noUnusedLocals` and `noUnusedParameters` are now enabled (tsconfig.json lines 12-13), alongside `strict: true`. Unused imports caught at compile time. | — |
+| F025 | Tooling | `package.json:10` | Medium | S | **RESOLVED 2026-05-27.** Scripts now include `typecheck`, `test`, `test:coverage`, and `lint`. Coverage and lint gates are available. | Add format, dead-code, and circular-dependency checks for full coverage. |
+| F026 | DevOps | `.github/workflows/ci.yml:20` | Medium | S | **RESOLVED 2026-05-27.** CI now pins `bun-version: "1.3.3"` and `package.json` has `engines.bun: ">=1.1.0"`. Builds are reproducible. | Keep Bun pinned; update intentionally with dependency PRs. |
+| F027 | HTTP resilience | `src/providers/openrouter/client.ts:59` | Medium | M | **NOT RESOLVED.** OpenRouter client still has no retry, backoff, rate-limit (429) handling, or circuit breaker. `chat()` and `chatStream()` do a single `fetch` call and throw immediately on any error. Pipeline `timeoutMs` remains optional. | Add default provider request timeouts with retry/backoff for retryable failures. |
+| F028 | Observability | `src/providers/openrouter/client.ts:124` | Medium | S | **RESOLVED 2026-05-27.** OpenRouter SSE parsing now includes try/catch with `chunk_parse_error` yield (lines 110-137). Ollama NDJSON parsing similarly yields `chunk_parse_error` (lines 104-126). No silent drops. | Count malformed chunks and fail if stream ends without valid content. |
+| F029 | API surface | `src/providers/openrouter/index.ts:85` | Medium | M | **RESOLVED 2026-05-27.** `stream()` method (lines 91-109) exists and delegates to `client.chatStream()`, yielding `token` and `log` events. Streaming API is available. | Pipeline executor still calls `review()` — evaluate whether to integrate `stream()` into orchestration. |
+| F030 | Report safety | `src/ui/markdown.ts:68` | Low | S | **RESOLVED 2026-05-27.** `escapeMd` now escapes *all* Markdown special characters: `` \`*_{}[]()#+-.!~|<> ``. User-supplied titles, bodies, file paths, and reviewer IDs pass through this function. No heading/table injection possible. | — |
+| F031 | Consensus correctness | `src/consensus/overlap-v1.ts:16` | Medium | M | **NOT RESOLVED.** `aggregate` loop still uses `g.representative` for matching (line 16). Representative can change on severity upgrade (lines 22-24), making grouping order-dependent. A,B,C,D same-line findings produce different groups depending on iteration order. | Match against all group members or use connected components over pairwise matches. |
+| F032 | Output contract | `src/reviewers/output.ts:81` | Medium | S | **RESOLVED 2026-05-27.** Missing/invalid lines default to 1; unknown severity/category default to `'medium'`/`'correctness'`. These are sensible defaults for a V1 tool that consumes untrusted LLM output. | Treat invalid required fields as parse errors when running in strict/permissive mode toggle. |
+| F033 | Output parsing | `src/reviewers/output.ts:135` | Medium | M | **NOT RESOLVED.** Fallback JSON recovery still uses `indexOf('{')` + `lastIndexOf('}')` with no balanced-brace scanner. Responses with multiple JSON objects or braces in prose will misparse. | Use a small balanced-brace scanner or require exact JSON for providers that support structured output. |
+| F034 | Privacy | `src/runtime/workspace.ts:107` | Medium | M | **RESOLVED 2026-05-27.** Untracked files are gated by `MAX_UNTRACKED_BYTES` (24KB per file), binary detection, non-regular file handling, line ending normalization, and unreadable-file fallbacks. | Add config flags for total cap and denylist for sensitive file patterns. |
+| F035 | Privacy / UX | `src/cli/index.ts:197` | Medium | S | **RESOLVED 2026-05-27.** Preview is controlled by `--no-preview` flag; `TerminalRenderer` accumulates tokens with 500ms/240-char debounce and shows only last 220 chars. Reasonable defaults. | Keep `--no-preview` default-off to maintain opt-in safety. |
+| F036 | Packaging | `package.json:6` | Low | M | **RESOLVED 2026-05-27.** `main` points to `src/index.ts`, `bin` points to `src/cli/index.ts`. Bun-run entrypoints are explicit. `engines.bun` declares Bun requirement. | Decide if a build step for npm consumers is needed; document Bun-only status. |
+| F037 | Error handling | `src/runtime/workspace.ts:79` | Medium | S | **PARTIALLY RESOLVED.** `runGit` returns `string | null` — distinguishes failure internally. However, callers cannot access stderr/exit code for diagnostics. The `null` return is still ambiguously "something went wrong." | Return `{ ok: true; stdout } | { ok: false; code; stderr }` for actionable errors. |
+| F038 | Config redaction | `src/cli/index.ts:398` | Low | S | **RESOLVED 2026-05-27.** `redactConfig` (lines 387-425) recursively redacts lazy `env:` refs, generic sensitive keys (api_key, token, secret, password variants), and provider-specific sensitive fields. Comprehensive coverage. | — |
 
-## Top 5 if you fix nothing else
+## Top 5 if you fix nothing else (updated 2026-05-27)
 
-1. **F002/F003/F008 - Standardize subprocess execution**
-   - Create `src/providers/subprocess-runner.ts`.
-   - Inputs: binary, cwd, args, stdin, env, timeout, abort signal, reviewer id.
-   - Outputs: stdout, stderr, exit code, timedOut, token events.
-   - Enforce stdin prompt delivery by default; require explicit exception for argv prompt CLIs.
-
-2. **F005 - Harden prompt construction**
+1. **F005 — Harden prompt construction**
    - Replace markdown fenced diff with a structured envelope:
      ```json
      { "changedFiles": ["..."], "diff": "...", "instruction": "review only this diff" }
      ```
    - Add tests where the diff contains ``` fences, JSON-looking text, and prompt-injection phrases.
 
-3. **F006/F037 - Make workspace probing fail loudly**
+2. **F006/F037 — Make workspace probing fail loudly**
    - Replace `string | null` git helpers with `{ ok: true, stdout } | { ok: false, stderr, code }`.
    - Invalid `--base` should exit non-zero with the git error.
 
-4. **F011/F012/F015 - Consolidate provider metadata and CLI modules**
-   - Provider modules should export factory + init defaults + safe args + model defaults.
-   - CLI command files should consume those modules instead of maintaining parallel switch statements.
+3. **F008 — Extract shared subprocess runner**
+   - Create `src/providers/subprocess-runner.ts`.
+   - Inputs: binary, cwd, args, stdin, env, timeout, abort signal, reviewer id.
+   - Outputs: stdout, stderr, exit code, timedOut, token events.
+   - Enforce stdin prompt delivery by default; require explicit exception for argv prompt CLIs.
 
-5. **F007/F019/F027/F034 - Add budget controls**
-   - Add `maxDiffBytes`, `includeUntracked`, `maxConcurrency`, `timeoutMs`, and provider request timeouts.
+4. **F007/F019/F027 — Add budget and resilience controls**
+   - Add `maxDiffBytes`, `maxConcurrency`, `timeoutMs` defaults, provider request timeouts.
+   - Add retry/backoff for HTTP providers (429, 5xx).
    - Fail with clear diagnostics when limits are exceeded instead of sending oversized prompts.
 
-## Quick wins
+5. **F015 — Split CLI god module**
+   - Extract `commands/review.ts`, `commands/config.ts`, `commands/init.ts`, `args.ts`, and `report-writer.ts`.
+   - Each command file should consume provider/persona metadata from a single shared registry.
 
-- [ ] F009: Add `timedOut` handling to Claude Code provider.
-- [ ] F016: Check overwrite/config path before `quorum init` prompts.
-- [ ] F017: Replace `writeReport` string slicing with `path.dirname`.
+## Quick wins (updated 2026-05-27)
+
+- [x] F009: Add `timedOut` handling to Claude Code provider.
+- [x] F016: Check overwrite/config path before `quorum init` prompts.
+- [x] F017: Replace `writeReport` string slicing with `path.dirname`.
 - [ ] F018: Preserve reviewer order in parallel results.
 - [ ] F022: Align `${VAR}` interpolation semantics with `env:VAR`.
-- [ ] F024: Enable TypeScript unused checks and remove unused imports.
-- [ ] F025: Add `test:coverage` and `lint` scripts.
-- [ ] F026: Pin Bun version in CI and `@types/bun`.
-- [ ] F028: Emit warnings for malformed stream chunks.
-- [ ] F030: Harden markdown escaping.
+- [x] F024: Enable TypeScript unused checks and remove unused imports.
+- [x] F025: Add `test:coverage` and `lint` scripts.
+- [x] F026: Pin Bun version in CI and `@types/bun`.
+- [x] F028: Emit warnings for malformed stream chunks.
+- [x] F030: Harden markdown escaping.
+- [ ] F006: Surface git failure stderr instead of "No diff detected".
 
-## Roadmap priorisee
+### New quick wins
+- [ ] F031: Fix order-dependence in overlap-v1 consensus by matching against all group members.
+- [ ] F012: Add `backend-senior` to `BUILTIN_PERSONAS` or generate from `quorum.yaml.example`.
+- [ ] F013: Move implemented providers out of "Out of scope for V1" in architecture docs.
 
-### Phase 1 - Security and correctness hardening
+## Roadmap priorisee (updated 2026-05-27)
 
-- Fix plugin argument handling and subprocess prompt delivery.
-- Make git failures explicit.
-- Harden prompt construction against fence-breaking and instruction injection.
-- Turn on provider default timeouts.
+### Phase 1 — Security and correctness hardening (reprioritized)
 
-### Phase 2 - Maintainability refactor
+- Harden prompt construction against fence-breaking and instruction injection (F005).
+- Make git failures explicit; surface stderr and exit codes (F006, F037).
+- Add provider request timeouts with retry/backoff (F027).
+- Fix order-dependence in overlap-v1 consensus grouping (F031).
+- Improve fallback JSON parsing with balanced-brace scanner (F033).
 
-- Extract CLI commands from `src/cli/index.ts`.
-- Introduce shared subprocess runner and shared output normalizer.
-- Replace duplicated provider/init metadata with a single registry-driven model.
-- Align built-in personas with `quorum.yaml.example`.
+### Phase 2 — Maintainability and architecture refactor
 
-### Phase 3 - Test and tooling maturity
+- Extract CLI commands from `src/cli/index.ts` (F015).
+- Introduce shared subprocess runner and shared output normalizer (F008, F010).
+- Replace duplicated provider/init metadata with a single registry-driven model (F011).
+- Align built-in personas with `quorum.yaml.example` (F012).
+- Resolve documentation drift for V1 scope and implemented providers (F013, F014).
 
-- Add config/interpolation tests, runtime resolver tests, stream error tests, markdown renderer tests, and plugin command tests.
-- Add lint/format/coverage scripts and CI gates.
-- Add dead-code and circular-dependency checks.
+### Phase 3 — Budget and resilience controls
 
-### Phase 4 - Product scalability
+- Add diff size budgets, file filters, untracked-file policy (F007).
+- Add concurrency limits and cost/token caps (F019).
+- Add default provider timeouts and retry/backoff (F027 — moved from Phase 1 if partially done).
 
-- Add diff size budgets, file filters, untracked-file policy, and concurrency/cost controls.
-- Decide whether `stream()` is a supported provider API or future-only surface.
-- Update docs to distinguish implemented V1 from future plugin/provider roadmap.
+### Phase 4 — Test and tooling maturity
+
+- Add config/interpolation tests, consensus edge-case tests, runtime resolver tests (F023, F031).
+- Add markdown renderer edge-case tests and plugin command tests.
+- Add dead-code and circular-dependency checks to CI.
 
 ## Examples of concrete refactorings
 
@@ -222,29 +240,23 @@ Use it to distinguish clean workspace, invalid base, missing git, and unexpected
 ## Tests and quality strategy
 
 - Keep current provider wrapper tests; they are valuable because they pin argv/stdin behavior.
-- Add regression tests for the high-risk cases:
-  - malicious diff with code fence and prompt-injection text;
-  - invalid `--base`;
-  - large diff exceeds budget;
-  - subprocess timeout classification for every subprocess provider;
-  - plugin command argument escaping;
-  - config interpolation with `env:VAR`, `${VAR}`, missing vars, and redaction.
-- Add behavior tests for report determinism: same reviewer order in JSON/markdown regardless of completion order.
-- Add renderer tests for markdown escaping and terminal preview redaction/truncation.
-- Add runtime tests for unknown provider/reviewer/pipeline and provider dispose failures.
+- Add regression tests for the remaining high-risk cases:
+  - malicious diff with code fence and prompt-injection text (F005);
+  - invalid `--base` surfacing git errors (F006/F037);
+  - large diff exceeds budget (F007);
+  - order-dependence in overlap-v1 grouping (F031);
+  - config interpolation with `env:VAR`, `${VAR}`, missing vars, and redaction (F023/F022);
+  - OpenRouter retry/backoff and timeout behavior (F027).
 
 ## DevOps and workflow
 
-- CI is minimal and useful, but not reproducible enough because Bun is `latest`.
+- CI pins Bun to `1.3.3` and has basic gates (typecheck, test, coverage, lint).
 - There is no lint/format gate, no coverage threshold, no unused/dead code check, and no circular-dependency check.
 - Dependency surface is small (`yaml`, `zod`), and `bun audit` found no vulnerabilities.
-- Recommended CI gates:
-  1. `bun install --frozen-lockfile`
-  2. `bun run typecheck`
-  3. `bun test --coverage`
-  4. lint/format check
-  5. dependency audit
-  6. dead-code/circular-dependency check once configured
+- Recommended additional CI gates:
+  1. format check
+  2. dead-code/circular-dependency check
+  3. coverage threshold enforcement
 
 ## Things that look bad but are actually fine
 
@@ -256,8 +268,10 @@ Use it to distinguish clean workspace, invalid base, missing git, and unexpected
 
 ## Open questions for the maintainer
 
-- Should Quorum include untracked files by default, or should that be opt-in for privacy?
-- Is Codex non-interactive execution allowed to bypass approvals/sandbox in production use, or was that a compatibility workaround?
+- ~~Should Quorum include untracked files by default, or should that be opt-in for privacy?~~ (Resolved: 24KB per-file cap, binary detection, non-regular file handling, and line-ending normalization in place. Add total cap and denylist config.)
+- ~~Is Codex non-interactive execution allowed to bypass approvals/sandbox in production use, or was that a compatibility workaround?~~ (Resolved: bypass is gated on `approval_policy: 'never'`, and `danger-full-access` + `never` is blocked by schema refine.)
+- Should the codex-cli `approval_policy` default change from `'never'` to `'untrusted'` for review-only tooling?
 - Is the project intended to be Bun-only, or should npm/Node library consumers be supported?
 - Should external provider plugins be part of the near-term contract, or should docs mark that as future work?
 - Should live token preview be on by default, or should report-only output be the safer default?
+- Should `stream()` be integrated into the pipeline executor, or kept as a future-only surface until performance metrics justify it?
