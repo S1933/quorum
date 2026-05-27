@@ -13,4 +13,6 @@ export const CursorAgentConfigSchema = z
   })
   .strict();
 
+export const SENSITIVE_FIELDS = new Set<string>(['api_key']);
+
 export type CursorAgentConfig = z.infer<typeof CursorAgentConfigSchema>;

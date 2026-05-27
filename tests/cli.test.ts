@@ -10,7 +10,7 @@ import { overlapV1 } from '../src/consensus/overlap-v1.ts';
 import { ConsensusRegistry } from '../src/consensus/registry.ts';
 import { ProviderRegistry } from '../src/providers/registry.ts';
 import type { BoundReviewer } from '../src/reviewers/reviewer.ts';
-import { main, type CliDeps, type CliIo } from '../src/cli/index.ts';
+import { main, redactConfig, type CliDeps, type CliIo } from '../src/cli/index.ts';
 import { loadConfigFromPath } from '../src/config/loader.ts';
 import { createInitConfig } from '../src/config/init.ts';
 import { InMemoryEventBus } from '../src/runtime/bus.ts';
@@ -466,6 +466,119 @@ describe('cli', () => {
     expect(cfg.providers['opencode-local']?.model).toBe(
       'safe-model\nreviewers:\n  injected: { persona: security, provider: opencode-local }',
     );
+  });
+});
+
+describe('redactConfig', () => {
+  test('redacts lazy env refs', () => {
+    const input = {
+      api_key: { __lazyEnv: true, varName: 'OPENROUTER_API_KEY', resolve: () => 'sk-key' },
+    };
+    const result = redactConfig(input) as Record<string, unknown>;
+    expect(result.api_key).toBe('***redacted***');
+  });
+
+  test('redacts schema-defined sensitive fields for known provider types', () => {
+    const input = {
+      type: 'openrouter',
+      api_key: 'sk-123',
+      model: 'gpt-4',
+      base_url: 'https://openrouter.ai/api/v1',
+    };
+    const result = redactConfig(input) as Record<string, unknown>;
+    expect(result.api_key).toBe('***redacted***');
+    expect(result.model).toBe('gpt-4');
+  });
+
+  test('redacts schema-defined sensitive fields for cursor-agent provider', () => {
+    const input = {
+      type: 'cursor-agent',
+      api_key: 'sk-cursor',
+      model: 'claude-sonnet',
+    };
+    const result = redactConfig(input) as Record<string, unknown>;
+    expect(result.api_key).toBe('***redacted***');
+    expect(result.model).toBe('claude-sonnet');
+  });
+
+  test('redacts nested provider configs with schema-aware fields', () => {
+    const input = {
+      providers: {
+        openrouter_main: { type: 'openrouter', api_key: 'sk-abc', model: 'gpt-4' },
+        local_ai: { type: 'claude-code', model: 'claude-opus' },
+      },
+    };
+    const result = redactConfig(input) as Record<string, unknown>;
+    const providers = result.providers as Record<string, unknown>;
+    expect((providers.openrouter_main as Record<string, unknown>).api_key).toBe('***redacted***');
+    expect((providers.openrouter_main as Record<string, unknown>).model).toBe('gpt-4');
+    expect((providers.local_ai as Record<string, unknown>).model).toBe('claude-opus');
+  });
+
+  test('redacts nonstandard-key values when schema marks them sensitive', () => {
+    const input = {
+      providers: {
+        custom: { type: 'cursor-agent', auth_header: 'sk-test', api_key: 'sk-test-2' },
+      },
+    };
+    const result = redactConfig(input) as Record<string, unknown>;
+    const providers = result.providers as Record<string, unknown>;
+    const custom = providers.custom as Record<string, unknown>;
+    expect(custom.api_key).toBe('***redacted***');
+    expect(custom.auth_header).toBe('sk-test');
+  });
+
+  test('falls back to key-name heuristics for unknown provider types', () => {
+    const input = {
+      type: 'unknown-provider',
+      api_key: 'secret-123',
+      password: 'pwd',
+      access_token: 'tok',
+      public_field: 'visible',
+    };
+    const result = redactConfig(input) as Record<string, unknown>;
+    expect(result.api_key).toBe('***redacted***');
+    expect(result.password).toBe('***redacted***');
+    expect(result.access_token).toBe('***redacted***');
+    expect(result.public_field).toBe('visible');
+  });
+
+  test('redacts secret fields nested arbitrarily deep', () => {
+    const input = {
+      providers: {
+        nested: {
+          level: {
+            type: 'openrouter',
+            api_key: 'deep-secret',
+          },
+        },
+      },
+    };
+    const result = redactConfig(input) as Record<string, unknown>;
+    const providers = result.providers as Record<string, unknown>;
+    const nested = (providers.nested as Record<string, unknown>).level as Record<string, unknown>;
+    expect(nested.api_key).toBe('***redacted***');
+  });
+
+  test('redacts env:VAR pattern values under sensitive keys', () => {
+    const input = {
+      type: 'openrouter',
+      api_key: 'env:OPENROUTER_API_KEY',
+    };
+    const result = redactConfig(input) as Record<string, unknown>;
+    expect(result.api_key).toBe('***redacted***');
+  });
+
+  test('redacts lazy env ref values under any key', () => {
+    const lazyRef = { __lazyEnv: true, varName: 'MY_SECRET', resolve: () => 'value' };
+    const input = {
+      providers: {
+        oc: { type: 'opencode-go', api_key: lazyRef },
+      },
+    };
+    const result = redactConfig(input) as Record<string, unknown>;
+    const providers = result.providers as Record<string, unknown>;
+    expect((providers.oc as Record<string, unknown>).api_key).toBe('***redacted***');
   });
 });
 

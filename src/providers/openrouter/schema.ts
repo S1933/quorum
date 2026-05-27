@@ -14,4 +14,6 @@ export const OpenRouterConfigSchema = z
   })
   .strict();
 
+export const SENSITIVE_FIELDS = new Set<string>(['api_key']);
+
 export type OpenRouterConfig = z.infer<typeof OpenRouterConfigSchema>;

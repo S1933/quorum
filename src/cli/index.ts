@@ -20,6 +20,8 @@ import { renderMarkdownReport } from '../ui/markdown.ts';
 import { renderJsonReport } from '../ui/json.ts';
 import { promptQuestion, selectManyCheckbox, type SelectChoice } from '../ui/select.ts';
 import { QuorumError, ConfigError } from '../core/errors.ts';
+import { isLazyEnvRef } from '../config/interpolate.ts';
+import { getSensitiveFields } from '../config/sensitive-fields.ts';
 import type { WorkspaceInfo } from '../core/task.ts';
 import type { WriteStreamLike } from '../ui/terminal.ts';
 
@@ -381,18 +383,30 @@ function parseSelection(value: string, available: string[]): string[] {
   return [...new Set(selected)];
 }
 
-function redactConfig(cfg: unknown): unknown {
+export function redactConfig(cfg: unknown, providerType?: string): unknown {
+  if (isLazyEnvRef(cfg)) return '***redacted***';
   if (typeof cfg !== 'object' || cfg === null) return cfg;
-  if (Array.isArray(cfg)) return cfg.map(redactConfig);
+  if (Array.isArray(cfg)) return cfg.map((v) => redactConfig(v, providerType));
+
+  const obj = cfg as Record<string, unknown>;
+  const typeFromConfig = typeof obj.type === 'string' ? obj.type : undefined;
+  const effectiveType = typeFromConfig ?? providerType;
+
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(cfg as Record<string, unknown>)) {
-    if (isSensitiveKey(k)) {
+  for (const [k, v] of Object.entries(obj)) {
+    if (isSensitiveKey(k) || isProviderSensitiveField(effectiveType, k)) {
       out[k] = '***redacted***';
     } else {
-      out[k] = redactConfig(v);
+      out[k] = redactConfig(v, k === 'type' ? providerType : effectiveType);
     }
   }
   return out;
+}
+
+function isProviderSensitiveField(providerType: string | undefined, key: string): boolean {
+  if (!providerType) return false;
+  const fields = getSensitiveFields(providerType);
+  return fields?.has(key) ?? false;
 }
 
 function isSensitiveKey(key: string): boolean {
