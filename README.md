@@ -25,25 +25,14 @@ Quorum runs several AI reviewers on the same git diff, compares their findings, 
 ## Review Workflow
 
 ```text
-changes
-   |
-   v
-config
-   |
-   v
-pipeline
-   |
-   v
-reviewers
-   |
-   v
-findings
-   |
-   v
-consensus
-   |
-   v
-report
++---------+     +--------+     +----------+     +-----------+
+| changes | --> | config | --> | pipeline | --> | reviewers |
++---------+     +--------+     +----------+     +-----------+
+                                                   |
+                                                   v
++--------+     +-----------+     +----------+
+| report | <-- | consensus | <-- | findings |
++--------+     +-----------+     +----------+
 ```
 
 ## Supported Providers
