@@ -161,6 +161,20 @@ claude --plugin-dir ./plugin
 
 Then run `/quorum:quorum-review` or `/quorum:quorum-config` in Claude Code.
 
+### Claude Code Hook
+
+Auto-run Quorum review before commits. See [docs/CLAUDE_CODE_HOOK.md](docs/CLAUDE_CODE_HOOK.md) for setup instructions.
+
+Blocks commits with `high` or `critical` severity findings:
+
+```bash
+# Normal commit (runs Quorum check)
+git commit -m "message"
+
+# Bypass the check
+QUORUM_BYPASS=1 git commit -m "message"
+```
+
 ## Consensus
 
 V1 ships `overlap-v1`.
