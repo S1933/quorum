@@ -11,13 +11,16 @@ Quorum runs several AI reviewers on the same git diff, compares their findings, 
 
 ## Features
 
-- Portable personas independent from provider choice
-- Parallel or sequential review pipelines
-- YAML config with `env:VAR` and `${VAR}` secret interpolation
-- Consensus grouping by file, line range, and category
-- Terminal output and Markdown report rendering
-- Machine-readable JSON output for scripts, CI, and editor integrations
-- Claude Code slash commands
+- Review the same git diff with multiple AI reviewers and compare their findings
+- Mix hosted APIs, local models, and agent CLIs through one provider-agnostic runtime
+- Define reusable personas, bind them to providers as reviewers, and compose named pipelines
+- Run reviewers in parallel for speed or sequentially for ordered review flows
+- Generate starter configs with `quorum init`, including provider and persona selection
+- Validate YAML config, resolve secrets from environment variables, and redact sensitive config output
+- Group matching findings by file, line range, and category with the `overlap-v1` consensus strategy
+- Tune reviewers with per-reviewer model, temperature, token, and `topP` overrides
+- Render live terminal progress, Markdown reports, or machine-readable JSON for scripts and CI
+- Use Quorum from the CLI or directly inside Claude Code with slash commands
 
 ## Supported Providers
 
