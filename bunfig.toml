@@ -5,8 +5,5 @@ exact = false
 "@quorum/core" = "./src/core/index.ts"
 "@quorum/core/*" = "./src/core/*"
 
-[test]
-coverage = ["src/**/*.ts"]
-
 [packages]
 lockfile = "bun.lockb"
