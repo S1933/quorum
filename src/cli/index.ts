@@ -36,7 +36,7 @@ const defaultDeps: CliDeps = {
     return true;
   },
   readConfigFile: async (configPath) => await Bun.file(configPath).text(),
-  writeConfigFile: async (configPath, content) => await Bun.write(configPath, content),
+  writeConfigFile: async (configPath, content) => { await Bun.write(configPath, content); },
 };
 
 function printHelp(io: CliIo): void {
