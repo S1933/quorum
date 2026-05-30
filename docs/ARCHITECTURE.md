@@ -370,8 +370,7 @@ quorum/
 │   │   ├── reviewer.ts     # binding logic
 │   │   └── builtin/        # ships with security/backend/frontend/performance/architecture personas
 │   ├── pipelines/
-│   │   ├── executor.ts
-│   │   └── parallel.ts
+│   │   └── executor.ts
 │   ├── consensus/
 │   │   ├── registry.ts
 │   │   └── overlap-v1.ts
