@@ -12,15 +12,10 @@ Works as a Bun CLI or Claude Code plugin.
 
 ## Features
 
-- Run multiple AI reviewers on the same diff
-- Mix APIs, local models, and agent CLIs
-- Define personas and bind them to providers
-- Run reviewers in parallel or sequentially
-- Validate YAML and resolve environment secrets
-- Group findings by file, line, and category
-- Override model, temperature, tokens per reviewer
-- Render progress, Markdown, or JSON reports
-- CLI and Claude Code slash commands
+- Multi-reviewer consensus on the same git diff, with findings grouped by file, line, and category.
+- Provider-agnostic execution across APIs, local models, and agent CLIs.
+- YAML-defined personas, reviewer overrides, file filters, and parallel or sequential pipelines.
+- Terminal progress plus Markdown/JSON reports, available from the CLI or Claude Code slash commands.
 
 ## Review Workflow
 
