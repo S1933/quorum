@@ -70,6 +70,12 @@ bun quorum reviewer add \
 
 # List all reviewers, providers, personas, and pipelines
 bun quorum reviewers
+
+# Enable pre-commit hook (blocks commits with high/critical findings)
+bun quorum pre-commit true
+
+# Disable pre-commit hook
+bun quorum pre-commit false
 ```
 
 JSON mode: `bun quorum review --json`. Use `--report <path>` to write to a file.

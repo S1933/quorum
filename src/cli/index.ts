@@ -6,6 +6,7 @@ import { QuorumError } from '../core/errors.ts';
 import { parseArgs } from './args.ts';
 import { cmdReview } from './commands/review.ts';
 import { cmdReviewer } from './commands/reviewer.ts';
+import { cmdPreCommit } from './commands/pre-commit.ts';
 import type { CliDeps, CliIo } from './types.ts';
 
 export type { CliDeps, CliIo } from './types.ts';
@@ -43,6 +44,7 @@ function printHelp(io: CliIo): void {
 
 Usage:
   quorum review [pipeline-id] [--pipeline <id>] [--base <ref>] [--config <path>] [--report <path>] [--format text|json] [--json] [--no-color] [--no-preview] [--max-diff-bytes <n>] [--include <glob>] [--exclude <glob>]
+  quorum pre-commit true|false
   quorum help
 
 Defaults are read from quorum.yaml in the working directory.
@@ -67,6 +69,8 @@ export async function main(
         return await cmdReview(positional, flags, deps, io);
       case 'reviewer':
         return await cmdReviewer(positional, flags, deps, io);
+      case 'pre-commit':
+        return await cmdPreCommit(positional, flags, deps, io);
       default:
         io.stderr.write(`Unknown command: ${command}\n\n`);
         printHelp(io);
