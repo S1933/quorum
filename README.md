@@ -16,7 +16,6 @@ Works as a Bun CLI or Claude Code plugin.
 - Mix APIs, local models, and agent CLIs
 - Define personas and bind them to providers
 - Run reviewers in parallel or sequentially
-- Generate starter configs with `quorum init`
 - Validate YAML and resolve environment secrets
 - Group findings by file, line, and category
 - Override model, temperature, tokens per reviewer
@@ -172,7 +171,6 @@ Available slash commands:
 | `/quorum-review` | Run the default review pipeline on the current diff |
 | `/quorum-review <pipeline>` | Run a named pipeline |
 | `/quorum-config` | Show loaded config with secrets redacted |
-| `/quorum-init` | Create a starter `quorum.yaml` for the current project |
 
 For local plugin development:
 
@@ -211,17 +209,5 @@ Example:
 - Result: one agreement group, `2 reviewers agreed`
 - Reviewer C: `src/db.ts:10`, `performance`
 - Result: one single-reviewer finding
-
-## Roadmap
-
-- Standalone `quorum` binary with improved packaging
-- CI command with exit codes and PR annotations
-- Better diagnostics for missing tools and bad credentials
-- Compatibility checks for Claude Code, OpenCode, Ollama, OpenRouter
-- Semantic deduplication
-- Contradiction detection
-- Per-reviewer trust and weighted voting
-- External provider plugins
-- Review history and web dashboard
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deeper design notes.
