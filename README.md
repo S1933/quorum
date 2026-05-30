@@ -36,15 +36,16 @@ Works as a Bun CLI.
 
 - [Bun](https://bun.sh) `>= 1.1`
 
-## Install
+## Quick Start
 
 ```bash
 git clone https://github.com/S1933/quorum.git
 cd quorum
 bun install
-```
 
-`bun install` automatically symlinks Quorum skills into `~/.agents/skills/` via a postinstall script.
+# Add your first reviewer
+bun quorum reviewer add --provider=openrouter --persona=security --model=claude-opus-4
+```
 
 ## Use The CLI
 
@@ -61,20 +62,19 @@ bun quorum review --pipeline consensus-security
 # Add a reviewer to your config
 bun quorum reviewer add --provider=openrouter --persona=security --model=claude-opus-4
 
-# Add with file filter and custom id
-bun quorum reviewer add --provider=claude-code --persona=backend-senior --ext=go --id=backend-go-reviewer --pipeline=default
+# Add with file filter, custom id, and target pipeline
+bun quorum reviewer add \
+  --provider=claude-code \
+  --persona=backend-senior \
+  --ext=go \
+  --id=backend-go-reviewer \
+  --pipeline=default
 
 # List all reviewers, providers, personas, and pipelines
 bun quorum reviewers
-
-# Print a clean JSON review report to stdout
-bun quorum review --json
-
-# Equivalent explicit format flag
-bun quorum review --format json
 ```
 
-JSON mode outputs only the JSON to stdout. Use `--report <path>` to write to a file.
+JSON mode: `bun quorum review --json`. Use `--report <path>` to write to a file.
 
 ## Consensus
 
