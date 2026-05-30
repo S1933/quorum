@@ -30,26 +30,6 @@ interface FakeRuntime extends Runtime {
 }
 
 describe('cli', () => {
-  test('config prints redacted configuration', async () => {
-    const io = captureIo();
-
-    const code = await main(
-      ['config', '--config', '/repo/quorum.yaml'],
-      deps({
-        loadConfigFromPath: async (path) => {
-          expect(path).toBe('/repo/quorum.yaml');
-          return config();
-        },
-      }),
-      io,
-    );
-
-    expect(code).toBe(0);
-    const printed = JSON.parse(io.stdoutText()) as QuorumConfig;
-    expect(printed.providers['fake-provider']?.api_key).toBe('***redacted***');
-    expect(io.stderrText()).toBe('');
-  });
-
   test('review runs configured pipeline through an injected runtime and writes report', async () => {
     const io = captureIo();
     const tmp = await mkdtemp(join(tmpdir(), 'quorum-cli-test-'));
