@@ -10,7 +10,6 @@ const PROVIDER_TYPE = 'cursor-agent';
 const STDIN_PROMPT = 'Read the review instructions from stdin and return only the requested output.';
 
 class CursorAgentProvider implements Provider {
-  readonly kind = 'subprocess' as const;
 
   constructor(
     readonly id: string,
@@ -25,8 +24,6 @@ class CursorAgentProvider implements Provider {
       tools: true,
       mcp: true,
       localExecution: true,
-      backgroundJobs: false,
-      costReporting: false,
     };
   }
 

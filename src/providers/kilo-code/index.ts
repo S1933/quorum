@@ -10,7 +10,6 @@ const PROVIDER_TYPE = 'kilo-code';
 const STDIN_PROMPT = 'Read the review instructions from stdin and return only the requested output.';
 
 class KiloCodeProvider implements Provider {
-  readonly kind = 'subprocess' as const;
 
   constructor(
     readonly id: string,
@@ -25,8 +24,6 @@ class KiloCodeProvider implements Provider {
       tools: true,
       mcp: true,
       localExecution: true,
-      backgroundJobs: false,
-      costReporting: false,
     };
   }
 

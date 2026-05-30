@@ -23,8 +23,6 @@ function reviewOnlyCapabilities(): ProviderCapabilities {
     tools: false,
     mcp: false,
     localExecution: false,
-    backgroundJobs: false,
-    costReporting: false,
   };
 }
 
@@ -34,7 +32,6 @@ describe('bindReviewer', () => {
 
     const provider: Provider = {
       id: 'provider-a',
-      kind: 'http',
       capabilities: reviewOnlyCapabilities,
       async review(task: ReviewTask, ctx: ExecCtx): Promise<ReviewResult> {
         capturedCtx = ctx;
@@ -74,7 +71,6 @@ describe('bindReviewer', () => {
   function makeReviewer(review: (task: ReviewTask, ctx: ExecCtx) => Promise<ReviewResult>) {
     const provider: Provider = {
       id: 'provider-a',
-      kind: 'subprocess',
       capabilities: reviewOnlyCapabilities,
       review,
     };

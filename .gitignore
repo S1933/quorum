@@ -6,5 +6,6 @@ dist/
 .env
 .env.local
 quorum.yaml
+quorum.yml
 !quorum.yaml.example
 .DS_Store

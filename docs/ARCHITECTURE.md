@@ -1,6 +1,6 @@
 # Quorum — Architecture
 
-> Status: **draft v0.1** · scope: design, not implementation · last updated 2026-05-22
+> Status: **draft v0.1** · scope: design, not implementation · last updated 2026-05-30
 
 Quorum is a provider-agnostic review runtime for AI-assisted code changes. Its differentiator is **multi-model consensus review**: when implementation is complete, the same reviewer persona is run across multiple providers, and a consensus engine aggregates and deduplicates findings like a team review meeting made only of LLM reviewers.
 
@@ -16,7 +16,7 @@ This document defines the domain model, layer boundaries, interfaces, and V1 cut
 4. **Event-driven, not callback soup.** A single event bus carries lifecycle events. UIs subscribe; they do not poll.
 5. **Provider variety validates the seam.** Quorum ships HTTP and local subprocess adapters, but they all satisfy the same review-focused provider interface.
 6. **No premature consensus.** V1 consensus = group findings by file+line overlap and emit an "N agreed" badge. Embedding-based semantic dedup and trust scoring are roadmap, not V1.
-7. **Claude Code plugin is a *distribution*, not the *runtime*.** The core is a Bun library + CLI; the plugin is a thin slash-command adapter.
+7. **Claude Code skill is a *distribution*, not the *runtime*.** The core is a Bun library + CLI; the skill is a thin adapter.
 
 ---
 
@@ -43,7 +43,7 @@ Three-tier hierarchy: **Provider → Reviewer → Pipeline.** Personas hang off 
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Distribution: Claude Code plugin · CLI · (future: web UI)   │
+│  Distribution: Claude Code skill · CLI · (future: web UI)    │
 ├──────────────────────────────────────────────────────────────┤
 │  UI: terminal renderer · markdown/json reports               │
 ├──────────────────────────────────────────────────────────────┤
@@ -319,19 +319,18 @@ The terminal renderer subscribes to runtime events for live progress. Markdown a
 
 ---
 
-## 10. Claude Code plugin layer
+## 10. Claude Code skill layer
 
-V1 distribution. Lives under `plugin/`.
+V1 distribution. Lives under `skills/`.
 
-**Slash commands (initial):**
-- `/quorum-review` — Run the `default` pipeline on the current diff (`git diff` vs default branch). Renders the consensus report inline.
-- `/quorum-config` — Show the loaded `quorum.yaml`, with `env:` redacted.
+**Skills:**
+- `quorum-review` — Run the configured pipeline on the current diff (`git diff` vs default branch). Renders the consensus report inline.
 
 **Optional surfaces (V1.x):**
-- A hook that runs `/quorum-review` post-commit and writes a markdown report to `.quorum/last-review.md`.
+- A hook that runs `quorum-review` post-commit and writes a markdown report to `.quorum/last-review.md`.
 - An MCP server exposing `quorum.review_diff` as a tool callable from Claude inside Claude Code.
 
-**Boundary contract:** the slash command is a *thin* shell — it parses args, loads config, invokes the library entry point, subscribes to events, prints. Zero domain logic in the command file. This is what lets us extract a standalone CLI later for free.
+**Boundary contract:** the skill is a *thin* shell — it parses args, loads config, invokes the CLI entry point, subscribes to events, prints. Zero domain logic in the skill file.
 
 ---
 
@@ -339,12 +338,9 @@ V1 distribution. Lives under `plugin/`.
 
 ```
 quorum/
-├── plugin/
-│   ├── .claude-plugin/
-│   │   └── plugin.json
-│   └── commands/
-│       ├── quorum-review.md
-│       └── quorum-config.md
+├── skills/
+│   └── review/
+│       └── SKILL.md
 ├── src/
 │   ├── core/                # types, schemas, errors. No I/O.
 │   │   ├── provider.ts
@@ -367,8 +363,7 @@ quorum/
 │   │   ├── opencode-go/           # subprocess provider
 │   │   └── cursor-agent/          # subprocess provider
 │   ├── reviewers/
-│   │   ├── reviewer.ts     # binding logic
-│   │   └── builtin/        # ships with security/backend/frontend/performance/architecture personas
+│   │   └── reviewer.ts     # binding logic; personas defined in quorum.yaml only
 │   ├── pipelines/
 │   │   └── executor.ts
 │   ├── consensus/
@@ -387,7 +382,13 @@ quorum/
 │   │   ├── markdown.ts
 │   │   └── json.ts
 │   └── cli/
-│       └── index.ts        # bun entrypoint; reused by Claude Code commands
+│       ├── index.ts              # bun entrypoint; reused by Quorum skill
+│       └── commands/
+│           ├── review.ts
+│           ├── config.ts
+│           ├── setup.ts
+│           ├── reviewers.ts
+│           └── reviewer.ts
 ├── tests/
 ├── docs/
 │   └── ARCHITECTURE.md     # this doc
@@ -398,7 +399,7 @@ quorum/
 └── README.md
 ```
 
-**Key observation:** `src/cli/index.ts` is the single entry point. The Claude Code slash commands shell out to it with stable, scriptable args. The same binary is the future standalone CLI.
+**Key observation:** `src/cli/index.ts` is the single entry point. The skill shells out to it with stable, scriptable args.
 
 ---
 
@@ -413,7 +414,8 @@ Six milestones, each independently shippable.
 | M3 | **Claude Code provider** | The same review task runs against Claude Code locally. Validates the abstraction across HTTP vs subprocess shapes. |
 | M4 | **Parallel pipeline + overlap-v1 consensus** | `quorum review` on a diff runs 2 reviewers in parallel, prints grouped findings with "N agreed" badges. |
 | M5 | **Terminal + markdown renderers** | Both renderers subscribe to events, produce live terminal output, and write a final `.quorum/last-review.md`. |
-| M6 | **Claude Code plugin shell** | `/quorum-review` works end-to-end inside Claude Code after an implementation is complete. |
+| M6 | **Claude Code skill** | `quorum-review` works end-to-end inside Claude Code after an implementation is complete. |
+| M7 | **CLI setup + reviewer commands** | `quorum setup`, `quorum reviewers`, `quorum reviewer add` for project integration and config management. |
 
 Each milestone gates on the prior one. No provider work before M1's config loader is solid — fixing config-parsing bugs after providers exist is much more expensive.
 
@@ -427,7 +429,7 @@ Each milestone gates on the prior one. No provider work before M1's config loade
 | **Consensus engine becomes a research project.** | Ship `overlap-v1` and resist embedding work until users ask. The badge is more valuable than the algorithm. |
 | **Subprocess providers have varied I/O.** | Validated. Seven subprocess providers (claude-code, codex-cli, gemini-cli, continue-dev, kilo-code, opencode-go, cursor-agent) share a common `runSubprocess()` runner with provider-specific args building and output normalization. The `kind: 'subprocess'` abstraction held up well. |
 | **Streaming is inconsistent across providers.** | Capability flag + fallback. UI must work without streaming; streaming is an upgrade, not a contract. |
-| **Claude Code plugin API drift.** | The plugin layer is intentionally thin (markdown commands shelling to `src/cli`). If Claude Code's plugin shape changes, only the plugin layer is affected. |
+| **Claude Code skill API drift.** | The skill layer is intentionally thin and shells out to `src/cli`. If Claude Code's skill shape changes, only the skill layer is affected. |
 | **Cost runaway with parallel pipelines.** | V1 ships with per-pipeline reviewer count printed up front. V2 adds budget guards. |
 | **YAML config sprawl.** | Built-in personas + a starter `quorum.yaml.example`. Most users should be able to run a sensible default with no config. |
 
@@ -453,12 +455,12 @@ Explicit deferrals — capture here so they don't sneak in.
 
 ---
 
-## 15. Open questions
+## 15. Resolved design questions
 
-To resolve before M1:
+The following questions from the original draft are now resolved by implementation:
 
-1. **Reviewer config inheritance** — should `reviewers.sec-opus` be able to override `provider.openrouter-claude.temperature`? Leaning yes, but adds schema surface. *(Recommendation: yes, allow `overrides: { temperature, maxTokens, topP }` on the reviewer block only.)*
-2. **How are findings parsed back from providers?** Options: ask the model for JSON via response-format; parse markdown headings; tool-call a `report_finding` function. *(Recommendation: tool-calling where the provider supports it; structured-output JSON fallback; markdown parsing as last resort.)*
-3. **Workspace context boundary** — does Quorum read files itself or rely on the host (Claude Code) to provide diff content? *(Recommendation: Quorum reads via `git` directly; Claude Code passes only the repo root + base ref. Keeps the CLI usable standalone.)*
+1. **Reviewer config inheritance** — reviewers can override `temperature`, `maxTokens`, and `topP` via an `overrides` block on the reviewer config (`src/config/schema.ts`).
+2. **Finding parsing** — subprocess providers parse JSON output via the shared normalizer in `src/providers/subprocess.ts`. HTTP providers use structured JSON response formats.
+3. **Workspace context** — Quorum reads diffs via `git` directly (`src/runtime/workspace.ts`). The CLI is usable standalone; the skill passes only the repo root + base ref.
 
-These are flagged but not blocking — defaults above are good enough to start M1.
+**Implemented since initial draft:** Codex CLI, Cursor Agent, Gemini CLI, Continue.dev, Kilo Code, and OpenCode Go are now shipped as built-in subprocess providers alongside the original OpenRouter, Claude Code, and Ollama adapters. The `skills/` directory replaces `plugin/`. Personas are defined in `quorum.yaml` only; the `src/reviewers/builtin/` directory has been removed. CLI commands are split into `src/cli/commands/` (review, config, setup, reviewers, reviewer).

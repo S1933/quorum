@@ -728,7 +728,6 @@ function reviewer(id: string): BoundReviewer {
 function fakeProvider(): Provider {
   return {
     id: 'fake-provider',
-    kind: 'http',
     capabilities() {
       return {
         review: true,
@@ -736,8 +735,6 @@ function fakeProvider(): Provider {
         tools: false,
         mcp: false,
         localExecution: false,
-        backgroundJobs: false,
-        costReporting: false,
       };
     },
   };

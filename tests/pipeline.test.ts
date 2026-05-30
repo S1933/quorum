@@ -204,7 +204,6 @@ function reviewer(
 function fakeProvider(id: string): Provider {
   return {
     id,
-    kind: 'http',
     capabilities() {
       return {
         review: true,
@@ -212,8 +211,6 @@ function fakeProvider(id: string): Provider {
         tools: false,
         mcp: false,
         localExecution: false,
-        backgroundJobs: false,
-        costReporting: false,
       };
     },
   };

@@ -23,8 +23,6 @@ class OpenRouterProvider implements Provider {
       tools: false,
       mcp: false,
       localExecution: false,
-      backgroundJobs: false,
-      costReporting: true,
     };
   }
 

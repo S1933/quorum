@@ -29,13 +29,6 @@ export interface FindingGroup {
   reviewers: string[];
 }
 
-export interface Contradiction {
-  groupId: string;
-  reviewerA: string;
-  reviewerB: string;
-  note: string;
-}
-
 export const SEVERITIES: readonly Severity[] = [
   'info',
   'low',

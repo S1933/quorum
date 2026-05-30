@@ -1,9 +1,5 @@
 [install]
 exact = false
 
-[alias]
-"@quorum/core" = "./src/core/index.ts"
-"@quorum/core/*" = "./src/core/*"
-
 [packages]
 lockfile = "bun.lockb"

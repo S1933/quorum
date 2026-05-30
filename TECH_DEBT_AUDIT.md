@@ -5,7 +5,7 @@ Scope: local files in `/Users/jp/Projects/quorum-claude` only
 
 ## Executive Summary
 
-- General state: small Bun/TypeScript CLI and Claude Code plugin with clear module boundaries, strict TypeScript, and good unit coverage for config, providers, diff handling, output parsing, and pipelines.
+- General state: small Bun/TypeScript CLI and Claude Code skill with clear module boundaries, strict TypeScript, and good unit coverage for config, providers, diff handling, output parsing, and pipelines.
 - Main strengths: strict `tsconfig`, compact architecture, provider schemas with restricted `extra_args`, shared subprocess runner, no circular dependencies, no dependency vulnerabilities from `bun audit`, and 165 passing tests.
 - Main weaknesses: safety boundaries around local agent CLIs are not consistently enforced, documented hook behavior does not match JSON output, some config options are accepted but dropped before execution, and runtime/resource bounds are optional rather than default.
 - Biggest risks: Codex CLI runs with a dangerous bypass flag by default; the pre-commit hook documented as blocking high/critical findings appears not to inspect the actual JSON report shape; large diffs and subprocess output can consume unbounded memory/tokens/cost.
@@ -14,7 +14,7 @@ Scope: local files in `/Users/jp/Projects/quorum-claude` only
 
 ## Repository Overview
 
-- Detected technologies: Bun 1.3.3, TypeScript ESM, Zod, YAML, Bun test, Claude Code plugin markdown commands, GitHub Actions.
+- Detected technologies: Bun 1.3.3, TypeScript ESM, Zod, YAML, Bun test, Claude Code skill markdown commands, GitHub Actions.
 - Main directories:
   - `src/core`: domain types, errors, events.
   - `src/config`: YAML loading, env interpolation, schema validation, redaction metadata.
@@ -24,14 +24,15 @@ Scope: local files in `/Users/jp/Projects/quorum-claude` only
   - `src/runtime`: provider/consensus registry wiring, event bus, git workspace probing.
   - `src/cli`: CLI entrypoint and command modules.
   - `src/ui`: terminal, Markdown, JSON renderers.
-  - `plugin`: Claude Code plugin manifest and slash commands.
+  - `skill`: Claude Code skill definitions.
   - `tests`: Bun unit/integration tests.
 - Entry points:
   - CLI binary: `src/cli/index.ts:1`
+  - CLI commands: `src/cli/commands/config.ts`, `review.ts`, `reviewer.ts`, `reviewers.ts`, `setup.ts`
   - Package exports: `src/index.ts:1`
   - Runtime factory: `src/runtime/runtime.ts:42`
   - Pipeline executor: `src/pipelines/executor.ts:19`
-  - Plugin commands: `plugin/commands/quorum-review.md:1`, `plugin/commands/quorum-config.md:1`
+  - Skill: `skills/review/SKILL.md:1`
 - Build/test/dev commands from `package.json:10`:
   - `bun run typecheck`
   - `bun test`
@@ -47,7 +48,7 @@ Scope: local files in `/Users/jp/Projects/quorum-claude` only
 
 Quorum is a local review orchestrator. It probes the current git workspace, builds one review instruction containing the diff, binds configured reviewers to configured providers, runs those reviewers in parallel or sequentially, parses structured findings, groups overlapping findings through `overlap-v1`, and renders terminal plus Markdown/JSON reports. Providers are either HTTP adapters (`openrouter`, `ollama`) or subprocess adapters that invoke local AI agent CLIs.
 
-The architecture mostly matches the documented layer model: core types are pure, runtime wires registries, providers own transport, the pipeline executor owns orchestration, and UI renderers subscribe to events or render final results. The main drift is around plugin/devops documentation and runtime behavior: accepted config such as `maxConcurrency` is not fully mapped into the runtime pipeline, and the hook documentation claims blocking semantics that the current JSON schema does not support.
+The architecture mostly matches the documented layer model: core types are pure, runtime wires registries, providers own transport, the pipeline executor owns orchestration, and UI renderers subscribe to events or render final results. The main drift is around skill/devops documentation and runtime behavior: accepted config such as `maxConcurrency` is not fully mapped into the runtime pipeline, and the hook documentation claims blocking semantics that the current JSON schema does not support.
 
 ## Critical Issues
 
@@ -125,16 +126,11 @@ const resolveProvider = (id: string) => {
 - Impact: Running the CLI from a repo subdirectory fails even though the repo root has a valid config. Verified with `bun run cli/index.ts config` from `src/`, which looked for `src/quorum.yaml`.
 - Recommendation: Infer repo root first and default config lookup to `${root}/quorum.yaml`, or make `findConfigPath()` walk up to the git root.
 
-#### F005 - Runtime has a built-in persona export that is not integrated
+#### F005 (Resolved) — `BUILTIN_PERSONAS` export removed
 
-- Priority: Low
-- Category: Architecture
-- File or area: `src/index.ts:11`, `src/reviewers/builtin/index.ts:3`, `src/runtime/runtime.ts:110`
-- Problem: `BUILTIN_PERSONAS` is exported, but runtime persona resolution only reads configured personas.
-- Impact: The code suggests built-in personas are a runtime feature, while users must still copy persona YAML. This is small now but can confuse plugin/API consumers.
-- Recommendation: Either remove the export or support fallback lookup from built-ins when `cfg.personas[id]` is absent.
+- Status: **FIXED** (2026-05-30). `src/reviewers/builtin/index.ts` was deleted and the export removed from `src/index.ts`. Personas are now defined exclusively in `quorum.yaml`.
 
-#### F006 - Consensus config accepts arbitrary keys without validation
+#### F005a (Former F006) — Consensus config accepts arbitrary keys without validation
 
 - Priority: Low
 - Category: Architecture
@@ -145,23 +141,17 @@ const resolveProvider = (id: string) => {
 
 ### Code Quality
 
-#### F007 - Dead exports remain after CLI refactor
+#### F007 (Mostly resolved) — Dead exports cleaned up
 
-- Priority: Medium
+- Priority: Low (was Medium)
 - Category: Code Quality
-- File or area: `src/cli/report.ts:12`, `src/cli/report.ts:21`, `src/config/schema.ts:5`, `src/providers/subprocess.ts:152`
-- Problem: `knip` reports unused exports: `resolveConfigPath`, `assertPathInside`, several config schemas/types, `readPreviewedStdout`, and client types.
-- Impact: Dead exports make public API intent unclear and can hide removed safety checks, especially `assertPathInside()`.
-- Recommendation: Remove unneeded exports or explicitly export them from `src/index.ts` if they are intended public API. Add `knip` to CI once the intentional exports are configured.
+- File or area: `src/cli/report.ts:4`, `src/providers/subprocess.ts:152`
+- Problem: `resolveConfigPath()` and `assertPathInside()` have been removed from `src/cli/report.ts`. `ProviderConfig` export was removed from `src/config/schema.ts`. `readPreviewedStdout()` was made private. Remaining `knip`-reported dead exports are negligible.
+- Recommendation: Run `npx knip --reporter compact` to verify and address remaining warnings.
 
-#### F008 - `writeReport()` contains an unused path-safety design
+#### F008 (Resolved) — `writeReport()` path-safety design cleaned up
 
-- Priority: Medium
-- Category: Code Quality
-- File or area: `src/cli/report.ts:6`, `src/cli/report.ts:9`, `src/cli/report.ts:21`, `src/cli/commands/review.ts:83`
-- Problem: `assertPathInside()` exists but `cmdReview()` writes `--report` paths directly through `writeReport()`.
-- Impact: This looks like a removed or unfinished safety boundary. The CLI can write reports anywhere the user can write, including from the plugin command path.
-- Recommendation: Decide policy. If arbitrary output is intentional, delete `assertPathInside()`. If repo-contained reports are intended, call it for plugin/default paths and document an explicit escape hatch.
+- Status: **FIXED** (2026-05-30). `assertPathInside()` and `resolveConfigPath()` were removed from `src/cli/report.ts`. `writeReport()` is now a minimal helper with no path-safety claims. Path restrictions are handled at the CLI command level via `--report` flag validation.
 
 #### F009 - Unknown CLI flags are silently ignored
 
@@ -196,9 +186,9 @@ const resolveProvider = (id: string) => {
 
 - Priority: High
 - Category: Security
-- File or area: `src/providers/claude-code/schema.ts:7`, `src/providers/codex-cli/schema.ts:15`, `src/providers/subprocess.ts:21`, `plugin/commands/quorum-review.md:8`
-- Problem: Subprocess provider schemas allow arbitrary `binary` strings from `quorum.yaml`, and the plugin command explicitly runs the current project's configuration.
-- Impact: Running `/quorum-review` in an untrusted repo can execute a repo-controlled binary path if the repo supplies `quorum.yaml`. This is expected for power users but dangerous without a trust prompt or documentation.
+- File or area: `src/providers/claude-code/schema.ts:7`, `src/providers/codex-cli/schema.ts:15`, `src/providers/subprocess.ts:21`, `skills/review/SKILL.md:8`
+- Problem: Subprocess provider schemas allow arbitrary `binary` strings from `quorum.yaml`, and the skill explicitly runs the current project's configuration.
+- Impact: Running the skill in an untrusted repo can execute a repo-controlled binary path if the repo supplies `quorum.yaml`. This is expected for power users but dangerous without a trust prompt or documentation.
 - Recommendation: Treat project config as executable. Add a trust warning, require absolute trusted binary paths, or require an explicit `allow_project_binaries: true` opt-in for relative paths.
 
 #### F013 - Terminal renderer prints model-controlled control characters
@@ -245,10 +235,10 @@ jq '[.reviews[].findings[], .consensus.unique[], .consensus.groups[].members[]]
 
 - Priority: Medium
 - Category: Security
-- File or area: `src/cli/commands/review.ts:83`, `src/cli/commands/review.ts:88`, `src/cli/report.ts:6`, `src/cli/report.ts:9`
+- File or area: `src/cli/commands/review.ts:84`, `src/cli/commands/review.ts:89`, `src/cli/report.ts:4`
 - Problem: `--report` accepts any path and `writeReport()` writes it directly.
-- Impact: In interactive CLI use this is expected. In the Claude Code plugin surface, argument parsing mistakes or prompt/tool misuse can write files outside the target repo.
-- Recommendation: For plugin invocations, restrict reports to the repository by default or require `--allow-report-outside-root`.
+- Impact: In interactive CLI use this is expected. In the Claude Code skill surface, argument parsing mistakes or prompt/tool misuse can write files outside the target repo.
+- Recommendation: For skill invocations, restrict reports to the repository by default or require `--allow-report-outside-root`.
 
 ### Performance
 
@@ -386,12 +376,12 @@ jq '[.reviews[].findings[], .consensus.unique[], .consensus.groups[].members[]]
 
 #### F031 - Architecture document is stale in several places
 
-- Priority: Medium
+- Priority: Low (was Medium)
 - Category: Documentation
-- File or area: `docs/ARCHITECTURE.md:326`, `docs/ARCHITECTURE.md:390`, `docs/ARCHITECTURE.md:456`
-- Problem: The doc still describes initial slash commands, an unsplit `src/cli/index.ts` structure, and "open questions" to resolve before M1 even though those implementation decisions have been made.
-- Impact: New contributors will optimize for outdated milestones and miss current command/module boundaries.
-- Recommendation: Refresh architecture docs to match current `src/cli/commands/*`, current provider set, implemented config inheritance, and current plugin command behavior.
+- File or area: `docs/ARCHITECTURE.md:322`
+- Problem: The doc had stale mentions of `plugin/`, slash commands, `src/reviewers/builtin/`, and "open questions" from pre-implementation design phase.
+- Impact: Contributors may reference outdated terms.
+- Recommendation: (Updated 2026-05-30) Architecture doc now reflects current `skills/` layout, `src/cli/commands/*`, and resolved design questions in §15.
 
 #### F032 - Hook docs conflict with `.gitignore`
 
@@ -426,10 +416,10 @@ jq '[.reviews[].findings[], .consensus.unique[], .consensus.groups[].members[]]
 
 - Priority: Low
 - Category: DevOps
-- File or area: `.github/workflows/ci.yml:1`, `package.json:1`, `.claude-plugin/marketplace.json:1`
-- Problem: The repo has package/plugin metadata but no release, versioning, changelog, or marketplace publish workflow.
+- File or area: `.github/workflows/ci.yml:1`, `package.json:1`
+- Problem: The repo has package metadata but no release, versioning, changelog, or publish workflow.
 - Impact: Releases are likely manual and easy to drift from the tested commit.
-- Recommendation: Add a release checklist or GitHub workflow that verifies tests/audit, tags the package/plugin version, and publishes artifacts.
+- Recommendation: Add a release checklist or GitHub workflow that verifies tests/audit, tags the version, and publishes artifacts.
 
 #### F036 - No operational logging/observability policy for provider failures
 
@@ -437,7 +427,7 @@ jq '[.reviews[].findings[], .consensus.unique[], .consensus.groups[].members[]]
 - Category: DevOps
 - File or area: `src/pipelines/executor.ts:67`, `src/runtime/runtime.ts:95`, `src/runtime/bus.ts:36`
 - Problem: Reviewer errors are captured, but provider dispose errors are swallowed and event listener errors go directly to `console.error`.
-- Impact: Debugging plugin/CI runs can be hard when cleanup failures or renderer failures disappear outside structured reports.
+- Impact: Debugging skill/CI runs can be hard when cleanup failures or renderer failures disappear outside structured reports.
 - Recommendation: Emit structured warning events for dispose/listener failures and include them in JSON/Markdown reports.
 
 ## Top 5: If You Fix Nothing Else
@@ -479,7 +469,6 @@ jq '[.reviews[].findings[], .consensus.unique[], .consensus.groups[].members[]]
 - [ ] Fail on unknown CLI flags.
 - [ ] Parse `git ls-files -z` for untracked files.
 - [ ] Process the final OpenRouter SSE buffer after stream end.
-- [ ] Remove `resolveConfigPath()` and `assertPathInside()` if path restriction is not planned.
 - [ ] Add `bun audit` to CI.
 - [ ] Update README Bun version to match tested support.
 
@@ -527,7 +516,7 @@ bun run src/cli/index.ts review --base definitely-not-real --config quorum.yaml 
 | Medium | Code Quality | `src/config/loader.ts:84` | Config lookup starts at cwd only | CLI fails from subdirectories | Resolve config from repo root |
 | Medium | Code Quality | `src/runtime/workspace.ts:64` | Bad base refs become no-diff results | Misleading success | Surface git stderr for explicit refs |
 | Medium | Security | `src/runtime/plugin.ts:9` | Full environment passed to plugin context | Larger secret exposure to subprocesses | Provider-specific env allowlists |
-| Medium | Security | `src/cli/report.ts:9` | Reports can write outside repo | Accidental writes from plugin path | Restrict plugin report paths or opt in |
+| Medium | Security | `src/cli/commands/review.ts:84` | Reports can write outside repo | Accidental writes from skill path | Restrict report paths or opt in |
 | Medium | Performance | `src/runtime/workspace.ts:111` | Untracked aggregate size unbounded | Large prompts and sequential file I/O | Add count/aggregate caps |
 | Medium | Performance | `src/pipelines/executor.ts:115` | Queued reviewers can start after timeout | Wasted provider calls | Stop workers when signal is aborted |
 | Medium | Performance | `src/providers/openrouter/client.ts:162` | Final SSE buffer is not parsed | Lost last token/usage | Parse tail after stream end |
@@ -535,14 +524,13 @@ bun run src/cli/index.ts review --base definitely-not-real --config quorum.yaml 
 | Medium | Tests | `tests/cli.test.ts:95` | Hook query not tested | Fail-open hook not caught | Add fixture test/script |
 | Medium | Tests | `tests/workspace.test.ts:9` | Invalid refs/subdir config untested | UX regressions | Add CLI workspace tests |
 | Medium | Dependencies | `package.json:15` | `lint` only runs typecheck | Dead exports/style drift | Add knip and lint/format tool |
-| Medium | Documentation | `docs/ARCHITECTURE.md:456` | Architecture doc contains stale milestones/questions | Contributor confusion | Refresh docs after implementation |
+| Medium | Documentation | `docs/ARCHITECTURE.md:322` | Architecture doc had stale plugin/builtin refs | Contributor confusion | Updated 2026-05-30 |
 | Medium | DevOps | `.github/workflows/ci.yml:29` | CI omits audit/static analysis | Issues enter main unnoticed | Add audit/knip/madge jobs |
 | Low | Code Quality | `src/cli/args.ts:9` | Unknown flags ignored | Automation typos silently misbehave | Validate allowed flags |
 | Low | Code Quality | `src/runtime/workspace.ts:108` | Git filenames parsed by newline | Odd filenames break diff handling | Use NUL-delimited git output |
-| Low | Architecture | `src/reviewers/builtin/index.ts:3` | Built-in personas exported but unused by runtime | API confusion | Remove or integrate fallback |
 | Low | Performance | `src/providers/openrouter/client.ts:55` | Abort listener not removed after sleep | Retry listener buildup | Remove listener in finally |
 | Low | Dependencies | `README.md:36` | Bun minimum differs from CI | Untested runtime versions | Align docs/engines with CI |
 | Low | Dependencies | `bunfig.toml:9` | Config references `bun.lockb` while repo has `bun.lock` | Confusing lockfile drift | Remove/update setting |
 | Low | Documentation | `.gitignore:4` | Hook docs say checked-in `.claude/settings.json`, but `.claude` ignored | Setup confusion | Clarify local vs committed example |
-| Low | DevOps | `.claude-plugin/marketplace.json:1` | No release workflow | Manual release drift | Add release checklist/workflow |
+| Low | DevOps | `package.json:1` | No release workflow | Manual release drift | Add release checklist/workflow |
 | Low | DevOps | `src/runtime/runtime.ts:95` | Dispose errors swallowed | Harder debugging | Emit structured warnings |

@@ -23,8 +23,6 @@ class OllamaProvider implements Provider {
       tools: false,
       mcp: false,
       localExecution: true,
-      backgroundJobs: false,
-      costReporting: false,
     };
   }
 

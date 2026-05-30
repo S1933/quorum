@@ -26,8 +26,4 @@ export class ConsensusRegistry {
     }
     return s;
   }
-
-  list(): string[] {
-    return [...this.strategies.keys()];
-  }
 }

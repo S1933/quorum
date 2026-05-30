@@ -1,5 +1,5 @@
 import type { ReviewResult } from './task.ts';
-import type { Finding, FindingGroup, Contradiction } from './finding.ts';
+import type { Finding, FindingGroup } from './finding.ts';
 
 export interface ReviewerOverrides {
   temperature?: number;
@@ -40,7 +40,7 @@ export interface ConsensusResult {
   groups: FindingGroup[];
   agreement: Record<string, number>;
   unique: Finding[];
-  contradictions: Contradiction[];
+  contradictions: Array<{ groupId: string; reviewerA: string; reviewerB: string; note: string }>;
   strategyId: string;
 }
 
