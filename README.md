@@ -44,6 +44,8 @@ cd quorum
 bun install
 ```
 
+`bun install` automatically symlinks Quorum skills into `~/.agents/skills/` via a postinstall script.
+
 ## Use The CLI
 
 ```bash
@@ -64,9 +66,6 @@ bun quorum reviewer add --provider=claude-code --persona=backend-senior --ext=go
 
 # List all reviewers, providers, personas, and pipelines
 bun quorum reviewers
-
-# Install Quorum skill symlinks for AI agents
-bun quorum install-skills
 
 # Print a clean JSON review report to stdout
 bun quorum review --json
