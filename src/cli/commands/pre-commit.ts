@@ -2,7 +2,8 @@ import { writeFile, unlink, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { CliDeps, CliIo } from '../types.ts';
 
-const HOOK_SCRIPT = `#!/usr/bin/env bash
+function hookScript(pipelineId: string): string {
+  return `#!/usr/bin/env bash
 set -e
 
 ROOT=$(git rev-parse --show-toplevel)
@@ -22,7 +23,7 @@ fi
 REPORT="$ROOT/.quorum/last-review.json"
 mkdir -p "$ROOT/.quorum"
 
-OUTPUT=$($CMD review --json --config quorum.yaml --report "$REPORT" 2>&1 || true)
+OUTPUT=$($CMD review --pipeline ${shellQuote(pipelineId)} --json --config quorum.yaml --report "$REPORT" 2>&1 || true)
 if [ -f "$REPORT" ]; then
   JSON_INPUT=$(cat "$REPORT")
 else
@@ -52,16 +53,26 @@ if [ "$CRITICAL" -gt 0 ]; then
   exit 1
 fi
 `;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
 
 export async function cmdPreCommit(
   positional: string[],
-  _flags: Record<string, string | boolean>,
+  flags: Record<string, string | boolean>,
   deps: CliDeps,
   io: CliIo,
 ): Promise<number> {
   const action = positional[0];
-  if (!action || (action !== 'true' && action !== 'false')) {
-    io.stderr.write('Usage: quorum pre-commit true|false\n');
+  if (
+    !action ||
+    (action !== 'true' && action !== 'false') ||
+    (flags.pipeline !== undefined && typeof flags.pipeline !== 'string') ||
+    flags.pipeline === ''
+  ) {
+    io.stderr.write('Usage: quorum pre-commit true|false [--pipeline <id>]\n');
     return 2;
   }
 
@@ -69,8 +80,9 @@ export async function cmdPreCommit(
   const hookPath = join(root, '.git', 'hooks', 'pre-commit');
 
   if (action === 'true') {
-    await writeFile(hookPath, HOOK_SCRIPT, { mode: 0o755 });
-    io.stdout.write(`pre-commit hook installed: ${hookPath}\n`);
+    const pipelineId = await resolvePipelineId(flags, deps, root);
+    await writeFile(hookPath, hookScript(pipelineId), { mode: 0o755 });
+    io.stdout.write(`pre-commit hook installed: ${hookPath} (pipeline: ${pipelineId})\n`);
     return 0;
   }
 
@@ -83,4 +95,19 @@ export async function cmdPreCommit(
   }
 
   return 0;
+}
+
+async function resolvePipelineId(
+  flags: Record<string, string | boolean>,
+  deps: CliDeps,
+  root: string,
+): Promise<string> {
+  if (typeof flags.pipeline === 'string') return flags.pipeline;
+
+  try {
+    const config = await deps.loadConfigFromPath(deps.findConfigPath(root));
+    return config.defaults?.pipeline ?? 'default';
+  } catch {
+    return 'default';
+  }
 }

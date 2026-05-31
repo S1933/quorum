@@ -44,7 +44,7 @@ cd quorum
 bun install
 ```
 
-## Use Quorum CLI in your project
+## Use Quorum CLI
 
 ### Initialize your project
 
@@ -63,14 +63,14 @@ bun quorum reviewer add --provider=openrouter --persona=security --model=claude-
 |------|----------|-------------|
 | `--provider <type>` | yes | Provider ID: `openrouter`, `claude-code`, `codex-cli`, `continue-dev`, `cursor-agent`, `gemini-cli`, `kilo-code`, `opencode-go`, `ollama` |
 | `--persona <name>` | yes | Persona defined in `quorum.yaml` |
-| `--model <model>` | no | Override the provider's model |
+| `--model <model>` | yes | Model to use for this reviewer and provider |
 | `--id <reviewer-id>` | no | Custom reviewer ID (default: `<persona>-<provider>`) |
 | `--ext <ext1,ext2,…>` | no | File extension filter, comma-separated (e.g. `ts,tsx`) |
 | `--pipeline <id>` | no | Pipeline to attach to (default: `defaults.pipeline` or `default`) |
 | `--config <path>` | no | Path to `quorum.yaml` (default: `./quorum.yaml`) |
 
 ```bash
-bun quorum reviewer add --provider=claude-code --persona=backend-senior --ext=go --id=backend-go-reviewer --pipeline=default
+bun quorum reviewer add --provider=claude-code --persona=backend-senior --model=claude-sonnet-4-20250514 --ext=go --id=backend-go-reviewer --pipeline=default
 ```
 
 **`quorum review [pipeline-id]`** — Run a review pipeline on the current diff.
@@ -109,12 +109,13 @@ bun quorum review --no-preview --no-color   # quiet terminal output
 bun quorum reviewers
 ```
 
-**`quorum pre-commit true|false`** — Install or remove a git pre-commit hook.
+**`quorum pre-commit true|false [--pipeline <id>]`** — Install or remove a git pre-commit hook.
 
-The hook runs `quorum review --json` and blocks the commit if any `critical` or `high` severity findings exist. Bypass with `QUORUM_BYPASS=1`.
+The hook runs `quorum review --pipeline <id> --json` and blocks the commit if any `critical` or `high` severity findings exist. If `--pipeline` is omitted, Quorum uses `defaults.pipeline` from `quorum.yaml`, then falls back to `default`. Bypass with `QUORUM_BYPASS=1`.
 
 ```bash
 bun quorum pre-commit true
+bun quorum pre-commit true --pipeline ci
 bun quorum pre-commit false
 ```
 

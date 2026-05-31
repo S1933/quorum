@@ -18,10 +18,10 @@ describe('pre-commit', () => {
     );
 
     expect(code).toBe(0);
-    expect(io.stdoutText()).toContain(`pre-commit hook installed: ${join(repo, '.git', 'hooks', 'pre-commit')}`);
+    expect(io.stdoutText()).toContain(`pre-commit hook installed: ${join(repo, '.git', 'hooks', 'pre-commit')} (pipeline: default)`);
 
     const hookContent = await Bun.file(join(repo, '.git', 'hooks', 'pre-commit')).text();
-    expect(hookContent).toContain('$CMD review --json');
+    expect(hookContent).toContain("$CMD review --pipeline 'default' --json");
     expect(hookContent).toContain('--report "$REPORT"');
     expect(hookContent).toContain('.reviews[].findings[]?');
     expect(hookContent).toContain('.consensus.unique[]?');
@@ -29,6 +29,101 @@ describe('pre-commit', () => {
     expect(hookContent).toContain('Quorum review report:');
     expect(hookContent).toContain('QUORUM_BYPASS');
     expect(hookContent).toContain('high/critical findings');
+  });
+
+  test('true installs hook with explicit pipeline', async () => {
+    const io = captureIo();
+    const repo = await mkdtemp(join('/tmp', 'quorum-precommit-'));
+
+    await mkdir(join(repo, '.git', 'hooks'), { recursive: true });
+
+    const code = await main(
+      ['pre-commit', 'true', '--pipeline', 'ci'],
+      baseDeps({ inferRepoRoot: async () => repo }),
+      io,
+    );
+
+    expect(code).toBe(0);
+    expect(io.stdoutText()).toContain('(pipeline: ci)');
+
+    const hookContent = await Bun.file(join(repo, '.git', 'hooks', 'pre-commit')).text();
+    expect(hookContent).toContain("$CMD review --pipeline 'ci' --json");
+  });
+
+  test('true with explicit pipeline does not require config', async () => {
+    const io = captureIo();
+    const repo = await mkdtemp(join('/tmp', 'quorum-precommit-'));
+
+    await mkdir(join(repo, '.git', 'hooks'), { recursive: true });
+
+    const code = await main(
+      ['pre-commit', 'true', '--pipeline', 'ci'],
+      baseDeps({
+        inferRepoRoot: async () => repo,
+        loadConfigFromPath: async () => {
+          throw new Error('missing config');
+        },
+      }),
+      io,
+    );
+
+    expect(code).toBe(0);
+
+    const hookContent = await Bun.file(join(repo, '.git', 'hooks', 'pre-commit')).text();
+    expect(hookContent).toContain("$CMD review --pipeline 'ci' --json");
+  });
+
+  test('true uses configured default pipeline when pipeline flag is omitted', async () => {
+    const io = captureIo();
+    const repo = await mkdtemp(join('/tmp', 'quorum-precommit-'));
+
+    await mkdir(join(repo, '.git', 'hooks'), { recursive: true });
+
+    const code = await main(
+      ['pre-commit', 'true'],
+      baseDeps({
+        inferRepoRoot: async () => repo,
+        loadConfigFromPath: async () => ({
+          version: 1,
+          defaults: { pipeline: 'strict' },
+          providers: {},
+          personas: {},
+          reviewers: {},
+          pipelines: {},
+        }),
+      }),
+      io,
+    );
+
+    expect(code).toBe(0);
+    expect(io.stdoutText()).toContain('(pipeline: strict)');
+
+    const hookContent = await Bun.file(join(repo, '.git', 'hooks', 'pre-commit')).text();
+    expect(hookContent).toContain("$CMD review --pipeline 'strict' --json");
+  });
+
+  test('true falls back to default pipeline when config is unavailable', async () => {
+    const io = captureIo();
+    const repo = await mkdtemp(join('/tmp', 'quorum-precommit-'));
+
+    await mkdir(join(repo, '.git', 'hooks'), { recursive: true });
+
+    const code = await main(
+      ['pre-commit', 'true'],
+      baseDeps({
+        inferRepoRoot: async () => repo,
+        loadConfigFromPath: async () => {
+          throw new Error('missing config');
+        },
+      }),
+      io,
+    );
+
+    expect(code).toBe(0);
+    expect(io.stdoutText()).toContain('(pipeline: default)');
+
+    const hookContent = await Bun.file(join(repo, '.git', 'hooks', 'pre-commit')).text();
+    expect(hookContent).toContain("$CMD review --pipeline 'default' --json");
   });
 
   test('false removes the hook script', async () => {
@@ -75,7 +170,7 @@ describe('pre-commit', () => {
     );
 
     expect(code).toBe(2);
-    expect(io.stderrText()).toContain('Usage: quorum pre-commit true|false');
+    expect(io.stderrText()).toContain('Usage: quorum pre-commit true|false [--pipeline <id>]');
   });
 
   test('invalid argument shows usage', async () => {
@@ -88,7 +183,33 @@ describe('pre-commit', () => {
     );
 
     expect(code).toBe(2);
-    expect(io.stderrText()).toContain('Usage: quorum pre-commit true|false');
+    expect(io.stderrText()).toContain('Usage: quorum pre-commit true|false [--pipeline <id>]');
+  });
+
+  test('pipeline without value shows usage', async () => {
+    const io = captureIo();
+
+    const code = await main(
+      ['pre-commit', 'true', '--pipeline'],
+      baseDeps({}),
+      io,
+    );
+
+    expect(code).toBe(2);
+    expect(io.stderrText()).toContain('Usage: quorum pre-commit true|false [--pipeline <id>]');
+  });
+
+  test('empty pipeline shows usage', async () => {
+    const io = captureIo();
+
+    const code = await main(
+      ['pre-commit', 'true', '--pipeline='],
+      baseDeps({}),
+      io,
+    );
+
+    expect(code).toBe(2);
+    expect(io.stderrText()).toContain('Usage: quorum pre-commit true|false [--pipeline <id>]');
   });
 });
 

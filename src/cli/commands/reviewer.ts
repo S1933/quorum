@@ -17,6 +17,8 @@ const SUPPORTED_PROVIDERS = [
   'ollama',
 ] as const;
 
+const REVIEWER_ADD_USAGE = 'Usage: quorum reviewer add --provider=<type> --persona=<name> --model=<model> [--id=<reviewer-id>] [--ext=<ext1,ext2,...>] [--pipeline=<id>]\n';
+
 export async function cmdReviewer(
   positional: string[],
   flags: Record<string, string | boolean>,
@@ -25,7 +27,7 @@ export async function cmdReviewer(
 ): Promise<number> {
   const sub = positional[0];
   if (!sub) {
-    io.stderr.write('Usage: quorum reviewer add --provider=<type> --persona=<name> [--model=<model>] [--id=<reviewer-id>] [--ext=<ext1,ext2,...>] [--pipeline=<id>]\n');
+    io.stderr.write(REVIEWER_ADD_USAGE);
     return 2;
   }
 
@@ -34,7 +36,7 @@ export async function cmdReviewer(
       return await cmdReviewerAdd(flags, deps, io);
     default:
       io.stderr.write(`Unknown subcommand: reviewer ${sub}\n\n`);
-      io.stderr.write('Usage: quorum reviewer add --provider=<type> --persona=<name> [--model=<model>] [--id=<reviewer-id>] [--ext=<ext1,ext2,...>] [--pipeline=<id>]\n');
+      io.stderr.write(REVIEWER_ADD_USAGE);
       return 2;
   }
 }
@@ -63,6 +65,10 @@ async function cmdReviewerAdd(
   }
   if (!persona) {
     io.stderr.write('Missing --persona flag\n');
+    return 1;
+  }
+  if (!model) {
+    io.stderr.write('Missing --model flag\n');
     return 1;
   }
 

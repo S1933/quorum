@@ -44,7 +44,7 @@ function printHelp(io: CliIo): void {
 
 Usage:
   quorum review [pipeline-id] [--pipeline <id>] [--base <ref>] [--config <path>] [--report <path>] [--format text|json] [--json] [--no-color] [--no-preview] [--max-diff-bytes <n>] [--include <glob>] [--exclude <glob>]
-  quorum pre-commit true|false
+  quorum pre-commit true|false [--pipeline <id>]
   quorum help
 
 Defaults are read from quorum.yaml in the working directory.
