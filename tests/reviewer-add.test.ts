@@ -56,26 +56,87 @@ describe('reviewer add', () => {
     );
 
     expect(code).toBe(0);
-    expect(io.stdoutText()).toContain('added reviewer "security-claude-code"');
+    const id = addedReviewerId(io);
+    expect(id).toMatch(/^[a-z0-9]+-security-claude-code$/);
 
     const updated = parseYaml(await Bun.file(configPath).text());
-    expect(updated.reviewers['security-claude-code']).toEqual({
+    expect(updated.reviewers[id]).toEqual({
       persona: 'security',
       provider: {
         type: 'claude-code',
         model: 'claude-opus-4-8',
       },
     });
-    expect(updated.pipelines.default.reviewers).toContain('security-claude-code');
+    expect(updated.pipelines.default.reviewers).toContain(id);
   });
 
-  test('adds a numeric suffix when the stable default reviewer id has different config', async () => {
+  test('uses another name prefix when the first generated reviewer id has different config', async () => {
+    const { configPath, deps } = await repoDeps();
+    const firstIo = captureIo();
+
+    const firstCode = await main(
+      [
+        'reviewer',
+        'add',
+        '--provider',
+        'claude-code',
+        '--persona',
+        'security',
+        '--model',
+        'claude-opus-4-7',
+        '--config',
+        configPath,
+      ],
+      deps,
+      firstIo,
+    );
+    const firstId = addedReviewerId(firstIo);
+    const secondIo = captureIo();
+
+    const secondCode = await main(
+      [
+        'reviewer',
+        'add',
+        '--provider',
+        'claude-code',
+        '--persona',
+        'security',
+        '--model',
+        'claude-opus-4-8',
+        '--config',
+        configPath,
+      ],
+      deps,
+      secondIo,
+    );
+
+    expect(firstCode).toBe(0);
+    expect(secondCode).toBe(0);
+    expect(secondIo.stdoutText()).not.toContain('already exists');
+    const secondId = addedReviewerId(secondIo);
+    expect(secondId).toMatch(/^[a-z0-9]+-security-claude-code$/);
+    expect(secondId).not.toBe(firstId);
+    expect(secondId.split('-')[0]).not.toBe(firstId.split('-')[0]);
+
+    const updated = parseYaml(await Bun.file(configPath).text());
+    expect(updated.reviewers[firstId]).toBeDefined();
+    expect(updated.reviewers[secondId]).toEqual({
+      persona: 'security',
+      provider: {
+        type: 'claude-code',
+        model: 'claude-opus-4-8',
+      },
+    });
+    expect(updated.pipelines.default.reviewers).toContain(secondId);
+  });
+
+  test('reuses a legacy reviewer id without a name prefix when config matches', async () => {
     const { configPath, deps } = await repoDeps(`reviewers:
   security-claude-code:
     persona: security
     provider:
       type: claude-code
-      model: claude-opus-4-7
+      model: claude-opus-4-8
 `);
     const io = captureIo();
 
@@ -97,18 +158,10 @@ describe('reviewer add', () => {
     );
 
     expect(code).toBe(0);
-    expect(io.stdoutText()).not.toContain('already exists');
+    expect(io.stdoutText()).toContain('Reviewer "security-claude-code" already exists');
 
     const updated = parseYaml(await Bun.file(configPath).text());
-    expect(updated.reviewers['security-claude-code']).toBeDefined();
-    expect(updated.reviewers['security-claude-code-2']).toEqual({
-      persona: 'security',
-      provider: {
-        type: 'claude-code',
-        model: 'claude-opus-4-8',
-      },
-    });
-    expect(updated.pipelines.default.reviewers).toContain('security-claude-code-2');
+    expect(Object.keys(updated.reviewers)).toEqual(['security-claude-code']);
   });
 
   test('reuses an existing reviewer id when persona provider and model already match', async () => {
@@ -194,4 +247,10 @@ function captureIo() {
     stdoutText() { return stdout; },
     stderrText() { return stderr; },
   };
+}
+
+function addedReviewerId(io: ReturnType<typeof captureIo>): string {
+  const match = io.stdoutText().match(/added reviewer "([^"]+)"/);
+  expect(match).not.toBeNull();
+  return match![1]!;
 }

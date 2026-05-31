@@ -1,5 +1,6 @@
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { resolve, join } from 'node:path';
+import { Faker, base as fakerBase, fr } from '@faker-js/faker';
 import type { CliDeps, CliIo } from '../types.ts';
 
 const PKG_ROOT = resolve(import.meta.dir, '..', '..', '..');
@@ -143,19 +144,75 @@ function resolveReviewerId(
   existing: Record<string, unknown>,
 ): string {
   for (const [id, cfg] of Object.entries(existing)) {
-    if (reviewerEntryMatches(cfg, target)) return id;
+    if (hasReviewerNamePrefix(id, persona, provider) && reviewerEntryMatches(cfg, target)) return id;
+  }
+
+  for (const [id, cfg] of Object.entries(existing)) {
+    if (!hasReviewerNamePrefix(id, persona, provider) && reviewerEntryMatches(cfg, target)) return id;
   }
 
   const base = `${persona}-${provider}`;
-  if (!existing[base]) return base;
+  const usedNames = usedReviewerNamePrefixes(existing);
+  const candidates = reviewerNameCandidates(base, existing);
+  const availableName = candidates.find((name) => !usedNames.has(name) && !existing[`${name}-${base}`]);
+  if (availableName) return `${availableName}-${base}`;
 
   let n = 2;
-  let id = `${base}-${n}`;
+  const fallbackName = candidates[0] ?? 'reviewer';
+  let id = `${fallbackName}-${base}-${n}`;
   while (existing[id]) {
     n += 1;
-    id = `${base}-${n}`;
+    id = `${fallbackName}-${base}-${n}`;
   }
   return id;
+}
+
+function reviewerNameCandidates(base: string, existing: Record<string, unknown>): string[] {
+  const faker = new Faker({ locale: [fr, fakerBase] });
+  faker.seed(stableSeed([base, ...Object.keys(existing).sort()].join('|')));
+
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < 100; i += 1) {
+    const name = slugPart(faker.person.firstName());
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      candidates.push(name);
+    }
+  }
+  return candidates;
+}
+
+function stableSeed(input: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function slugPart(input: string): string {
+  return input
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function usedReviewerNamePrefixes(existing: Record<string, unknown>): Set<string> {
+  const used = new Set<string>();
+  for (const id of Object.keys(existing)) {
+    const name = id.split('-')[0];
+    if (name) used.add(name);
+  }
+  return used;
+}
+
+function hasReviewerNamePrefix(id: string, persona: string, provider: string): boolean {
+  const suffix = `-${persona}-${provider}`;
+  return id.endsWith(suffix) && id.length > suffix.length;
 }
 
 function reviewerEntryMatches(actual: unknown, target: Record<string, unknown>): boolean {

@@ -11,6 +11,7 @@ export interface ParsedArgs {
 }
 
 export interface CliIo {
+  stdin?: NodeJS.ReadStream;
   stdout: WriteStreamLike;
   stderr: WriteStreamLike;
 }

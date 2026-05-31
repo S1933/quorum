@@ -19,6 +19,7 @@ export {
 } from './commands/review.ts';
 
 const defaultIo: CliIo = {
+  stdin: process.stdin,
   stdout: process.stdout,
   stderr: process.stderr,
 };
@@ -43,11 +44,15 @@ function printHelp(io: CliIo): void {
   io.stdout.write(`quorum — multi-model consensus reviewer
 
 Usage:
-  quorum review [pipeline-id] [--pipeline <id>] [--base <ref>] [--config <path>] [--report <path>] [--format text|json] [--json] [--no-color] [--no-preview] [--max-diff-bytes <n>] [--include <glob>] [--exclude <glob>]
+  quorum review [pipeline-id] [--pipeline <id>] [--base <ref>] [--config <path>] [--report <path>] [--format text|json] [--json] [--no-color] [--no-preview] [--max-diff-bytes <n>] [--include <glob>] [--exclude <glob>] [--interactive]
   quorum pre-commit true|false [--pipeline <id>]
   quorum help
 
 Defaults are read from quorum.yaml in the working directory.
+
+Flags:
+  --interactive    Enable interactive mode: reviewers may ask you questions
+                   before producing their final findings.
 `);
 }
 

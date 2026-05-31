@@ -16,6 +16,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@faker-js/faker": "^10.4.0",
     "yaml": "^2.5.0",
     "zod": "^3.23.0"
   },

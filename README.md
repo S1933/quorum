@@ -51,9 +51,6 @@ bun install
 Run anywhere in your repo. If no `quorum.yaml` exists, the first command copies `quorum.yaml.example`.
 
 ```bash
-# Add your first reviewer — inits config if missing
-bun quorum reviewer add --provider=openrouter --persona=security --model=anthropic/claude-sonnet-4
-
 # OpenRouter — uses provider/model format (anthropic/claude-sonnet-4, openai/gpt-5.1-codex...)
 bun quorum reviewer add --provider=openrouter --persona=security --model=anthropic/claude-sonnet-4
 
@@ -97,7 +94,7 @@ bun quorum reviewer add --provider=<type> --persona=<name> --model=<model> [flag
 | `--provider` *required* | `openrouter`, `claude-code`, `codex-cli`, `continue-dev`, `cursor-agent`, `gemini-cli`, `kilo-code`, `opencode-go`, `ollama` |
 | `--persona` *required* | Persona defined in `quorum.yaml` |
 | `--model` *required* | Model for this provider (see examples above) |
-| `--id` | Custom reviewer ID (default: `<persona>-<provider>`) |
+| `--id` | Custom reviewer ID (default: `<name>-<persona>-<provider>`) |
 | `--ext` | File extension filter, comma-separated (e.g. `ts,tsx`) |
 | `--pipeline` | Target pipeline (default: `default`) |
 | `--config` | Path to `quorum.yaml` (default: `./quorum.yaml`) |

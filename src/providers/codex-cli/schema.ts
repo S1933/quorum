@@ -17,7 +17,7 @@ export const CodexCliConfigSchema = z
     approval_policy: z.enum(['untrusted', 'on-request', 'never']).default('on-request'),
     extra_args: z.array(SafeExtraArgSchema).default([]),
     cwd: z.string().optional(),
-    timeout_ms: z.number().int().positive().default(60_000),
+    timeout_ms: z.number().int().positive().default(120_000),
   })
   .strict()
   .refine(

@@ -13,7 +13,7 @@ export const ContinueDevConfigSchema = z
     format: z.enum(['text', 'json']).default('text'),
     extra_args: z.array(SafeExtraArgSchema).default([]),
     cwd: z.string().optional(),
-    timeout_ms: z.number().int().positive().default(60_000),
+    timeout_ms: z.number().int().positive().default(120_000),
   })
   .strict();
 

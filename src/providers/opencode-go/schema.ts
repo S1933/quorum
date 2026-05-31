@@ -10,7 +10,7 @@ export const OpenCodeGoConfigSchema = z
     quiet: z.boolean().default(true),
     extra_args: z.array(z.never()).default([]),
     cwd: z.string().optional(),
-    timeout_ms: z.number().int().positive().default(60_000),
+    timeout_ms: z.number().int().positive().default(120_000),
   })
   .strict();
 

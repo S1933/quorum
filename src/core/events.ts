@@ -2,6 +2,12 @@ import type { ProviderEvent } from './provider.ts';
 import type { ReviewResult } from './task.ts';
 import type { PipelineResult, ReviewerError } from './pipeline.ts';
 
+export interface ReviewerQuestion {
+  reviewerId: string;
+  question: string;
+  context?: string;
+}
+
 export type QuorumEvent =
   | { type: 'pipeline.started'; pipelineId: string; reviewers: string[] }
   | { type: 'reviewer.started'; reviewerId: string }
@@ -9,7 +15,10 @@ export type QuorumEvent =
   | { type: 'reviewer.finished'; reviewerId: string; result: ReviewResult }
   | { type: 'reviewer.failed'; reviewerId: string; error: ReviewerError }
   | { type: 'pipeline.finished'; result: PipelineResult }
-  | { type: 'pipeline.timeout' };
+  | { type: 'pipeline.timeout' }
+  | { type: 'questions.collected'; count: number }
+  | { type: 'questions.waiting' }
+  | { type: 'questions.answered'; count: number };
 
 export type QuorumEventType = QuorumEvent['type'];
 

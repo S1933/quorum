@@ -93,6 +93,24 @@ export class TerminalRenderer {
         this.line(this.c('dim', `pipeline ${e.result.pipelineId} done in ${this.formatDuration(e.result.durationMs)} (${e.result.reviews.length} reviews, ${e.result.errors.length} errors)`));
       }),
     );
+    unsubs.push(
+      bus.on('questions.collected', (e) => {
+        this.line(`${this.c('cyan', '❓')}  ${e.count} question(s) from reviewers`);
+        this.line('');
+      }),
+    );
+    unsubs.push(
+      bus.on('questions.waiting', () => {
+        this.line(`${this.c('yellow', '💬')}  waiting for your answers…`);
+        this.line('');
+      }),
+    );
+    unsubs.push(
+      bus.on('questions.answered', (e) => {
+        this.line(`${this.c('green', '✅')}  ${e.count} question(s) answered`);
+        this.line('');
+      }),
+    );
 
     return () => {
       for (const u of unsubs) u();

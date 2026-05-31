@@ -1,13 +1,23 @@
 import type { QuorumConfig, ReviewerConfig } from '../../config/schema.ts';
 import { defaultPluginCtx } from '../../runtime/plugin.ts';
 import { applyDiffLimits, type DiffLimits } from '../../runtime/workspace.ts';
-import { PipelineExecutor } from '../../pipelines/executor.ts';
+import { PipelineExecutor, type PipelineRunInput } from '../../pipelines/executor.ts';
 import { TerminalRenderer } from '../../ui/terminal.ts';
 import { renderMarkdownReport } from '../../ui/markdown.ts';
 import { renderJsonReport } from '../../ui/json.ts';
 import { ConfigError } from '../../core/errors.ts';
+import type { PipelineResult } from '../../core/pipeline.ts';
 import type { CliDeps, CliIo } from '../types.ts';
 import { writeReport } from '../report.ts';
+import {
+  QUESTIONS_PROMPT,
+  buildFindingsWithQAInstruction,
+} from '../../reviewers/output.ts';
+import {
+  collectQuestions,
+  deduplicateQuestions,
+  promptQuestions,
+} from '../../interactive/qa.ts';
 
 export async function cmdReview(
   positional: string[],
@@ -66,17 +76,28 @@ export async function cmdReview(
 
   const executor = new PipelineExecutor();
   const instruction = buildReviewInstruction(workspace.diff, workspace.files ?? []);
+  const interactive = flags.interactive === true;
 
   try {
-    const result = await executor.run({
-      pipeline: filteredPipeline,
-      reviewers,
-      workspace,
-      instruction,
-      taskId: `review-${deps.now()}`,
-      bus: runtime.bus,
-      consensus: runtime.consensus,
-    });
+    const result = interactive
+      ? await runInteractive(executor, {
+          pipeline: filteredPipeline,
+          reviewers,
+          workspace,
+          instruction,
+          taskId: `review-${deps.now()}`,
+          bus: runtime.bus,
+          consensus: runtime.consensus,
+        }, io)
+      : await executor.run({
+          pipeline: filteredPipeline,
+          reviewers,
+          workspace,
+          instruction,
+          taskId: `review-${deps.now()}`,
+          bus: runtime.bus,
+          consensus: runtime.consensus,
+        });
 
     if (format === 'json') {
       const json = renderJsonReport(result);
@@ -94,6 +115,50 @@ export async function cmdReview(
     detach();
     await runtime.dispose();
   }
+}
+
+async function runInteractive(
+  executor: PipelineExecutor,
+  input: PipelineRunInput,
+  io: CliIo,
+): Promise<PipelineResult> {
+  if (!io.stdin || !io.stdin.isTTY) {
+    throw new ConfigError(
+      'Interactive mode requires a TTY (stdin is not a terminal). Run without --interactive or redirect stdin from a terminal.',
+    );
+  }
+
+  const questionInstruction = `${input.instruction}\n\n${QUESTIONS_PROMPT}`;
+
+  const phase1Result = await executor.run({
+    ...input,
+    instruction: questionInstruction,
+    taskId: `${input.taskId}-q`,
+  });
+
+  const questions = collectQuestions(phase1Result.reviews);
+  if (questions.length === 0) {
+    return phase1Result;
+  }
+
+  const deduped = deduplicateQuestions(questions);
+  input.bus.emit({ type: 'questions.collected', count: deduped.length });
+
+  input.bus.emit({ type: 'questions.waiting' });
+  const answers = await promptQuestions(deduped, io);
+  input.bus.emit({ type: 'questions.answered', count: answers.size });
+
+  const qaList = deduped
+    .map((q) => ({ question: q.question, answer: answers.get(q.question) ?? '' }))
+    .filter((qa) => qa.answer.length > 0);
+
+  const findingsInstruction = buildFindingsWithQAInstruction(input.instruction, qaList);
+
+  return executor.run({
+    ...input,
+    instruction: findingsInstruction,
+    taskId: `${input.taskId}-f`,
+  });
 }
 
 export function resolveDiffLimits(

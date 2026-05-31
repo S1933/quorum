@@ -9,7 +9,7 @@ export const CursorAgentConfigSchema = z
     output_format: z.enum(['text', 'json', 'stream-json']).default('text'),
     extra_args: z.array(z.never()).default([]),
     cwd: z.string().optional(),
-    timeout_ms: z.number().int().positive().default(60_000),
+    timeout_ms: z.number().int().positive().default(120_000),
   })
   .strict();
 

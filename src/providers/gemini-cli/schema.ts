@@ -14,7 +14,7 @@ export const GeminiCliConfigSchema = z
     skip_trust: z.boolean().default(true),
     extra_args: z.array(SafeExtraArgSchema).default([]),
     cwd: z.string().optional(),
-    timeout_ms: z.number().int().positive().default(60_000),
+    timeout_ms: z.number().int().positive().default(120_000),
   })
   .strict();
 
