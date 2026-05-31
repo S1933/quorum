@@ -19,11 +19,36 @@ if ! command -v "$CMD" &>/dev/null && ! [ -f "$ROOT/src/cli/index.ts" ]; then
   exit 0
 fi
 
-OUTPUT=$($CMD review --json --config quorum.yaml 2>&1 || true)
-CRITICAL=$(echo "$OUTPUT" | jq -r '.findings[] | select(.severity=="critical" or .severity=="high") | .severity' 2>/dev/null | wc -l || echo 0)
+REPORT="$ROOT/.quorum/last-review.json"
+mkdir -p "$ROOT/.quorum"
+
+OUTPUT=$($CMD review --json --config quorum.yaml --report "$REPORT" 2>&1 || true)
+if [ -f "$REPORT" ]; then
+  JSON_INPUT=$(cat "$REPORT")
+else
+  JSON_INPUT="$OUTPUT"
+fi
+
+BLOCKING=$(echo "$JSON_INPUT" | jq '
+  [
+    .reviews[].findings[]?,
+    .consensus.unique[]?,
+    .consensus.groups[].members[]?
+  ]
+  | unique_by([.reviewer, .file, .lineRange.start, .lineRange.end, .severity, .title])
+  | map(select(.severity == "critical" or .severity == "high"))
+' 2>/dev/null || echo '[]')
+CRITICAL=$(echo "$BLOCKING" | jq 'length' 2>/dev/null || echo 0)
 
 if [ "$CRITICAL" -gt 0 ]; then
   echo "Quorum found $CRITICAL high/critical findings. Set QUORUM_BYPASS=1 to bypass."
+  echo
+  echo "Quorum review report:"
+  echo "$BLOCKING" | jq -r '
+    .[]
+    | "- [\(.severity)] \(.file):\(.lineRange.start)-\(.lineRange.end) \(.title)\n  reviewer: \(.reviewer)\n  category: \(.category)\n  \(.body // "")\n"
+  '
+  echo "Full JSON report: $REPORT"
   exit 1
 fi
 `;

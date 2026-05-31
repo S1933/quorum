@@ -46,39 +46,77 @@ bun install
 
 ## Use Quorum CLI in your project
 
-### Setup your project
+### Initialize your project
+
+Run anywhere in your repo. If no `quorum.yaml` exists, the first command copies `quorum.yaml.example`.
 
 ```bash
-# Add your first reviewer (run this in your project directory)
-bun quorum reviewer add --provider=openrouter --persona=security --model=claude-opus-4
+# Add your first reviewer — inits config if missing
+bun quorum reviewer add --provider=openrouter --persona=security --model=claude-sonnet-4-20250514
 ```
 
+### Commands
+
+**`quorum reviewer add`** — Add a reviewer and wire it into a pipeline.
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--provider <type>` | yes | Provider ID: `openrouter`, `claude-code`, `codex-cli`, `continue-dev`, `cursor-agent`, `gemini-cli`, `kilo-code`, `opencode-go`, `ollama` |
+| `--persona <name>` | yes | Persona defined in `quorum.yaml` |
+| `--model <model>` | no | Override the provider's model |
+| `--id <reviewer-id>` | no | Custom reviewer ID (default: `<persona>-<provider>`) |
+| `--ext <ext1,ext2,…>` | no | File extension filter, comma-separated (e.g. `ts,tsx`) |
+| `--pipeline <id>` | no | Pipeline to attach to (default: `defaults.pipeline` or `default`) |
+| `--config <path>` | no | Path to `quorum.yaml` (default: `./quorum.yaml`) |
+
 ```bash
-# Review current changes against the default branch
-bun quorum review
+bun quorum reviewer add --provider=claude-code --persona=backend-senior --ext=go --id=backend-go-reviewer --pipeline=default
+```
 
-# Add a reviewer to your config
-bun quorum reviewer add --provider=openrouter --persona=security --model=claude-opus-4
+**`quorum review [pipeline-id]`** — Run a review pipeline on the current diff.
 
-# Add with file filter, custom id, and target pipeline
-bun quorum reviewer add \
-  --provider=claude-code \
-  --persona=backend-senior \
-  --ext=go \
-  --id=backend-go-reviewer \
-  --pipeline=default
+| Flag | Description |
+|------|-------------|
+| `--pipeline <id>` | Pipeline to run (overrides positional) |
+| `--base <ref>` | Git ref to diff against (default: auto-detects `origin/main`, `origin/master`, `main`, `master`) |
+| `--format text\|json` | Output format (default: `text`) |
+| `--json` | Shorthand for `--format json` |
+| `--report <path>` | Write report to file |
+| `--no-color` | Disable ANSI colors |
+| `--no-preview` | Disable live token streaming in terminal |
+| `--max-diff-bytes <n>` | Clip diff to byte budget |
+| `--include <glob>` | Comma-separated glob patterns to include |
+| `--exclude <glob>` | Comma-separated glob patterns to exclude |
+| `--config <path>` | Path to `quorum.yaml` |
 
-# List all reviewers, providers, personas, and pipelines
+```bash
+bun quorum review                           # run default pipeline
+bun quorum review --pipeline ci             # run named pipeline
+bun quorum review --json                    # JSON output to stdout
+bun quorum review --json --report .quorum/review.json  # JSON to file
+bun quorum review --base origin/main        # diff against a specific ref
+bun quorum review --include "src/**/*.ts"   # only .ts files
+bun quorum review --no-preview --no-color   # quiet terminal output
+```
+
+**`quorum reviewers`** — List providers, personas, reviewers, and pipelines.
+
+| Flag | Description |
+|------|-------------|
+| `--config <path>` | Path to `quorum.yaml` |
+
+```bash
 bun quorum reviewers
+```
 
-# Enable pre-commit hook (blocks commits with high/critical findings)
+**`quorum pre-commit true|false`** — Install or remove a git pre-commit hook.
+
+The hook runs `quorum review --json` and blocks the commit if any `critical` or `high` severity findings exist. Bypass with `QUORUM_BYPASS=1`.
+
+```bash
 bun quorum pre-commit true
-
-# Disable pre-commit hook
 bun quorum pre-commit false
 ```
-
-JSON mode: `bun quorum review --json`. Use `--report <path>` to write to a file.
 
 ## Consensus
 

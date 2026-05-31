@@ -22,6 +22,11 @@ describe('pre-commit', () => {
 
     const hookContent = await Bun.file(join(repo, '.git', 'hooks', 'pre-commit')).text();
     expect(hookContent).toContain('$CMD review --json');
+    expect(hookContent).toContain('--report "$REPORT"');
+    expect(hookContent).toContain('.reviews[].findings[]?');
+    expect(hookContent).toContain('.consensus.unique[]?');
+    expect(hookContent).toContain('.consensus.groups[].members[]?');
+    expect(hookContent).toContain('Quorum review report:');
     expect(hookContent).toContain('QUORUM_BYPASS');
     expect(hookContent).toContain('high/critical findings');
   });
