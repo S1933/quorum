@@ -96,14 +96,11 @@ describe('kilo-code provider', () => {
     const runtime = await createRuntime({
       config: {
         version: 1,
-        providers: {
-          'kilo-local': { type: 'kilo-code' },
-        },
         personas: {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: 'kilo-local' },
+          sec: { persona: 'security', provider: { type: 'kilo-code' } },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },

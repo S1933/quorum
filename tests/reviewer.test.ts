@@ -50,6 +50,7 @@ describe('bindReviewer', () => {
         id: 'security-openrouter',
         personaId: 'security',
         providerId: 'provider-a',
+        providerConfig: { type: 'openrouter' },
         overrides: { temperature: 0.1 },
       },
       {
@@ -75,7 +76,7 @@ describe('bindReviewer', () => {
       review,
     };
     return bindReviewer(
-      { id: 'arch-reviewer', personaId: 'architecture', providerId: 'provider-a' },
+      { id: 'arch-reviewer', personaId: 'architecture', providerId: 'provider-a', providerConfig: { type: 'openrouter' } },
       { id: 'architecture', description: 'Architecture review', system: 'Review architecture.' },
       provider,
     );

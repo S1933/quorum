@@ -128,13 +128,6 @@ describe('ollama provider', () => {
     const runtime = await createRuntime({
       config: {
         version: 1,
-        providers: {
-          'ollama-local': {
-            type: 'ollama',
-            model: 'llama3.1',
-            base_url: 'http://ollama.test',
-          },
-        },
         personas: {
           security: {
             description: 'Security review',
@@ -144,7 +137,7 @@ describe('ollama provider', () => {
         reviewers: {
           'sec-ollama': {
             persona: 'security',
-            provider: 'ollama-local',
+            provider: { type: 'ollama', model: 'llama3.1', base_url: 'http://ollama.test' },
           },
         },
         pipelines: {

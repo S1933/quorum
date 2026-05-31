@@ -96,14 +96,11 @@ describe('continue-dev provider', () => {
     const runtime = await createRuntime({
       config: {
         version: 1,
-        providers: {
-          'continue-local': { type: 'continue-dev' },
-        },
         personas: {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: 'continue-local' },
+          sec: { persona: 'security', provider: { type: 'continue-dev' } },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },

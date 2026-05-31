@@ -130,14 +130,11 @@ describe('codex-cli provider', () => {
     const runtime = await createRuntime({
       config: {
         version: 1,
-        providers: {
-          'codex-local': { type: 'codex-cli' },
-        },
         personas: {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: 'codex-local' },
+          sec: { persona: 'security', provider: { type: 'codex-cli' } },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },

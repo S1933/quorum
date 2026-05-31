@@ -101,14 +101,11 @@ describe('gemini-cli provider', () => {
     const runtime = await createRuntime({
       config: {
         version: 1,
-        providers: {
-          'gemini-local': { type: 'gemini-cli' },
-        },
         personas: {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: 'gemini-local' },
+          sec: { persona: 'security', provider: { type: 'gemini-cli' } },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
