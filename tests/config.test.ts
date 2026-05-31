@@ -5,11 +5,6 @@ import { interpolateString, interpolateDeep, resolveLazy, isLazyEnvRef } from '.
 
 const MINIMAL_YAML = `
 version: 1
-providers:
-  openrouter-claude:
-    type: openrouter
-    api_key: test-key
-    model: test-model
 personas:
   security:
     description: Security review
@@ -17,7 +12,10 @@ personas:
 reviewers:
   sec:
     persona: security
-    provider: openrouter-claude
+    provider:
+      type: openrouter
+      api_key: test-key
+      model: test-model
 pipelines:
   default:
     reviewers: [sec]
@@ -28,46 +26,23 @@ function withDefaults(extra: string): string {
 }
 
 describe('loadConfigFromString', () => {
-  test('rejects defaults.provider because review-only config selects pipelines', async () => {
-    const source = `
-version: 1
-defaults:
-  provider: openrouter-claude
-  pipeline: default
-providers:
-  openrouter-claude:
-    type: openrouter
-    api_key: test-key
-    model: test-model
-personas:
-  security:
-    description: Security review
-    system: Review security issues.
-reviewers:
-  sec:
-    persona: security
-    provider: openrouter-claude
-pipelines:
-  default:
-    reviewers: [sec]
-`;
-
-    await expect(loadConfigFromString(source)).rejects.toThrow(ConfigError);
-  });
-
   test('parses a minimal valid config', async () => {
     const cfg = await loadConfigFromString(MINIMAL_YAML);
     expect(cfg.version).toBe(1);
-    expect(Object.keys(cfg.providers)).toEqual(['openrouter-claude']);
     expect(Object.keys(cfg.personas)).toEqual(['security']);
     expect(Object.keys(cfg.reviewers)).toEqual(['sec']);
+    expect(cfg.reviewers.sec?.provider).toEqual({
+      type: 'openrouter',
+      api_key: 'test-key',
+      model: 'test-model',
+    });
     expect(Object.keys(cfg.pipelines)).toEqual(['default']);
   });
 
   test('accepts reviewer file extension filters', async () => {
     const cfg = await loadConfigFromString(MINIMAL_YAML.replace(
-      '    provider: openrouter-claude',
-      '    provider: openrouter-claude\n    fileExtensions: [go, ts, .tsx]',
+      '      model: test-model',
+      '      model: test-model\n    fileExtensions: [go, ts, .tsx]',
     ));
     expect(cfg.reviewers.sec?.fileExtensions).toEqual(['go', 'ts', '.tsx']);
   });
@@ -102,42 +77,23 @@ pipelines:
   test('rejects reviewer referencing unknown persona', async () => {
     const source = `
 version: 1
-providers:
-  p: { type: openrouter, api_key: k, model: m }
 personas:
   sec: { description: d, system: s }
 reviewers:
-  r: { persona: nonexistent, provider: p }
+  r: { persona: nonexistent, provider: { type: openrouter, api_key: k, model: m } }
 pipelines:
   default: { reviewers: [r] }
 `;
     await expect(loadConfigFromString(source)).rejects.toThrow(/unknown persona/);
   });
 
-  test('rejects reviewer referencing unknown provider', async () => {
-    const source = `
-version: 1
-providers:
-  p: { type: openrouter, api_key: k, model: m }
-personas:
-  sec: { description: d, system: s }
-reviewers:
-  r: { persona: sec, provider: nonexistent }
-pipelines:
-  default: { reviewers: [r] }
-`;
-    await expect(loadConfigFromString(source)).rejects.toThrow(/unknown provider/);
-  });
-
   test('rejects pipeline referencing unknown reviewer', async () => {
     const source = `
 version: 1
-providers:
-  p: { type: openrouter, api_key: k, model: m }
 personas:
   sec: { description: d, system: s }
 reviewers:
-  r: { persona: sec, provider: p }
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
 pipelines:
   default: { reviewers: [ghost] }
 `;
@@ -147,12 +103,10 @@ pipelines:
   test('rejects consensus.requireAgreement exceeding reviewer count', async () => {
     const source = `
 version: 1
-providers:
-  p: { type: openrouter, api_key: k, model: m }
 personas:
   sec: { description: d, system: s }
 reviewers:
-  r: { persona: sec, provider: p }
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
 pipelines:
   default:
     reviewers: [r]
@@ -169,12 +123,10 @@ pipelines:
 
   test('rejects missing version field', async () => {
     const source = `
-providers:
-  p: { type: openrouter, api_key: k, model: m }
 personas:
   sec: { description: d, system: s }
 reviewers:
-  r: { persona: sec, provider: p }
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
 pipelines:
   default: { reviewers: [r] }
 `;
@@ -184,12 +136,10 @@ pipelines:
   test('accepts empty reviewers array in pipeline', async () => {
     const source = `
 version: 1
-providers:
-  p: { type: openrouter, api_key: k, model: m }
 personas:
   sec: { description: d, system: s }
 reviewers:
-  r: { persona: sec, provider: p }
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
 pipelines:
   default: { reviewers: [] }
 `;
@@ -200,12 +150,10 @@ pipelines:
   test('accepts pipeline with maxConcurrency', async () => {
     const source = `
 version: 1
-providers:
-  p: { type: openrouter, api_key: k, model: m }
 personas:
   sec: { description: d, system: s }
 reviewers:
-  r: { persona: sec, provider: p }
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
 pipelines:
   default:
     reviewers: [r]
@@ -215,17 +163,81 @@ pipelines:
     expect(cfg.pipelines.default!.maxConcurrency).toBe(3);
   });
 
+  test('rejects invalid YAML', async () => {
+    await expect(loadConfigFromString('{ invalid: yaml: :')).rejects.toThrow(ConfigError);
+  });
+
+  test('accepts empty reviewers array in pipeline', async () => {
+    const source = `
+version: 1
+personas:
+  sec: { description: d, system: s }
+reviewers:
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
+pipelines:
+  default: { reviewers: [] }
+`;
+    const cfg = await loadConfigFromString(source);
+    expect(cfg.pipelines.default!.reviewers).toEqual([]);
+  });
+
+  test('accepts pipeline with maxConcurrency', async () => {
+    const source = `
+version: 1
+personas:
+  sec: { description: d, system: s }
+reviewers:
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
+pipelines:
+  default:
+    reviewers: [r]
+    maxConcurrency: 3
+`;
+    const cfg = await loadConfigFromString(source);
+    expect(cfg.pipelines.default!.maxConcurrency).toBe(3);
+  });
+
+  test('rejects pipeline referencing unknown reviewer', async () => {
+    const source = `
+version: 1
+personas:
+  sec: { description: d, system: s }
+reviewers:
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
+pipelines:
+  default: { reviewers: [ghost] }
+`;
+    await expect(loadConfigFromString(source)).rejects.toThrow(/unknown reviewer/);
+  });
+
+  test('rejects consensus.requireAgreement exceeding reviewer count', async () => {
+    const source = `
+version: 1
+personas:
+  sec: { description: d, system: s }
+reviewers:
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
+pipelines:
+  default:
+    reviewers: [r]
+    consensus:
+      strategy: overlap-v1
+      requireAgreement: 5
+`;
+    await expect(loadConfigFromString(source)).rejects.toThrow(/requireAgreement.*exceeds/);
+  });
+
   test('resolves env:VAR lazily during config parse', async () => {
     const source = MINIMAL_YAML.replace('api_key: test-key', 'api_key: env:MY_API_KEY');
     const cfg = await loadConfigFromString(source, { env: { MY_API_KEY: 'secret-123' } });
-    const provider = cfg.providers['openrouter-claude'] as Record<string, unknown>;
+    const provider = cfg.reviewers.sec?.provider as Record<string, unknown>;
     expect(isLazyEnvRef(provider.api_key)).toBe(true);
   });
 
   test('resolves ${VAR} template during config parse', async () => {
     const source = MINIMAL_YAML.replace('api_key: test-key', 'api_key: prefix-${MY_KEY}-suffix');
     const cfg = await loadConfigFromString(source, { env: { MY_KEY: 'abc' } });
-    const provider = cfg.providers['openrouter-claude'] as Record<string, unknown>;
+    const provider = cfg.reviewers.sec?.provider as Record<string, unknown>;
     expect(provider.api_key).toBe('prefix-abc-suffix');
   });
 });

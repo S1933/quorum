@@ -13,8 +13,10 @@ const MAX_UNTRACKED_BYTES = 24 * 1024;
 export async function probeWorkspace(opts: WorkspaceProbeOptions): Promise<WorkspaceInfo> {
   const { root } = opts;
   const baseRef = opts.baseRef ?? (await defaultBaseRef(root));
-  const diff = await gitDiff(root, baseRef);
-  const untrackedDiff = await gitUntrackedDiff(root);
+  const [diff, untrackedDiff] = await Promise.all([
+    gitDiff(root, baseRef),
+    gitUntrackedDiff(root),
+  ]);
   const combinedDiff = [diff, untrackedDiff].filter(Boolean).join('\n\n') || undefined;
   const files = parseDiffFiles(combinedDiff);
   const ws: WorkspaceInfo = { root, files };
@@ -50,12 +52,12 @@ async function gitDiff(root: string, baseRef: string | undefined): Promise<strin
   }
 
   const chunks: string[] = [];
-  const stagedDiff = await runGitDiff(root, ['diff', '--cached']);
-  if (stagedDiff === null) return undefined;
+  const [stagedDiff, worktreeDiff] = await Promise.all([
+    runGitDiff(root, ['diff', '--cached']),
+    runGitDiff(root, ['diff']),
+  ]);
+  if (stagedDiff === null || worktreeDiff === null) return undefined;
   if (stagedDiff) chunks.push(stagedDiff);
-
-  const worktreeDiff = await runGitDiff(root, ['diff']);
-  if (worktreeDiff === null) return undefined;
   if (worktreeDiff) chunks.push(worktreeDiff);
 
   return chunks.length > 0 ? chunks.join('\n') : undefined;

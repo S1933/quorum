@@ -158,23 +158,6 @@ version: 1
 defaults:
   pipeline: default
 
-providers:
-  openrouter-claude:
-    type: openrouter
-    api_key: env:OPENROUTER_API_KEY
-    model: anthropic/claude-opus-4
-    temperature: 0.2
-
-  openrouter-gpt:
-    type: openrouter
-    api_key: env:OPENROUTER_API_KEY
-    model: openai/gpt-5-codex
-    temperature: 0.2
-
-  claude-code-local:
-    type: claude-code
-    model: claude-opus-4-7
-
 personas:
   security:
     description: Adversarial security review
@@ -195,10 +178,32 @@ personas:
       abstractions, and testability. Prefer fewer, deeper findings.
 
 reviewers:
-  sec-opus:    { persona: security,     provider: openrouter-claude }
-  sec-gpt:     { persona: security,     provider: openrouter-gpt }
-  perf-opus:   { persona: performance,  provider: openrouter-claude }
-  arch-opus:   { persona: architecture, provider: openrouter-claude }
+  sec-opus:
+    persona: security
+    provider:
+      type: openrouter
+      api_key: env:OPENROUTER_API_KEY
+      model: anthropic/claude-opus-4
+      temperature: 0.2
+  sec-gpt:
+    persona: security
+    provider:
+      type: openrouter
+      api_key: env:OPENROUTER_API_KEY
+      model: openai/gpt-5-codex
+      temperature: 0.2
+  perf-opus:
+    persona: performance
+    provider:
+      type: openrouter
+      api_key: env:OPENROUTER_API_KEY
+      model: anthropic/claude-opus-4
+      temperature: 0.2
+  arch-opus:
+    persona: architecture
+    provider:
+      type: claude-code
+      model: claude-opus-4-7
 
 pipelines:
   default:
@@ -214,9 +219,8 @@ pipelines:
 
 **Schema notes:**
 
-- `providers` is a map keyed by *instance id*, not by type — you can have many `openrouter`-typed providers with different models.
-- `reviewers` are the binding layer. Three-tier hierarchy is visible in the file structure.
-- Pipelines reference reviewers by id; they never embed persona/provider inline. Forces reuse.
+- `reviewers.*.provider` embeds the provider config (`type`, `model`, auth, transport options).
+- Pipelines reference reviewers by id; they never embed persona/provider inline.
 - `consensus.strategy` is a registry key; V1 ships `overlap-v1` only.
 
 Loader resolves `env:` lazily so missing keys fail at provider instantiation, not at config-parse time — better error locality.

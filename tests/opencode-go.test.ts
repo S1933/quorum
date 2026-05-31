@@ -144,17 +144,11 @@ describe('opencode-go provider', () => {
     const runtime = await createRuntime({
       config: {
         version: 1,
-        providers: {
-          'opencode-local': {
-            type: 'opencode-go',
-            extra_args: ['--trust-all'],
-          },
-        },
         personas: {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: 'opencode-local' },
+          sec: { persona: 'security', provider: { type: 'opencode-go', extra_args: ['--trust-all'] } },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -163,7 +157,7 @@ describe('opencode-go provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveProvider('opencode-local')).rejects.toThrow('extra_args.0');
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow('extra_args.0');
   });
 });
 

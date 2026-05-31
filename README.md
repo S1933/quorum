@@ -15,7 +15,7 @@ Works as a Bun CLI.
 
 - Multi-reviewer consensus on the same git diff, with findings grouped by file, line, and category.
 - Provider-agnostic execution across APIs, local models, and agent CLIs.
-- YAML-defined personas, reviewer overrides, file filters, and parallel or sequential pipelines.
+- YAML-defined personas, reviewer providers, file filters, and parallel or sequential pipelines.
 - Terminal progress plus Markdown/JSON reports, available from the CLI.
 
 ## Supported Providers
@@ -55,6 +55,17 @@ Run anywhere in your repo. If no `quorum.yaml` exists, the first command copies 
 bun quorum reviewer add --provider=openrouter --persona=security --model=claude-opus-4-8
 ```
 
+Reviewer provider config is inline:
+
+```yaml
+reviewers:
+  security-openrouter:
+    persona: security
+    provider:
+      type: openrouter
+      model: claude-opus-4-8
+```
+
 ### Commands
 
 **`quorum reviewer add`** — Add a reviewer and wire it into a pipeline.
@@ -64,7 +75,7 @@ bun quorum reviewer add --provider=openrouter --persona=security --model=claude-
 | `--provider <type>` | yes | Provider ID: `openrouter`, `claude-code`, `codex-cli`, `continue-dev`, `cursor-agent`, `gemini-cli`, `kilo-code`, `opencode-go`, `ollama` |
 | `--persona <name>` | yes | Persona defined in `quorum.yaml` |
 | `--model <model>` | yes | Model to use for this reviewer and provider |
-| `--id <reviewer-id>` | no | Custom reviewer ID (default: `<persona>-<provider>`) |
+| `--id <reviewer-id>` | no | Custom reviewer ID (default: `<persona>-<provider>`, with numeric suffix on conflict) |
 | `--ext <ext1,ext2,…>` | no | File extension filter, comma-separated (e.g. `ts,tsx`) |
 | `--pipeline <id>` | no | Pipeline to attach to (default: `defaults.pipeline` or `default`) |
 | `--config <path>` | no | Path to `quorum.yaml` (default: `./quorum.yaml`) |
@@ -99,7 +110,7 @@ bun quorum review --include "src/**/*.ts"   # only .ts files
 bun quorum review --no-preview --no-color   # quiet terminal output
 ```
 
-**`quorum reviewers`** — List providers, personas, reviewers, and pipelines.
+**`quorum reviewers`** — List personas, reviewers, and pipelines.
 
 | Flag | Description |
 |------|-------------|

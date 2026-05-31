@@ -124,17 +124,11 @@ describe('gemini-cli provider', () => {
     const runtime = await createRuntime({
       config: {
         version: 1,
-        providers: {
-          'gemini-local': {
-            type: 'gemini-cli',
-            extra_args: ['--yolo'],
-          },
-        },
         personas: {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: 'gemini-local' },
+          sec: { persona: 'security', provider: { type: 'gemini-cli', extra_args: ['--yolo'] } },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -143,7 +137,7 @@ describe('gemini-cli provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveProvider('gemini-local')).rejects.toThrow('Invalid enum value');
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow('Invalid enum value');
   });
 });
 

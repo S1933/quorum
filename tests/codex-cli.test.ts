@@ -153,17 +153,11 @@ describe('codex-cli provider', () => {
     const runtime = await createRuntime({
       config: {
         version: 1,
-        providers: {
-          'codex-local': {
-            type: 'codex-cli',
-            extra_args: ['--add-dir', '/tmp'],
-          },
-        },
         personas: {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: 'codex-local' },
+          sec: { persona: 'security', provider: { type: 'codex-cli', extra_args: ['--add-dir', '/tmp'] } },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -172,25 +166,18 @@ describe('codex-cli provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveProvider('codex-local')).rejects.toThrow('Invalid enum value');
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow('Invalid enum value');
   });
 
   test('rejects full host access without approvals', async () => {
     const runtime = await createRuntime({
       config: {
         version: 1,
-        providers: {
-          'codex-local': {
-            type: 'codex-cli',
-            sandbox: 'danger-full-access',
-            approval_policy: 'never',
-          },
-        },
         personas: {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: 'codex-local' },
+          sec: { persona: 'security', provider: { type: 'codex-cli', sandbox: 'danger-full-access', approval_policy: 'never' } },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -199,7 +186,7 @@ describe('codex-cli provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveProvider('codex-local')).rejects.toThrow(
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow(
       'danger-full-access requires approval_policy other than never',
     );
   });

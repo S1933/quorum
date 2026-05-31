@@ -82,7 +82,12 @@ async function cmdReviewerAdd(
     return 1;
   }
 
-  const reviewerId = typeof flags.id === 'string' ? flags.id : `${persona}-${provider}`;
+  const providerEntry: Record<string, unknown> = { type: provider, model };
+  const newEntry: Record<string, unknown> = { persona, provider: providerEntry };
+  if (extensions) newEntry.fileExtensions = extensions;
+  const reviewerId = typeof flags.id === 'string'
+    ? flags.id
+    : resolveReviewerId(persona, provider, newEntry, config.reviewers);
 
   if (config.reviewers[reviewerId]) {
     io.stdout.write(`Reviewer "${reviewerId}" already exists — skipping.\n`);
@@ -101,21 +106,6 @@ async function cmdReviewerAdd(
   const raw = await deps.readConfigFile!(configPath);
   const doc = parseYaml(raw);
   const d = (doc && typeof doc === 'object' ? doc : {}) as Record<string, unknown>;
-
-  if (!d.providers || typeof d.providers !== 'object') {
-    d.providers = {};
-  }
-  const providers = d.providers as Record<string, unknown>;
-  if (!providers[provider]) {
-    const providerEntry: Record<string, unknown> = { type: provider };
-    if (model) providerEntry.model = model;
-    providers[provider] = providerEntry;
-    io.stdout.write(`added provider "${provider}"  type=${provider}${model ? ` (${model})` : ''}\n`);
-  }
-
-  const newEntry: Record<string, unknown> = { persona, provider };
-  if (model) newEntry.overrides = { model };
-  if (extensions) newEntry.fileExtensions = extensions;
 
   if (!d.reviewers || typeof d.reviewers !== 'object') {
     d.reviewers = {};
@@ -144,4 +134,55 @@ function parseExtensions(flags: Record<string, string | boolean>): string[] | nu
     : flags.ext;
   if (!Array.isArray(raw) || raw.length === 0) return null;
   return raw.map((s) => String(s).trim()).filter(Boolean);
+}
+
+function resolveReviewerId(
+  persona: string,
+  provider: string,
+  target: Record<string, unknown>,
+  existing: Record<string, unknown>,
+): string {
+  for (const [id, cfg] of Object.entries(existing)) {
+    if (reviewerEntryMatches(cfg, target)) return id;
+  }
+
+  const base = `${persona}-${provider}`;
+  if (!existing[base]) return base;
+
+  let n = 2;
+  let id = `${base}-${n}`;
+  while (existing[id]) {
+    n += 1;
+    id = `${base}-${n}`;
+  }
+  return id;
+}
+
+function reviewerEntryMatches(actual: unknown, target: Record<string, unknown>): boolean {
+  if (!actual || typeof actual !== 'object') return false;
+  const a = actual as Record<string, unknown>;
+  return (
+    a.persona === target.persona
+    && deepEqual(a.provider, target.provider)
+    && deepEqual(a.fileExtensions ?? [], target.fileExtensions ?? [])
+  );
+}
+
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (typeof a !== typeof b) return false;
+  if (typeof a === 'object') {
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return false;
+      return a.every((v, i) => deepEqual(v, b[i]));
+    }
+    const aObj = a as Record<string, unknown>;
+    const bObj = b as Record<string, unknown>;
+    const aKeys = Object.keys(aObj);
+    const bKeys = Object.keys(bObj);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every((k) => deepEqual(aObj[k], bObj[k]));
+  }
+  return false;
 }

@@ -12,6 +12,7 @@ export interface ReviewerRef {
   id: string;
   personaId: string;
   providerId: string;
+  providerConfig: unknown;
   overrides?: ReviewerOverrides;
 }
 

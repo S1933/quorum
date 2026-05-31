@@ -45,6 +45,7 @@ export class TerminalRenderer {
       bus.on('pipeline.started', (e) => {
         this.line(`${this.c('cyan', '🧭')}  pipeline ${this.c('bold', e.pipelineId)} · ${e.reviewers.length} reviewer(s)`);
         this.line(this.c('dim', `    ${e.reviewers.join(', ')}`));
+        this.line('');
       }),
     );
     unsubs.push(
@@ -67,11 +68,13 @@ export class TerminalRenderer {
       bus.on('reviewer.finished', (e) => {
         const n = e.result.findings.length;
         this.line(`${this.c('green', '  ✅')} ${e.reviewerId} finished · ${n} finding${n === 1 ? '' : 's'} ${this.c('dim', `(${this.formatDuration(e.result.durationMs)})`)}`);
+        this.line('');
       }),
     );
     unsubs.push(
       bus.on('reviewer.failed', (e) => {
         this.line(`${this.c('red', '  ❌')} ${e.reviewerId} failed: ${e.error.message}`);
+        this.line('');
       }),
     );
     unsubs.push(
@@ -133,12 +136,21 @@ export class TerminalRenderer {
       for (const g of priorityGroups) {
         const f = g.representative;
         const badge = this.c('magenta', `🤝 ${g.reviewers.length} agreed`);
-        this.line(`${this.severityIcon(f.severity)} ${this.c('bold', f.title)} ${badge} ${this.c('dim', `(${f.file}:${f.lineRange.start}-${f.lineRange.end})`)}`);
-        if (f.body) this.line(`   ${f.body.replace(/\n/g, '\n   ')}`);
-        this.line(this.c('dim', `   ${this.categoryIcon(f.category)} ${f.category} · reviewers: ${g.reviewers.join(', ')}`));
+        this.line(`  ${this.severityIcon(f.severity)} ${this.c('bold', f.title)} ${badge}`);
+        this.line(this.c('dim', `     ${f.file}:${f.lineRange.start}-${f.lineRange.end}`));
+        if (f.body) this.line(`     ${f.body.replace(/\n/g, '\n     ')}`);
+        this.line('');
+        this.line(this.c('dim', `     ${this.categoryIcon(f.category)} ${f.category}`));
+        this.line(this.c('dim', `     reviewers: ${g.reviewers.join(', ')}`));
+        this.line('');
       }
       for (const f of priorityUnique) {
-        this.line(`${this.severityIcon(f.severity)} ${f.title} ${this.c('dim', `(${f.file}:${f.lineRange.start}-${f.lineRange.end}, ${this.categoryIcon(f.category)} ${f.category}, ${f.reviewer})`)}`);
+        this.line(`  ${this.severityIcon(f.severity)} ${this.c('bold', f.title)}`);
+        this.line(this.c('dim', `     ${f.file}:${f.lineRange.start}-${f.lineRange.end}`));
+        if (f.body) this.line(`     ${f.body.replace(/\n/g, '\n     ')}`);
+        this.line('');
+        this.line(this.c('dim', `     ${this.categoryIcon(f.category)} ${f.category} · ${f.reviewer}`));
+        this.line('');
       }
     }
   }

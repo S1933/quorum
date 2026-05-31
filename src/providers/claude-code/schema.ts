@@ -7,7 +7,7 @@ export const ClaudeCodeConfigSchema = z
     binary: z.string().default('claude'),
     extra_args: z.array(z.never()).default([]),
     cwd: z.string().optional(),
-    timeout_ms: z.number().int().positive().default(120_000),
+    timeout_ms: z.number().int().positive().default(60_000),
   })
   .strict();
 

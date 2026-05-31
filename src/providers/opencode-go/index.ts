@@ -32,7 +32,7 @@ class OpenCodeGoProvider implements Provider {
     const args =
       this.cfg.command_style === 'run'
         ? ['run', ...this.cfg.extra_args]
-        : ['-p', STDIN_PROMPT, ...this.cfg.extra_args];
+        : ['--prompt', STDIN_PROMPT, ...this.cfg.extra_args];
 
     if (this.cfg.command_style === 'run') {
       if (model) args.push('--model', model);

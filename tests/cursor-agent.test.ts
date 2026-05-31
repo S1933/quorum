@@ -122,17 +122,11 @@ describe('cursor-agent provider', () => {
     const runtime = await createRuntime({
       config: {
         version: 1,
-        providers: {
-          'cursor-local': {
-            type: 'cursor-agent',
-            extra_args: ['--force'],
-          },
-        },
         personas: {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: 'cursor-local' },
+          sec: { persona: 'security', provider: { type: 'cursor-agent', extra_args: ['--force'] } },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -141,7 +135,7 @@ describe('cursor-agent provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveProvider('cursor-local')).rejects.toThrow();
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow();
   });
 });
 

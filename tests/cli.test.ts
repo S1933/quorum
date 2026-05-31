@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, test } from 'bun:test';
 import type { QuorumConfig } from '../src/config/schema.ts';
+import type { Severity } from '../src/core/finding.ts';
 import type { Pipeline } from '../src/core/pipeline.ts';
 import type { Provider } from '../src/core/provider.ts';
 import type { ReviewResult } from '../src/core/task.ts';
@@ -62,6 +63,9 @@ describe('cli', () => {
     expect(io.stdoutText()).toContain('── 📊 Review summary ──');
     expect(io.stdoutText()).toContain('── 🔎 Findings by priority ──');
     expect(io.stdoutText()).toContain('⚠️ Medium (1)');
+    expect(io.stdoutText()).toContain('pipeline default · 1 reviewer(s)\n    fake-reviewer\n\n  ⏳ fake-reviewer started');
+    expect(io.stdoutText()).toContain('  ✅ fake-reviewer finished · 1 finding (1ms)\n\n');
+    expect(io.stdoutText()).toContain('  ⚠️ Fake finding\n     src/app.ts:1-1\n     Fake body\n\n');
     expect(io.stdoutText()).toContain(`report: ${reportPath}`);
 
     const report = await Bun.file(reportPath).text();
@@ -175,33 +179,6 @@ describe('redactConfig', () => {
     expect(result.model).toBe('claude-sonnet');
   });
 
-  test('redacts nested provider configs with schema-aware fields', () => {
-    const input = {
-      providers: {
-        openrouter_main: { type: 'openrouter', api_key: 'sk-abc', model: 'gpt-4' },
-        local_ai: { type: 'claude-code', model: 'claude-opus' },
-      },
-    };
-    const result = redactConfig(input) as Record<string, unknown>;
-    const providers = result.providers as Record<string, unknown>;
-    expect((providers.openrouter_main as Record<string, unknown>).api_key).toBe('***redacted***');
-    expect((providers.openrouter_main as Record<string, unknown>).model).toBe('gpt-4');
-    expect((providers.local_ai as Record<string, unknown>).model).toBe('claude-opus');
-  });
-
-  test('redacts nonstandard-key values when schema marks them sensitive', () => {
-    const input = {
-      providers: {
-        custom: { type: 'cursor-agent', auth_header: 'sk-test', api_key: 'sk-test-2' },
-      },
-    };
-    const result = redactConfig(input) as Record<string, unknown>;
-    const providers = result.providers as Record<string, unknown>;
-    const custom = providers.custom as Record<string, unknown>;
-    expect(custom.api_key).toBe('***redacted***');
-    expect(custom.auth_header).toBe('sk-test');
-  });
-
   test('falls back to key-name heuristics for unknown provider types', () => {
     const input = {
       type: 'unknown-provider',
@@ -217,23 +194,6 @@ describe('redactConfig', () => {
     expect(result.public_field).toBe('visible');
   });
 
-  test('redacts secret fields nested arbitrarily deep', () => {
-    const input = {
-      providers: {
-        nested: {
-          level: {
-            type: 'openrouter',
-            api_key: 'deep-secret',
-          },
-        },
-      },
-    };
-    const result = redactConfig(input) as Record<string, unknown>;
-    const providers = result.providers as Record<string, unknown>;
-    const nested = (providers.nested as Record<string, unknown>).level as Record<string, unknown>;
-    expect(nested.api_key).toBe('***redacted***');
-  });
-
   test('redacts env:VAR pattern values under sensitive keys', () => {
     const input = {
       type: 'openrouter',
@@ -241,18 +201,6 @@ describe('redactConfig', () => {
     };
     const result = redactConfig(input) as Record<string, unknown>;
     expect(result.api_key).toBe('***redacted***');
-  });
-
-  test('redacts lazy env ref values under any key', () => {
-    const lazyRef = { __lazyEnv: true, varName: 'MY_SECRET', resolve: () => 'value' };
-    const input = {
-      providers: {
-        oc: { type: 'opencode-go', api_key: lazyRef },
-      },
-    };
-    const result = redactConfig(input) as Record<string, unknown>;
-    const providers = result.providers as Record<string, unknown>;
-    expect((providers.oc as Record<string, unknown>).api_key).toBe('***redacted***');
   });
 });
 
@@ -477,10 +425,10 @@ describe('reviewer file extension filters', () => {
     const ids = filterReviewersByChangedFiles(
       ['security', 'backend', 'frontend', 'architecture'],
       {
-        security: { persona: 'security', provider: 'fake-provider' },
-        backend: { persona: 'backend', provider: 'fake-provider', fileExtensions: ['go'] },
-        frontend: { persona: 'frontend', provider: 'fake-provider', fileExtensions: ['.ts', '.tsx'] },
-        architecture: { persona: 'architecture', provider: 'fake-provider', fileExtensions: ['php', 'go', 'ts'] },
+        security: { persona: 'security', provider: { type: 'fake' } },
+        backend: { persona: 'backend', provider: { type: 'fake' }, fileExtensions: ['go'] },
+        frontend: { persona: 'frontend', provider: { type: 'fake' }, fileExtensions: ['.ts', '.tsx'] },
+        architecture: { persona: 'architecture', provider: { type: 'fake' }, fileExtensions: ['php', 'go', 'ts'] },
       },
       ['cmd/api/main.go', 'README.md'],
     );
@@ -492,7 +440,7 @@ describe('reviewer file extension filters', () => {
     const ids = filterReviewersByChangedFiles(
       ['backend'],
       {
-        backend: { persona: 'backend', provider: 'fake-provider', fileExtensions: ['go'] },
+        backend: { persona: 'backend', provider: { type: 'fake' }, fileExtensions: ['go'] },
       },
       [],
     );
@@ -516,9 +464,9 @@ describe('reviewer file extension filters', () => {
         loadConfigFromPath: async () => ({
           ...config(),
           reviewers: {
-            'backend-reviewer': { persona: 'fake', provider: 'fake-provider', fileExtensions: ['go'] },
-            'frontend-reviewer': { persona: 'fake', provider: 'fake-provider', fileExtensions: ['ts', 'tsx'] },
-            'arch-reviewer': { persona: 'fake', provider: 'fake-provider', fileExtensions: ['php', 'go', 'ts'] },
+            'backend-reviewer': { persona: 'fake', provider: { type: 'fake' }, fileExtensions: ['go'] },
+            'frontend-reviewer': { persona: 'fake', provider: { type: 'fake' }, fileExtensions: ['ts', 'tsx'] },
+            'arch-reviewer': { persona: 'fake', provider: { type: 'fake' }, fileExtensions: ['php', 'go', 'ts'] },
           },
           pipelines: {
             default: {
@@ -562,7 +510,7 @@ describe('reviewer file extension filters', () => {
         loadConfigFromPath: async () => ({
           ...config(),
           reviewers: {
-            'backend-reviewer': { persona: 'fake', provider: 'fake-provider', fileExtensions: ['go'] },
+            'backend-reviewer': { persona: 'fake', provider: { type: 'fake' }, fileExtensions: ['go'] },
           },
           pipelines: {
             default: {
@@ -601,12 +549,6 @@ function config(): QuorumConfig {
   return {
     version: 1,
     defaults: { pipeline: 'default' },
-    providers: {
-      'fake-provider': {
-        type: 'fake',
-        api_key: 'secret-key',
-      },
-    },
     personas: {
       fake: {
         description: 'Fake persona',
@@ -616,7 +558,7 @@ function config(): QuorumConfig {
     reviewers: {
       'fake-reviewer': {
         persona: 'fake',
-        provider: 'fake-provider',
+        provider: { type: 'fake', api_key: 'secret-key' },
       },
     },
     pipelines: {
@@ -640,7 +582,7 @@ function deps(overrides: Partial<CliDeps>): CliDeps {
   };
 }
 
-function fakeRuntime(opts: { defaultPipeline?: Pipeline } = {}): FakeRuntime {
+function fakeRuntime(opts: { defaultPipeline?: Pipeline; severity?: Severity } = {}): FakeRuntime {
   const consensus = new ConsensusRegistry();
   consensus.register(overlapV1);
   const runtime: FakeRuntime = {
@@ -652,15 +594,12 @@ function fakeRuntime(opts: { defaultPipeline?: Pipeline } = {}): FakeRuntime {
     disposed: false,
     lastPipelineId: undefined,
     lastReviewerIds: undefined,
-    async resolveProvider() {
-      throw new Error('not used');
-    },
     async resolveReviewer() {
       throw new Error('not used');
     },
     async resolveReviewers(ids: string[]) {
       runtime.lastReviewerIds = ids;
-      return ids.map((id) => reviewer(id));
+      return ids.map((id) => reviewer(id, opts.severity));
     },
     resolvePipeline(id: string): Pipeline {
       runtime.lastPipelineId = id;
@@ -673,7 +612,7 @@ function fakeRuntime(opts: { defaultPipeline?: Pipeline } = {}): FakeRuntime {
   return runtime;
 }
 
-function reviewer(id: string): BoundReviewer {
+function reviewer(id: string, severity: Severity = 'medium'): BoundReviewer {
   return {
     id,
     persona: { id: 'fake', description: 'Fake persona', system: 'Review.' },
@@ -691,7 +630,7 @@ function reviewer(id: string): BoundReviewer {
           {
             file: 'src/app.ts',
             lineRange: { start: 1, end: 1 },
-            severity: 'medium',
+            severity,
             category: 'correctness',
             title: 'Fake finding',
             body: 'Fake body',

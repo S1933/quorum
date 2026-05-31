@@ -17,10 +17,16 @@ export const ReviewerOverridesSchema = z
   })
   .strict();
 
+export const ProviderConfigSchema = z
+  .object({
+    type: NonEmpty,
+  })
+  .catchall(z.unknown());
+
 export const ReviewerConfigSchema = z
   .object({
     persona: NonEmpty,
-    provider: NonEmpty,
+    provider: ProviderConfigSchema,
     overrides: ReviewerOverridesSchema.optional(),
     fileExtensions: z.array(NonEmpty).optional(),
   })
@@ -43,12 +49,6 @@ export const PipelineConfigSchema = z
   })
   .strict();
 
-export const ProviderConfigSchema = z
-  .object({
-    type: NonEmpty,
-  })
-  .catchall(z.unknown());
-
 export const DefaultsSchema = z
   .object({
     pipeline: NonEmpty.optional(),
@@ -62,7 +62,6 @@ export const QuorumConfigSchema = z
   .object({
     version: z.literal(1),
     defaults: DefaultsSchema.optional(),
-    providers: z.record(NonEmpty, ProviderConfigSchema),
     personas: z.record(NonEmpty, PersonaConfigSchema),
     reviewers: z.record(NonEmpty, ReviewerConfigSchema),
     pipelines: z.record(NonEmpty, PipelineConfigSchema),

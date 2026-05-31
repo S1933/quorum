@@ -1,4 +1,4 @@
-import { readdir, symlink, stat, mkdir } from 'node:fs/promises';
+import { readdir, readlink, symlink, stat, mkdir, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -34,14 +34,14 @@ for (const entry of entries) {
   }
 
   const linkPath = join(skillsTarget, `quorum-${entry.name}`);
-  try {
-    await symlink(skillDir, linkPath);
-    console.log(`symlink ${entry.name} → ${linkPath}`);
-  } catch (err) {
-    if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'EEXIST') {
-      console.log(`exists, skipping: ${linkPath}`);
-    } else {
-      throw err;
-    }
+  const existingTarget = await readlink(linkPath).catch(() => null);
+  if (existingTarget === skillDir) {
+    console.log(`exists, skipping: ${linkPath}`);
+    continue;
   }
+  if (existingTarget) {
+    await unlink(linkPath);
+  }
+  await symlink(skillDir, linkPath);
+  console.log(`symlink ${entry.name} → ${linkPath}`);
 }

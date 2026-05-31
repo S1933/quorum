@@ -22,13 +22,6 @@ function formatConfig(cfg: QuorumConfig): string {
     lines.push(`defaults: pipeline=${cfg.defaults.pipeline}\n`);
   }
 
-  lines.push('── Providers ──');
-  for (const [id, p] of Object.entries(cfg.providers)) {
-    const model = typeof p.model === 'string' ? ` (${p.model})` : '';
-    lines.push(`  ${id}  type=${p.type}${model}`);
-  }
-  lines.push('');
-
   lines.push('── Personas ──');
   for (const [id, p] of Object.entries(cfg.personas)) {
     lines.push(`  ${id}  ${p.description}`);
@@ -39,7 +32,8 @@ function formatConfig(cfg: QuorumConfig): string {
   for (const [id, r] of Object.entries(cfg.reviewers)) {
     const ext = r.fileExtensions?.length ? ` [${r.fileExtensions.join(', ')}]` : '';
     const ov = r.overrides ? ` (overrides: ${Object.entries(r.overrides).map(([k, v]) => `${k}=${v}`).join(', ')})` : '';
-    lines.push(`  ${id}  persona=${r.persona}  provider=${r.provider}${ext}${ov}`);
+    const provider = `${r.provider.type}${typeof r.provider.model === 'string' ? ` (${r.provider.model})` : ''}`;
+    lines.push(`  ${id}  persona=${r.persona}  provider=${provider}${ext}${ov}`);
   }
   lines.push('');
 

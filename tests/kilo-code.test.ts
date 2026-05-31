@@ -119,17 +119,11 @@ describe('kilo-code provider', () => {
     const runtime = await createRuntime({
       config: {
         version: 1,
-        providers: {
-          'kilo-local': {
-            type: 'kilo-code',
-            extra_args: ['--auto'],
-          },
-        },
         personas: {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: 'kilo-local' },
+          sec: { persona: 'security', provider: { type: 'kilo-code', extra_args: ['--auto'] } },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -138,7 +132,7 @@ describe('kilo-code provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveProvider('kilo-local')).rejects.toThrow('Invalid enum value');
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow('Invalid enum value');
   });
 });
 

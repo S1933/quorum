@@ -26,7 +26,6 @@ export interface Runtime {
   consensus: ConsensusRegistry;
   config: QuorumConfig;
   pluginCtx: PluginCtx;
-  resolveProvider(id: string): Promise<Provider>;
   resolveReviewer(id: string): Promise<BoundReviewer>;
   resolveReviewers(ids: string[]): Promise<BoundReviewer[]>;
   resolvePipeline(id: string): Pipeline;
@@ -55,22 +54,12 @@ export async function createRuntime(opts: CreateRuntimeOptions): Promise<Runtime
   providers.register(ollamaFactory);
   consensus.register(overlapV1);
 
-  const providerInstances = new Map<string, Provider>();
-
-  const resolveProvider = async (id: string): Promise<Provider> => {
-    const existing = providerInstances.get(id);
-    if (existing) return existing;
-    const cfg = opts.config.providers[id];
-    if (!cfg) throw new ConfigError(`Unknown provider "${id}"`);
-    const inst = await providers.instantiate(id, cfg, opts.pluginCtx);
-    providerInstances.set(id, inst);
-    return inst;
-  };
+  const providerCache = new Map<string, Provider>();
 
   const resolveReviewer = async (id: string): Promise<BoundReviewer> => {
     const ref = toReviewerRef(id, opts.config.reviewers[id]);
     const persona = toPersona(ref.personaId, opts.config.personas[ref.personaId]);
-    const provider = await resolveProvider(ref.providerId);
+    const provider = await instantiateProvider(ref.providerId, ref.providerConfig);
     return bindReviewer(ref, persona, provider);
   };
 
@@ -80,7 +69,6 @@ export async function createRuntime(opts: CreateRuntimeOptions): Promise<Runtime
     consensus,
     config: opts.config,
     pluginCtx: opts.pluginCtx,
-    resolveProvider,
     resolveReviewer,
     async resolveReviewers(ids) {
       return Promise.all(ids.map(resolveReviewer));
@@ -91,17 +79,30 @@ export async function createRuntime(opts: CreateRuntimeOptions): Promise<Runtime
       return toPipeline(id, cfg);
     },
     async dispose() {
-      for (const p of providerInstances.values()) {
+      for (const p of providerCache.values()) {
         if (p.dispose) await p.dispose().catch(() => undefined);
       }
-      providerInstances.clear();
+      providerCache.clear();
     },
   };
+
+  async function instantiateProvider(id: string, cfg: unknown): Promise<Provider> {
+    const existing = providerCache.get(id);
+    if (existing) return existing;
+    const inst = await providers.instantiate(id, cfg, opts.pluginCtx);
+    providerCache.set(id, inst);
+    return inst;
+  }
 }
 
 function toReviewerRef(id: string, cfg: ReviewerConfig | undefined): ReviewerRef {
   if (!cfg) throw new ConfigError(`Unknown reviewer "${id}"`);
-  const ref: ReviewerRef = { id, personaId: cfg.persona, providerId: cfg.provider };
+  const ref: ReviewerRef = {
+    id,
+    personaId: cfg.persona,
+    providerId: `${id}:provider`,
+    providerConfig: cfg.provider,
+  };
   const overrides = toReviewerOverrides(cfg.overrides);
   if (overrides) ref.overrides = overrides;
   return ref;

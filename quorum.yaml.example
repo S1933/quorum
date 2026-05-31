@@ -3,8 +3,6 @@ version: 1
 defaults:
   pipeline: default
 
-providers: {}
-
 personas:
   security:
     description: Adversarial security review

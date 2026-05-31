@@ -34,7 +34,7 @@ describe('reviewer add', () => {
     expect(io.stderrText()).toContain('Missing --model flag');
   });
 
-  test('adds reviewer with required model override and provider model', async () => {
+  test('adds reviewer with inline provider model', async () => {
     const { configPath, deps } = await repoDeps();
     const io = captureIo();
 
@@ -56,27 +56,100 @@ describe('reviewer add', () => {
     );
 
     expect(code).toBe(0);
-    expect(io.stdoutText()).toContain('added provider "claude-code"');
     expect(io.stdoutText()).toContain('added reviewer "security-claude-code"');
 
     const updated = parseYaml(await Bun.file(configPath).text());
-    expect(updated.providers['claude-code']).toEqual({
-      type: 'claude-code',
-      model: 'claude-opus-4-8',
-    });
     expect(updated.reviewers['security-claude-code']).toEqual({
       persona: 'security',
-      provider: 'claude-code',
-      overrides: { model: 'claude-opus-4-8' },
+      provider: {
+        type: 'claude-code',
+        model: 'claude-opus-4-8',
+      },
     });
     expect(updated.pipelines.default.reviewers).toContain('security-claude-code');
   });
+
+  test('adds a numeric suffix when the stable default reviewer id has different config', async () => {
+    const { configPath, deps } = await repoDeps(`reviewers:
+  security-claude-code:
+    persona: security
+    provider:
+      type: claude-code
+      model: claude-opus-4-7
+`);
+    const io = captureIo();
+
+    const code = await main(
+      [
+        'reviewer',
+        'add',
+        '--provider',
+        'claude-code',
+        '--persona',
+        'security',
+        '--model',
+        'claude-opus-4-8',
+        '--config',
+        configPath,
+      ],
+      deps,
+      io,
+    );
+
+    expect(code).toBe(0);
+    expect(io.stdoutText()).not.toContain('already exists');
+
+    const updated = parseYaml(await Bun.file(configPath).text());
+    expect(updated.reviewers['security-claude-code']).toBeDefined();
+    expect(updated.reviewers['security-claude-code-2']).toEqual({
+      persona: 'security',
+      provider: {
+        type: 'claude-code',
+        model: 'claude-opus-4-8',
+      },
+    });
+    expect(updated.pipelines.default.reviewers).toContain('security-claude-code-2');
+  });
+
+  test('reuses an existing reviewer id when persona provider and model already match', async () => {
+    const { configPath, deps } = await repoDeps(`reviewers:
+  alice-security-claude-code:
+    persona: security
+    provider:
+      type: claude-code
+      model: claude-opus-4-8
+`);
+    const io = captureIo();
+
+    const code = await main(
+      [
+        'reviewer',
+        'add',
+        '--provider',
+        'claude-code',
+        '--persona',
+        'security',
+        '--model',
+        'claude-opus-4-8',
+        '--config',
+        configPath,
+      ],
+      deps,
+      io,
+    );
+
+    expect(code).toBe(0);
+    expect(io.stdoutText()).toContain('Reviewer "alice-security-claude-code" already exists');
+
+    const updated = parseYaml(await Bun.file(configPath).text());
+    expect(Object.keys(updated.reviewers)).toEqual(['alice-security-claude-code']);
+  });
 });
 
-async function repoDeps(): Promise<{ configPath: string; deps: CliDeps }> {
+async function repoDeps(reviewers = 'reviewers: {}'): Promise<{ configPath: string; deps: CliDeps }> {
   const root = await mkdtemp(join('/tmp', 'quorum-reviewer-add-'));
   const configPath = join(root, 'quorum.yaml');
-  await Bun.write(configPath, configText);
+  await Bun.write(configPath, configText(reviewers));
 
   return {
     configPath,
@@ -96,20 +169,21 @@ async function repoDeps(): Promise<{ configPath: string; deps: CliDeps }> {
   };
 }
 
-const configText = `version: 1
+function configText(reviewers: string): string {
+  return `version: 1
 defaults:
   pipeline: default
-providers: {}
 personas:
   security:
     description: Security reviewer
     system: Review security issues.
-reviewers: {}
+${reviewers}
 pipelines:
   default:
     parallel: true
     reviewers: []
 `;
+}
 
 function captureIo() {
   let stdout = '';

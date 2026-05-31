@@ -54,9 +54,7 @@ function validateCrossRefs(cfg: QuorumConfig): void {
     if (!cfg.personas[rev.persona]) {
       errors.push(`reviewer "${revId}" references unknown persona "${rev.persona}"`);
     }
-    if (!cfg.providers[rev.provider]) {
-      errors.push(`reviewer "${revId}" references unknown provider "${rev.provider}"`);
-    }
+
   }
 
   for (const [pipeId, pipe] of Object.entries(cfg.pipelines)) {

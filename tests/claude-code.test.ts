@@ -45,22 +45,18 @@ describe('claude-code provider', () => {
     expect(tokenText(events)).toBe('{"findings":[]}');
   });
 
-  test('rejects unsafe claude extra args', async () => {
+  test('rejects unsafe claude extra args in inline provider config', async () => {
     const runtime = await createRuntime({
       config: {
         version: 1,
-        providers: {
-          'claude-local': {
-            type: 'claude-code',
-            model: 'sonnet',
-            extra_args: ['--dangerously-skip-permissions'],
-          },
-        },
         personas: {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: 'claude-local' },
+          sec: {
+            persona: 'security',
+            provider: { type: 'claude-code', model: 'sonnet', extra_args: ['--dangerously-skip-permissions'] },
+          },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -69,7 +65,31 @@ describe('claude-code provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveProvider('claude-local')).rejects.toThrow('extra_args.0');
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow('extra_args.0');
+  });
+
+  test('resolves reviewers with inline provider config', async () => {
+    const runtime = await createRuntime({
+      config: {
+        version: 1,
+        personas: {
+          security: { description: 'Security', system: 'Review security.' },
+        },
+        reviewers: {
+          sec: {
+            persona: 'security',
+            provider: { type: 'claude-code', model: 'sonnet' },
+          },
+        },
+        pipelines: {
+          default: { parallel: true, reviewers: ['sec'] },
+        },
+      },
+      pluginCtx: { workspaceRoot: '.', env: {} },
+    });
+
+    const reviewer = await runtime.resolveReviewer('sec');
+    expect(reviewer.provider.id).toBe('sec:provider');
   });
 
   test('classifies timeouts distinctly from exit-code failures', async () => {

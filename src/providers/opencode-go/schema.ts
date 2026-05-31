@@ -5,12 +5,12 @@ export const OpenCodeGoConfigSchema = z
     type: z.literal('opencode-go'),
     model: z.string().min(1).optional(),
     binary: z.string().min(1).default('opencode'),
-    command_style: z.enum(['prompt', 'run']).default('prompt'),
+    command_style: z.enum(['prompt', 'run']).default('run'),
     output_format: z.enum(['text', 'json']).default('text'),
     quiet: z.boolean().default(true),
     extra_args: z.array(z.never()).default([]),
     cwd: z.string().optional(),
-    timeout_ms: z.number().int().positive().default(120_000),
+    timeout_ms: z.number().int().positive().default(60_000),
   })
   .strict();
 

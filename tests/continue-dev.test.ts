@@ -119,17 +119,11 @@ describe('continue-dev provider', () => {
     const runtime = await createRuntime({
       config: {
         version: 1,
-        providers: {
-          'continue-local': {
-            type: 'continue-dev',
-            extra_args: ['--allow'],
-          },
-        },
         personas: {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: 'continue-local' },
+          sec: { persona: 'security', provider: { type: 'continue-dev', extra_args: ['--allow'] } },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -138,7 +132,7 @@ describe('continue-dev provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveProvider('continue-local')).rejects.toThrow('Invalid enum value');
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow('Invalid enum value');
   });
 });
 
