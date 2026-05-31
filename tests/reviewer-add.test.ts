@@ -47,7 +47,7 @@ describe('reviewer add', () => {
         '--persona',
         'security',
         '--model',
-        'claude-sonnet-4-20250514',
+        'claude-opus-4-8',
         '--config',
         configPath,
       ],
@@ -62,12 +62,12 @@ describe('reviewer add', () => {
     const updated = parseYaml(await Bun.file(configPath).text());
     expect(updated.providers['claude-code']).toEqual({
       type: 'claude-code',
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-opus-4-8',
     });
     expect(updated.reviewers['security-claude-code']).toEqual({
       persona: 'security',
       provider: 'claude-code',
-      overrides: { model: 'claude-sonnet-4-20250514' },
+      overrides: { model: 'claude-opus-4-8' },
     });
     expect(updated.pipelines.default.reviewers).toContain('security-claude-code');
   });

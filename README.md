@@ -52,7 +52,7 @@ Run anywhere in your repo. If no `quorum.yaml` exists, the first command copies 
 
 ```bash
 # Add your first reviewer — inits config if missing
-bun quorum reviewer add --provider=openrouter --persona=security --model=claude-sonnet-4-20250514
+bun quorum reviewer add --provider=openrouter --persona=security --model=claude-opus-4-8
 ```
 
 ### Commands
@@ -70,7 +70,7 @@ bun quorum reviewer add --provider=openrouter --persona=security --model=claude-
 | `--config <path>` | no | Path to `quorum.yaml` (default: `./quorum.yaml`) |
 
 ```bash
-bun quorum reviewer add --provider=claude-code --persona=backend-senior --model=claude-sonnet-4-20250514 --ext=go --id=backend-go-reviewer --pipeline=default
+bun quorum reviewer add --provider=claude-code --persona=backend-senior --model=claude-opus-4-8 --ext=go --id=backend-go-reviewer --pipeline=default
 ```
 
 **`quorum review [pipeline-id]`** — Run a review pipeline on the current diff.

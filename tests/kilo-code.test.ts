@@ -27,7 +27,7 @@ describe('kilo-code provider', () => {
       {
         type: 'kilo-code',
         binary,
-        model: 'anthropic/claude-sonnet-4-20250514',
+        model: 'anthropic/claude-opus-4-8',
         format: 'default',
         extra_args: [],
         timeout_ms: 5_000,
@@ -76,14 +76,14 @@ describe('kilo-code provider', () => {
       bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
-      modelOverride: { model: 'anthropic/claude-sonnet-4-20250514' },
+      modelOverride: { model: 'anthropic/claude-opus-4-8' },
     });
 
     const args = await Bun.file(argsFile).text();
     const stdin = await Bun.file(stdinFile).text();
     expect(args).toContain('run\n');
     expect(args).toContain('--thinking');
-    expect(args).toContain('--model\nanthropic/claude-sonnet-4-20250514');
+    expect(args).toContain('--model\nanthropic/claude-opus-4-8');
     expect(args).toContain('--agent\nreviewer');
     expect(args).toContain('--variant\nhigh');
     expect(args).toContain('--format\njson');
