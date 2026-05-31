@@ -2,6 +2,7 @@ import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provide
 import type { ReviewTask, ReviewResult } from '../../core/task.ts';
 import type { ProviderFactory } from '../registry.ts';
 import type { PluginCtx } from '../../runtime/plugin.ts';
+import { ProviderRuntimeError } from '../../core/errors.ts';
 import { REVIEW_OUTPUT_INSTRUCTIONS } from '../../reviewers/output.ts';
 import { runSubprocess, buildSubprocessReviewResult } from '../subprocess.ts';
 import { CodexCliConfigSchema, type CodexCliConfig } from './schema.ts';
@@ -41,7 +42,7 @@ class CodexCliProvider implements Provider {
     ];
 
     if (this.cfg.approval_policy === 'never') {
-      args.push('--dangerously-bypass-approvals-and-sandbox');
+      throw new ProviderRuntimeError(this.id, 'Unsafe no-approval Codex mode is disabled');
     }
 
     if (model) args.push('--model', model);

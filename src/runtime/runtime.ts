@@ -124,6 +124,7 @@ function toPipeline(id: string, cfg: PipelineConfig): Pipeline {
   const consensus = toConsensusConfig(cfg.consensus);
   if (consensus) pipeline.consensus = consensus;
   if (cfg.timeoutMs) pipeline.timeoutMs = cfg.timeoutMs;
+  if (cfg.maxConcurrency) pipeline.maxConcurrency = cfg.maxConcurrency;
   return pipeline;
 }
 

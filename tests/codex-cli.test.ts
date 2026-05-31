@@ -29,7 +29,7 @@ describe('codex-cli provider', () => {
         binary,
         model: 'gpt-5-codex',
         sandbox: 'read-only',
-        approval_policy: 'never',
+        approval_policy: 'on-request',
         extra_args: [],
         timeout_ms: 5_000,
       },
@@ -62,7 +62,7 @@ describe('codex-cli provider', () => {
         binary,
         model: 'gpt-5',
         sandbox: 'read-only',
-        approval_policy: 'never',
+        approval_policy: 'on-request',
         extra_args: ['--ephemeral'],
         timeout_ms: 5_000,
       },
@@ -79,8 +79,7 @@ describe('codex-cli provider', () => {
     const args = await Bun.file(argsFile).text();
     expect(args).toContain('exec\n');
     expect(args).toContain('--sandbox\nread-only');
-    expect(args).toContain('--dangerously-bypass-approvals-and-sandbox');
-    expect(args).not.toContain('--ask-for-approval');
+    expect(args).not.toContain('--dangerously-bypass-approvals-and-sandbox');
     expect(args).toContain('--ephemeral');
     expect(args).toContain('--model\ngpt-5-codex');
   });
@@ -106,7 +105,7 @@ describe('codex-cli provider', () => {
         binary,
         model: 'gpt-5',
         sandbox: 'read-only',
-        approval_policy: 'never',
+        approval_policy: 'on-request',
         extra_args: [],
         timeout_ms: 5_000,
       },
@@ -186,6 +185,32 @@ describe('codex-cli provider', () => {
     await expect(runtime.resolveReviewer('sec')).rejects.toThrow(
       'danger-full-access requires approval_policy other than never',
     );
+  });
+  test('rejects approval_policy never at runtime', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'quorum-codex-'));
+    tmpRoots.push(root);
+    const binary = join(root, 'codex');
+    await Bun.write(binary, '#!/bin/sh\nprintf \'{"findings":[]}\'\n');
+    await chmod(binary, 0o755);
+
+    const provider = await codexCliFactory.create(
+      'codex-local',
+      {
+        type: 'codex-cli',
+        binary,
+        sandbox: 'read-only',
+        approval_policy: 'never',
+        extra_args: [],
+        timeout_ms: 5_000,
+      },
+      { workspaceRoot: root, env: {} },
+    );
+
+    await expect(provider.review!(task(root), {
+      bus: captureBus(),
+      signal: new AbortController().signal,
+      workspace: { root },
+    })).rejects.toThrow('Unsafe no-approval Codex mode is disabled');
   });
 });
 

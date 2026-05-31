@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { ConfigError } from '../src/core/errors.ts';
 import { loadConfigFromString } from '../src/config/loader.ts';
 import { interpolateString, interpolateDeep, resolveLazy, isLazyEnvRef } from '../src/config/interpolate.ts';
+import { createRuntime } from '../src/runtime/runtime.ts';
 
 const MINIMAL_YAML = `
 version: 1
@@ -195,6 +196,27 @@ pipelines:
 `;
     const cfg = await loadConfigFromString(source);
     expect(cfg.pipelines.default!.maxConcurrency).toBe(3);
+  });
+
+  test('propagates maxConcurrency from config to resolved pipeline', async () => {
+    const source = `
+version: 1
+personas:
+  sec: { description: d, system: s }
+reviewers:
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
+pipelines:
+  default:
+    reviewers: [r]
+    maxConcurrency: 3
+`;
+    const cfg = await loadConfigFromString(source);
+    const runtime = await createRuntime({
+      config: cfg,
+      pluginCtx: { workspaceRoot: '.', env: {} },
+    });
+    const pipeline = runtime.resolvePipeline('default');
+    expect(pipeline.maxConcurrency).toBe(3);
   });
 
   test('rejects pipeline referencing unknown reviewer', async () => {

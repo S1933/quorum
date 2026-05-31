@@ -14,7 +14,7 @@ export const CodexCliConfigSchema = z
     model: z.string().min(1).optional(),
     binary: z.string().min(1).default('codex'),
     sandbox: z.enum(['read-only', 'workspace-write', 'danger-full-access']).default('read-only'),
-    approval_policy: z.enum(['untrusted', 'on-request', 'never']).default('never'),
+    approval_policy: z.enum(['untrusted', 'on-request', 'never']).default('on-request'),
     extra_args: z.array(SafeExtraArgSchema).default([]),
     cwd: z.string().optional(),
     timeout_ms: z.number().int().positive().default(60_000),

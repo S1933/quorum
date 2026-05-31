@@ -9,7 +9,7 @@
   },
   "scripts": {
     "quorum": "bun run src/cli/index.ts",
-    "postinstall": "bun run scripts/postinstall.ts",
+    "postinstall": "bun run src/postinstall.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "test:coverage": "bun test --coverage",
