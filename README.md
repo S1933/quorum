@@ -81,9 +81,7 @@ bun quorum reviewer add --provider=ollama --persona=security --model=qwen2.5-cod
 
 ### Commands
 
-#### bun quorum reviewer add
-
-Add a reviewer and wire it into a pipeline.
+#### Add a reviewer
 
 ```
 bun quorum reviewer add --provider=<type> --persona=<name> --model=<model> [flags]
@@ -103,9 +101,7 @@ bun quorum reviewer add --provider=<type> --persona=<name> --model=<model> [flag
 bun quorum reviewer add --provider=claude-code --persona=backend-senior --model=sonnet --ext=go --id=backend-go-reviewer --pipeline=default
 ```
 
-#### bun quorum review [pipeline-id]
-
-Run a review pipeline on the current diff.
+#### Run a review pipeline
 
 ```
 bun quorum review [--pipeline=<id>] [flags]
@@ -134,17 +130,15 @@ bun quorum review --include "src/**/*.ts"               # filter by glob
 bun quorum review --no-preview --no-color               # quiet mode
 ```
 
-#### bun quorum reviewers
-
-List personas, reviewers, and pipelines.
+#### List personas, reviewers, and pipelines
 
 ```
 bun quorum reviewers [--config=<path>]
 ```
 
-#### bun quorum pre-commit
+#### Install a git pre-commit hook
 
-Install or remove a git pre-commit hook. The hook blocks commits with `critical` or `high` findings. Bypass with `QUORUM_BYPASS=1`.
+The hook blocks commits with `critical` or `high` findings. Bypass with `QUORUM_BYPASS=1`.
 
 ```
 bun quorum pre-commit true|false [--pipeline=<id>]
