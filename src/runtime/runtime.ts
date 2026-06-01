@@ -17,6 +17,7 @@ import { kiloCodeFactory } from '../providers/kilo-code/index.ts';
 import { openCodeGoFactory } from '../providers/opencode-go/index.ts';
 import { ollamaFactory } from '../providers/ollama/index.ts';
 import { overlapV1 } from '../consensus/overlap-v1.ts';
+import { majorityV1 } from '../consensus/majority-v1.ts';
 import { ConfigError } from '../core/errors.ts';
 import type { EventBus } from '../core/events.ts';
 
@@ -53,6 +54,7 @@ export async function createRuntime(opts: CreateRuntimeOptions): Promise<Runtime
   providers.register(openCodeGoFactory);
   providers.register(ollamaFactory);
   consensus.register(overlapV1);
+  consensus.register(majorityV1);
 
   const providerCache = new Map<string, Provider>();
 
