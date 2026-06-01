@@ -51,55 +51,55 @@ bun install
 Run anywhere in your repo. If no `quorum.yaml` exists, the first command copies `quorum.yaml.example`.
 
 ```bash
-# OpenRouter — uses provider/model format (anthropic/claude-sonnet-4, openai/gpt-5.1-codex...)
+# OpenRouter
 bun quorum reviewer add \
   --provider=openrouter \
   --persona=security \
   --model=anthropic/claude-sonnet-4
 
-# Claude Code — uses model nickname (sonnet, opus, haiku)
+# Claude Code
 bun quorum reviewer add \
   --provider=claude-code \
   --persona=security \
   --model=sonnet
 
-# Codex CLI — uses Codex model alias (gpt-5-codex)
+# Codex CLI
 bun quorum reviewer add \
   --provider=codex-cli \
   --persona=security \
   --model=gpt-5-codex
 
-# Continue.dev — model is configured in Continue.dev's own config, not via --model
+# Continue.dev
 bun quorum reviewer add \
   --provider=continue-dev \
   --persona=security \
   --model=claude-sonnet-4
 
-# Cursor Agent CLI — use "auto" to let Cursor pick the best model
+# Cursor Agent CLI
 bun quorum reviewer add \
   --provider=cursor-agent \
   --persona=security \
-  --model=auto
+  --model=composer-2.5-fast
 
-# Gemini CLI — uses Google model name (gemini-2.5-pro, gemini-2.5-flash)
+# Gemini CLI
 bun quorum reviewer add \
   --provider=gemini-cli \
   --persona=security \
   --model=gemini-2.5-pro
 
-# Kilo Code CLI — uses provider/model format (anthropic/claude-sonnet-4)
+# Kilo Code CLI
 bun quorum reviewer add \
   --provider=kilo-code \
   --persona=security \
   --model=anthropic/claude-sonnet-4
 
-# OpenCode Go — uses opencode-go/ prefix (deepseek-v4-pro, kimi-k2.6, glm-5...)
+# OpenCode Go
 bun quorum reviewer add \
   --provider=opencode-go \
   --persona=security \
   --model=opencode-go/deepseek-v4-pro
 
-# Ollama — any model available in your local Ollama instance (qwen2.5-coder, llama3.1...)
+# Ollama
 bun quorum reviewer add \
   --provider=ollama \
   --persona=security \
