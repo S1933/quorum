@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { Category, Finding, Severity } from '../src/core/finding.ts';
 import type { ReviewResult } from '../src/core/task.ts';
 import { overlapV1 } from '../src/consensus/overlap-v1.ts';
+import { majorityV1 } from '../src/consensus/majority-v1.ts';
 
 describe('overlap-v1', () => {
   test('keeps only groups that satisfy requireAgreement and returns non-passing findings as unique', () => {
@@ -106,6 +107,114 @@ describe('overlap-v1', () => {
     expect(result.groups).toHaveLength(1);
     expect(result.groups[0]?.representative).toBe(critical);
     expect(result.groups[0]?.reviewers).toEqual(['perf-a', 'perf-b', 'perf-c']);
+  });
+});
+
+describe('majority-v1', () => {
+  test('promotes a group backed by a strict majority and drops the lone finding into unique', () => {
+    const agreedA = finding({ reviewer: 'a', lineStart: 10 });
+    const agreedB = finding({ reviewer: 'b', lineStart: 11 });
+    const single = finding({
+      reviewer: 'c',
+      file: 'src/other.ts',
+      lineStart: 40,
+      title: 'Only one reviewer saw this',
+    });
+
+    const result = majorityV1.aggregate(
+      [review('a', [agreedA]), review('b', [agreedB]), review('c', [single])],
+      { strategy: 'majority-v1' },
+    );
+
+    // 3 reviewers -> threshold 2
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]?.reviewers).toEqual(['a', 'b']);
+    expect(result.unique).toEqual([single]);
+    expect(result.strategyId).toBe('majority-v1');
+  });
+
+  test('requires unanimity when only two reviewers ran', () => {
+    const a = finding({ reviewer: 'a', file: 'src/a.ts', lineStart: 10 });
+    const b = finding({ reviewer: 'b', file: 'src/b.ts', lineStart: 50 });
+
+    const result = majorityV1.aggregate(
+      [review('a', [a]), review('b', [b])],
+      { strategy: 'majority-v1' },
+    );
+
+    // 2 reviewers -> threshold 2, neither group reaches it
+    expect(result.groups).toEqual([]);
+    expect(result.unique).toEqual([a, b]);
+  });
+
+  test('promotes a group when both of two reviewers agree (unanimity)', () => {
+    const a = finding({ reviewer: 'a', lineStart: 10 });
+    const b = finding({ reviewer: 'b', lineStart: 11 });
+
+    const result = majorityV1.aggregate(
+      [review('a', [a]), review('b', [b])],
+      { strategy: 'majority-v1' },
+    );
+
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]?.reviewers).toEqual(['a', 'b']);
+    expect(result.unique).toEqual([]);
+  });
+
+  test('two of four reviewers is not a majority, three of five is', () => {
+    const twoOfFour = majorityV1.aggregate(
+      [
+        review('a', [finding({ reviewer: 'a', lineStart: 10 })]),
+        review('b', [finding({ reviewer: 'b', lineStart: 11 })]),
+        review('c', [finding({ reviewer: 'c', file: 'src/x.ts', lineStart: 80 })]),
+        review('d', [finding({ reviewer: 'd', file: 'src/y.ts', lineStart: 90 })]),
+      ],
+      { strategy: 'majority-v1' },
+    );
+    // 4 reviewers -> threshold 3
+    expect(twoOfFour.groups).toEqual([]);
+
+    const threeOfFive = majorityV1.aggregate(
+      [
+        review('a', [finding({ reviewer: 'a', lineStart: 10 })]),
+        review('b', [finding({ reviewer: 'b', lineStart: 11 })]),
+        review('c', [finding({ reviewer: 'c', lineStart: 12 })]),
+        review('d', [finding({ reviewer: 'd', file: 'src/x.ts', lineStart: 80 })]),
+        review('e', [finding({ reviewer: 'e', file: 'src/y.ts', lineStart: 90 })]),
+      ],
+      { strategy: 'majority-v1' },
+    );
+    // 5 reviewers -> threshold 3
+    expect(threeOfFive.groups).toHaveLength(1);
+    expect(threeOfFive.groups[0]?.reviewers).toEqual(['a', 'b', 'c']);
+  });
+
+  test('uses the highest severity finding as the group representative', () => {
+    const low = finding({ reviewer: 'a', severity: 'low', title: 'Low' });
+    const critical = finding({ reviewer: 'b', severity: 'critical', title: 'Critical', lineStart: 9 });
+    const medium = finding({ reviewer: 'c', severity: 'medium', title: 'Medium', lineStart: 11 });
+
+    const result = majorityV1.aggregate(
+      [review('a', [low]), review('b', [critical]), review('c', [medium])],
+      { strategy: 'majority-v1' },
+    );
+
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]?.representative).toBe(critical);
+  });
+
+  test('requireAgreement acts as an additional floor above the majority', () => {
+    const a = finding({ reviewer: 'a', lineStart: 10 });
+    const b = finding({ reviewer: 'b', lineStart: 11 });
+
+    const result = majorityV1.aggregate(
+      [review('a', [a]), review('b', [b])],
+      { strategy: 'majority-v1', requireAgreement: 3 },
+    );
+
+    // 2 reviewers agree (majority met) but floor of 3 is not reached
+    expect(result.groups).toEqual([]);
+    expect(result.unique).toEqual([a, b]);
   });
 });
 

@@ -101,4 +101,10 @@ pipelines:
   default:
     parallel: true
     reviewers: []
+    # Consensus strategies:
+    #   overlap-v1  - group by file + category + line overlap; promote on an
+    #                 absolute agreement threshold (requireAgreement, default 2).
+    #   majority-v1 - same grouping, but promote only when a strict majority of
+    #                 the reviewers that ran agree. requireAgreement is an
+    #                 optional floor. Robust to changing reviewer counts.
     consensus: { strategy: overlap-v1 }
