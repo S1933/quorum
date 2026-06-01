@@ -3,6 +3,7 @@ import type { Category, Finding, Severity } from '../src/core/finding.ts';
 import type { ReviewResult } from '../src/core/task.ts';
 import { overlapV1 } from '../src/consensus/overlap-v1.ts';
 import { majorityV1 } from '../src/consensus/majority-v1.ts';
+import { severityAwareV1 } from '../src/consensus/severity-aware-v1.ts';
 
 describe('overlap-v1', () => {
   test('keeps only groups that satisfy requireAgreement and returns non-passing findings as unique', () => {
@@ -226,6 +227,92 @@ describe('majority-v1', () => {
     // 2 reviewers agree (majority met) but floor of 3 is not reached
     expect(result.groups).toEqual([]);
     expect(result.unique).toEqual([a, b]);
+  });
+});
+
+describe('severity-aware-v1', () => {
+  test('promotes a lone reviewer critical finding (threshold 1 for critical)', () => {
+    const lone = finding({ reviewer: 'a', severity: 'critical', lineStart: 10 });
+
+    const result = severityAwareV1.aggregate(
+      [review('a', [lone]), review('b', [])],
+      { strategy: 'severity-aware-v1' },
+    );
+
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]?.reviewers).toEqual(['a']);
+    expect(result.unique).toEqual([]);
+    expect(result.strategyId).toBe('severity-aware-v1');
+  });
+
+  test('drops a lone low-severity finding into unique (threshold 3 for low)', () => {
+    const lone = finding({ reviewer: 'a', severity: 'low', lineStart: 10 });
+
+    const result = severityAwareV1.aggregate(
+      [review('a', [lone]), review('b', []), review('c', [])],
+      { strategy: 'severity-aware-v1' },
+    );
+
+    expect(result.groups).toEqual([]);
+    expect(result.unique).toEqual([lone]);
+  });
+
+  test('a medium-severity group needs two reviewers', () => {
+    const lone = finding({ reviewer: 'a', severity: 'medium', lineStart: 10 });
+    const single = severityAwareV1.aggregate(
+      [review('a', [lone]), review('b', [])],
+      { strategy: 'severity-aware-v1' },
+    );
+    expect(single.groups).toEqual([]);
+    expect(single.unique).toEqual([lone]);
+
+    const a = finding({ reviewer: 'a', severity: 'medium', lineStart: 10 });
+    const b = finding({ reviewer: 'b', severity: 'medium', lineStart: 11 });
+    const paired = severityAwareV1.aggregate(
+      [review('a', [a]), review('b', [b])],
+      { strategy: 'severity-aware-v1' },
+    );
+    expect(paired.groups).toHaveLength(1);
+    expect(paired.groups[0]?.reviewers).toEqual(['a', 'b']);
+  });
+
+  test('uses the highest severity in the group to pick the threshold', () => {
+    // A lone reviewer flags it as low, but another flags the same spot critical:
+    // representative is critical -> threshold 1 -> promoted.
+    const low = finding({ reviewer: 'a', severity: 'low', lineStart: 10 });
+    const critical = finding({ reviewer: 'b', severity: 'critical', lineStart: 11 });
+
+    const result = severityAwareV1.aggregate(
+      [review('a', [low]), review('b', [critical])],
+      { strategy: 'severity-aware-v1' },
+    );
+
+    expect(result.groups).toHaveLength(1);
+    expect(result.groups[0]?.representative).toBe(critical);
+  });
+
+  test('requireAgreement raises the floor even for critical findings', () => {
+    const lone = finding({ reviewer: 'a', severity: 'critical', lineStart: 10 });
+
+    const result = severityAwareV1.aggregate(
+      [review('a', [lone]), review('b', [])],
+      { strategy: 'severity-aware-v1', requireAgreement: 2 },
+    );
+
+    expect(result.groups).toEqual([]);
+    expect(result.unique).toEqual([lone]);
+  });
+
+  test('severityThresholds overrides the per-severity default', () => {
+    const lone = finding({ reviewer: 'a', severity: 'critical', lineStart: 10 });
+
+    const result = severityAwareV1.aggregate(
+      [review('a', [lone]), review('b', [])],
+      { strategy: 'severity-aware-v1', severityThresholds: { critical: 2 } },
+    );
+
+    expect(result.groups).toEqual([]);
+    expect(result.unique).toEqual([lone]);
   });
 });
 

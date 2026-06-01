@@ -108,4 +108,10 @@ pipelines:
     #                 the reviewers that ran agree (never fewer than 2, so a lone
     #                 surviving reviewer can't auto-promote). requireAgreement
     #                 raises that floor. Robust to changing reviewer counts.
+    #   severity-aware-v1 - same grouping, but the agreement threshold scales
+    #                 inversely with severity (critical/high -> 1, medium -> 2,
+    #                 low/info -> 3): a lone critical finding is surfaced, while
+    #                 low-severity noise needs broader agreement. requireAgreement
+    #                 raises the floor for every severity; per-severity overrides
+    #                 via severityThresholds.
     consensus: { strategy: overlap-v1 }
