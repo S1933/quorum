@@ -74,6 +74,23 @@ Invocation:
 - Resolve relative report paths from the target root.
 - Never invent a report when no report file exists.
 
+## Reviewer Naming In Assistant Updates
+
+When writing assistant progress updates or explanatory text around the Quorum run, do not name reviewers by raw provider, provider CLI, or full reviewer id. Use a friendly reviewer label every time a reviewer is mentioned.
+
+Format:
+
+- `<FirstName> (<Model>, <Role>)`
+- Example: `Olivia (Opus 4.8, Senior Backend Developer)`
+
+Build the label from `quorum.yaml` when possible:
+
+- First name: prefer `reviewers.<id>.name`, `displayName`, or `display_name` if present. Otherwise, use the first slug segment of the reviewer id only when it looks like a human first name and is not a provider/model token such as `claude`, `deepseek`, `gemini`, `cursor`, `codex`, `openrouter`, `opencode`, `ollama`, or `kilo`. If no usable name exists, assign a stable first name by pipeline order from this list: `Olivia`, `Noah`, `Emma`, `Liam`, `Mia`, `Lucas`, `Sofia`, `Ethan`, `Chloe`, `Hugo`.
+- Model: use `reviewers.<id>.provider.model` or the model override. Strip provider prefixes before `/`, drop transport/provider words, and title-case the result. Normalize common model strings for readability, e.g. `claude-opus-4-8` -> `Opus 4.8`, `composer-2.5-fast` -> `Composer 2.5 Fast`, `opencode-go/deepseek-v4-pro` -> `DeepSeek V4 Pro`, `gpt-5-codex` -> `GPT-5 Codex`.
+- Role: prefer the persona description when it is concise. Otherwise title-case the persona id and expand common words: `backend-senior` -> `Senior Backend Developer`, `frontend-senior` -> `Senior Frontend Developer`, `architecture` -> `Software Architect`, `security` -> `Security Reviewer`, `performance` -> `Performance Reviewer`.
+
+Use the friendly label in status messages, summaries, and any prose outside the required exact CLI/report blocks. Do not rewrite reviewer ids inside fenced exact stdout/stderr, JSON, or Markdown report content.
+
 ## Final Response
 
 If the CLI ran:
