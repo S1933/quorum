@@ -18,7 +18,7 @@ const SUPPORTED_PROVIDERS = [
   'ollama',
 ] as const;
 
-const REVIEWER_ADD_USAGE = 'Usage: quorum reviewer add --provider=<type> --persona=<name> --model=<model> [--id=<reviewer-id>] [--ext=<ext1,ext2,...>] [--pipeline=<id>]\n';
+const REVIEWER_ADD_USAGE = 'Usage: quorum reviewer add --provider=<type> --persona=<name> --model=<model> [--id=<reviewer-id>] [--ext=<ext1,ext2,...>] [--fileExtensions=<ext1,ext2,...>] [--temperature=<0..2>] [--pipeline=<id>] [--config=<path>]\n';
 
 export async function cmdReviewer(
   positional: string[],
@@ -59,6 +59,7 @@ async function cmdReviewerAdd(
   const persona = typeof flags.persona === 'string' ? flags.persona : null;
   const model = typeof flags.model === 'string' ? flags.model : null;
   const extensions = parseExtensions(flags);
+  const temperature = parseTemperature(flags);
 
   if (!provider) {
     io.stderr.write('Missing --provider flag\n');
@@ -70,6 +71,10 @@ async function cmdReviewerAdd(
   }
   if (!model) {
     io.stderr.write('Missing --model flag\n');
+    return 1;
+  }
+  if (temperature === false) {
+    io.stderr.write('Invalid --temperature flag; expected a number between 0 and 2\n');
     return 1;
   }
 
@@ -86,6 +91,7 @@ async function cmdReviewerAdd(
   const providerEntry: Record<string, unknown> = { type: provider, model };
   const newEntry: Record<string, unknown> = { persona, provider: providerEntry };
   if (extensions) newEntry.fileExtensions = extensions;
+  if (temperature !== null) newEntry.overrides = { temperature };
   const reviewerId = typeof flags.id === 'string'
     ? flags.id
     : resolveReviewerId(persona, provider, newEntry, config.reviewers);
@@ -130,11 +136,20 @@ async function cmdReviewerAdd(
 }
 
 function parseExtensions(flags: Record<string, string | boolean>): string[] | null {
-  const raw = typeof flags.ext === 'string'
-    ? flags.ext.split(',').map((s) => s.trim()).filter(Boolean)
-    : flags.ext;
+  const flag = flags.fileExtensions ?? flags.fileExtension ?? flags.ext;
+  const raw = typeof flag === 'string'
+    ? flag.split(',').map((s) => s.trim()).filter(Boolean)
+    : flag;
   if (!Array.isArray(raw) || raw.length === 0) return null;
   return raw.map((s) => String(s).trim()).filter(Boolean);
+}
+
+function parseTemperature(flags: Record<string, string | boolean>): number | null | false {
+  if (flags.temperature === undefined) return null;
+  if (typeof flags.temperature !== 'string' || flags.temperature.trim() === '') return false;
+  const temperature = Number(flags.temperature);
+  if (!Number.isFinite(temperature) || temperature < 0 || temperature > 2) return false;
+  return temperature;
 }
 
 function resolveReviewerId(
@@ -222,6 +237,7 @@ function reviewerEntryMatches(actual: unknown, target: Record<string, unknown>):
     a.persona === target.persona
     && deepEqual(a.provider, target.provider)
     && deepEqual(a.fileExtensions ?? [], target.fileExtensions ?? [])
+    && deepEqual(a.overrides ?? {}, target.overrides ?? {})
   );
 }
 

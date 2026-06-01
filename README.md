@@ -52,31 +52,58 @@ Run anywhere in your repo. If no `quorum.yaml` exists, the first command copies 
 
 ```bash
 # OpenRouter — uses provider/model format (anthropic/claude-sonnet-4, openai/gpt-5.1-codex...)
-bun quorum reviewer add --provider=openrouter --persona=security --model=anthropic/claude-sonnet-4
+bun quorum reviewer add \
+  --provider=openrouter \
+  --persona=security \
+  --model=anthropic/claude-sonnet-4
 
 # Claude Code — uses model nickname (sonnet, opus, haiku)
-bun quorum reviewer add --provider=claude-code --persona=security --model=sonnet
+bun quorum reviewer add \
+  --provider=claude-code \
+  --persona=security \
+  --model=sonnet
 
 # Codex CLI — uses Codex model alias (gpt-5-codex)
-bun quorum reviewer add --provider=codex-cli --persona=security --model=gpt-5-codex
+bun quorum reviewer add \
+  --provider=codex-cli \
+  --persona=security \
+  --model=gpt-5-codex
 
 # Continue.dev — model is configured in Continue.dev's own config, not via --model
-bun quorum reviewer add --provider=continue-dev --persona=security --model=claude-sonnet-4
+bun quorum reviewer add \
+  --provider=continue-dev \
+  --persona=security \
+  --model=claude-sonnet-4
 
 # Cursor Agent CLI — use "auto" to let Cursor pick the best model
-bun quorum reviewer add --provider=cursor-agent --persona=security --model=auto
+bun quorum reviewer add \
+  --provider=cursor-agent \
+  --persona=security \
+  --model=auto
 
 # Gemini CLI — uses Google model name (gemini-2.5-pro, gemini-2.5-flash)
-bun quorum reviewer add --provider=gemini-cli --persona=security --model=gemini-2.5-pro
+bun quorum reviewer add \
+  --provider=gemini-cli \
+  --persona=security \
+  --model=gemini-2.5-pro
 
 # Kilo Code CLI — uses provider/model format (anthropic/claude-sonnet-4)
-bun quorum reviewer add --provider=kilo-code --persona=security --model=anthropic/claude-sonnet-4
+bun quorum reviewer add \
+  --provider=kilo-code \
+  --persona=security \
+  --model=anthropic/claude-sonnet-4
 
 # OpenCode Go — uses opencode-go/ prefix (deepseek-v4-pro, kimi-k2.6, glm-5...)
-bun quorum reviewer add --provider=opencode-go --persona=security --model=opencode-go/deepseek-v4-pro
+bun quorum reviewer add \
+  --provider=opencode-go \
+  --persona=security \
+  --model=opencode-go/deepseek-v4-pro
 
 # Ollama — any model available in your local Ollama instance (qwen2.5-coder, llama3.1...)
-bun quorum reviewer add --provider=ollama --persona=security --model=qwen2.5-coder
+bun quorum reviewer add \
+  --provider=ollama \
+  --persona=security \
+  --model=qwen2.5-coder
 ```
 
 ### Commands
@@ -84,7 +111,11 @@ bun quorum reviewer add --provider=ollama --persona=security --model=qwen2.5-cod
 #### Add a reviewer
 
 ```
-bun quorum reviewer add --provider=<type> --persona=<name> --model=<model> [flags]
+bun quorum reviewer add \
+  --provider=<type> \
+  --persona=<name> \
+  --model=<model> \
+  [flags]
 ```
 
 | Flag | Description |
@@ -93,12 +124,20 @@ bun quorum reviewer add --provider=<type> --persona=<name> --model=<model> [flag
 | `--persona` *required* | Persona defined in `quorum.yaml` |
 | `--model` *required* | Model for this provider (see examples above) |
 | `--id` | Custom reviewer ID (default: `<name>-<persona>-<provider>`) |
-| `--ext` | File extension filter, comma-separated (e.g. `ts,tsx`) |
-| `--pipeline` | Target pipeline (default: `default`) |
+| `--ext`, `--fileExtensions` | File extension filter, comma-separated (e.g. `ts,tsx`) |
+| `--temperature` | Reviewer model temperature override, from `0` to `2` |
+| `--pipeline` | Target pipeline (default: `defaults.pipeline`, then `default`) |
 | `--config` | Path to `quorum.yaml` (default: `./quorum.yaml`) |
 
 ```bash
-bun quorum reviewer add --provider=claude-code --persona=backend-senior --model=sonnet --ext=go --id=backend-go-reviewer --pipeline=default
+bun quorum reviewer add \
+  --provider=claude-code \
+  --persona=backend-senior \
+  --model=sonnet \
+  --fileExtensions=go \
+  --temperature=0.2 \
+  --id=backend-go-reviewer \
+  --pipeline=default
 ```
 
 #### Run a review pipeline
