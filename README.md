@@ -191,13 +191,19 @@ bun quorum pre-commit false
 
 ## Consensus
 
-V1 ships `overlap-v1`.
-
 Findings are grouped when they share the same file, line range (±2 lines), and category.
 Categories: `security`, `performance`, `architecture`, `correctness`, `style`.
-Multiple reviewers get an agreement badge. Single-reviewer findings are reported separately.
+Multiple reviewers get an agreement badge. Findings below the promotion threshold are
+reported separately.
 
-Example:
+Two strategies ship today, selected per pipeline via `consensus: { strategy: <id> }`:
+
+| Strategy | Promotion rule |
+|---|---|
+| `overlap-v1` | Absolute threshold — a group is promoted when at least `requireAgreement` reviewers agree (default 2). |
+| `majority-v1` | Strict majority — a group is promoted when more than half of the reviewers that ran agree. The threshold is derived from the reviewer count (n=3→2, n=4→3, n=5→3), so it stays robust as reviewers are added or removed. It never drops below 2, so a lone surviving reviewer (e.g. when others time out) can't auto-promote its findings; `requireAgreement` raises that floor further. |
+
+Example (`overlap-v1`, default threshold):
 
 - Reviewer A: `src/auth.ts:42`, `security`
 - Reviewer B: `src/auth.ts:43`, `security`
