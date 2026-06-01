@@ -50,6 +50,29 @@ bun install
 
 Run anywhere in your repo. If no `quorum.yaml` exists, the first command copies `quorum.yaml.example`.
 
+### Commands
+
+#### Add a reviewer
+
+```
+bun quorum reviewer add \
+  --provider=<type> \
+  --persona=<name> \
+  --model=<model> \
+  [flags]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--provider` *required* | `openrouter`, `claude-code`, `codex-cli`, `continue-dev`, `cursor-agent`, `gemini-cli`, `kilo-code`, `opencode-go`, `ollama` |
+| `--persona` *required* | Persona defined in `quorum.yaml` |
+| `--model` *required* | Model for this provider (see examples above) |
+| `--id` | Custom reviewer ID (default: `<name>-<persona>-<provider>`) |
+| `--ext`, `--fileExtensions` | File extension filter, comma-separated (e.g. `ts,tsx`) |
+| `--temperature` | Reviewer model temperature override, from `0` to `2` |
+| `--pipeline` | Target pipeline (default: `defaults.pipeline`, then `default`) |
+| `--config` | Path to `quorum.yaml` (default: `./quorum.yaml`) |
+
 ```bash
 # OpenRouter
 bun quorum reviewer add \
@@ -105,29 +128,6 @@ bun quorum reviewer add \
   --persona=security \
   --model=qwen2.5-coder
 ```
-
-### Commands
-
-#### Add a reviewer
-
-```
-bun quorum reviewer add \
-  --provider=<type> \
-  --persona=<name> \
-  --model=<model> \
-  [flags]
-```
-
-| Flag | Description |
-|------|-------------|
-| `--provider` *required* | `openrouter`, `claude-code`, `codex-cli`, `continue-dev`, `cursor-agent`, `gemini-cli`, `kilo-code`, `opencode-go`, `ollama` |
-| `--persona` *required* | Persona defined in `quorum.yaml` |
-| `--model` *required* | Model for this provider (see examples above) |
-| `--id` | Custom reviewer ID (default: `<name>-<persona>-<provider>`) |
-| `--ext`, `--fileExtensions` | File extension filter, comma-separated (e.g. `ts,tsx`) |
-| `--temperature` | Reviewer model temperature override, from `0` to `2` |
-| `--pipeline` | Target pipeline (default: `defaults.pipeline`, then `default`) |
-| `--config` | Path to `quorum.yaml` (default: `./quorum.yaml`) |
 
 ```bash
 bun quorum reviewer add \

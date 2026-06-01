@@ -31,6 +31,31 @@ interface FakeRuntime extends Runtime {
 }
 
 describe('cli', () => {
+  test('reviewers prints configured personas, reviewers, and pipelines', async () => {
+    const io = captureIo();
+
+    const code = await main(
+      ['reviewers', '--config', '/repo/quorum.yaml'],
+      deps({
+        loadConfigFromPath: async (path) => {
+          expect(path).toBe('/repo/quorum.yaml');
+          return config();
+        },
+      }),
+      io,
+    );
+
+    expect(code).toBe(0);
+    expect(io.stdoutText()).toContain('── Personas ──');
+    expect(io.stdoutText()).toContain('fake  Fake persona');
+    expect(io.stdoutText()).toContain('── Reviewers ──');
+    expect(io.stdoutText()).toContain('fake-reviewer  persona=fake  provider=fake');
+    expect(io.stdoutText()).toContain('── Pipelines ──');
+    expect(io.stdoutText()).toContain('default  parallel');
+    expect(io.stdoutText()).toContain('- fake-reviewer');
+    expect(io.stderrText()).toBe('');
+  });
+
   test('review runs configured pipeline through an injected runtime and writes report', async () => {
     const io = captureIo();
     const tmp = await mkdtemp(join(tmpdir(), 'quorum-cli-test-'));
