@@ -189,6 +189,17 @@ describe('majority-v1', () => {
     expect(threeOfFive.groups[0]?.reviewers).toEqual(['a', 'b', 'c']);
   });
 
+  test('never auto-promotes findings when only one reviewer ran (floor of 2)', () => {
+    const a = finding({ reviewer: 'a', lineStart: 10 });
+    const b = finding({ reviewer: 'a', lineStart: 50, file: 'src/b.ts' });
+
+    const result = majorityV1.aggregate([review('a', [a, b])], { strategy: 'majority-v1' });
+
+    // 1 reviewer -> majority would be 1, but the floor of 2 blocks promotion
+    expect(result.groups).toEqual([]);
+    expect(result.unique).toEqual([a, b]);
+  });
+
   test('uses the highest severity finding as the group representative', () => {
     const low = finding({ reviewer: 'a', severity: 'low', title: 'Low' });
     const critical = finding({ reviewer: 'b', severity: 'critical', title: 'Critical', lineStart: 9 });
