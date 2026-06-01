@@ -196,12 +196,13 @@ Categories: `security`, `performance`, `architecture`, `correctness`, `style`.
 Multiple reviewers get an agreement badge. Findings below the promotion threshold are
 reported separately.
 
-Two strategies ship today, selected per pipeline via `consensus: { strategy: <id> }`:
+Three strategies ship today, selected per pipeline via `consensus: { strategy: <id> }`:
 
 | Strategy | Promotion rule |
 |---|---|
 | `overlap-v1` | Absolute threshold — a group is promoted when at least `requireAgreement` reviewers agree (default 2). |
 | `majority-v1` | Strict majority — a group is promoted when more than half of the reviewers that ran agree. The threshold is derived from the reviewer count (n=3→2, n=4→3, n=5→3), so it stays robust as reviewers are added or removed. It never drops below 2, so a lone surviving reviewer (e.g. when others time out) can't auto-promote its findings; `requireAgreement` raises that floor further. |
+| `severity-aware-v1` | Severity-scaled threshold — the agreement bar scales inversely with the group's severity (`critical`/`high`→1, `medium`→2, `low`/`info`→3). A lone reviewer's critical finding is promoted because missing a real critical issue costs more than an occasional false positive, while low-severity noise must clear a broader bar. `requireAgreement` raises the floor for every severity; per-severity overrides via `severityThresholds`. |
 
 Example (`overlap-v1`, default threshold):
 
