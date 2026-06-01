@@ -6,6 +6,7 @@ import { QuorumError } from '../core/errors.ts';
 import { parseArgs } from './args.ts';
 import { cmdReview } from './commands/review.ts';
 import { cmdReviewer } from './commands/reviewer.ts';
+import { cmdReviewers } from './commands/reviewers.ts';
 import { cmdPreCommit } from './commands/pre-commit.ts';
 import type { CliDeps, CliIo } from './types.ts';
 
@@ -45,6 +46,8 @@ function printHelp(io: CliIo): void {
 
 Usage:
   quorum review [pipeline-id] [--pipeline <id>] [--base <ref>] [--config <path>] [--report <path>] [--format text|json] [--json] [--no-color] [--no-preview] [--max-diff-bytes <n>] [--include <glob>] [--exclude <glob>] [--interactive]
+  quorum reviewers [--config <path>]
+  quorum reviewer add --persona <id> --provider <type> --model <model> [--pipeline <id>] [--id <id>]
   quorum pre-commit true|false [--pipeline <id>]
   quorum help
 
@@ -72,6 +75,8 @@ export async function main(
         return 0;
       case 'review':
         return await cmdReview(positional, flags, deps, io);
+      case 'reviewers':
+        return await cmdReviewers(positional, flags, deps, io);
       case 'reviewer':
         return await cmdReviewer(positional, flags, deps, io);
       case 'pre-commit':
