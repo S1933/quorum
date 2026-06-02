@@ -47,7 +47,7 @@ Scope: local files only
   - `bun test`
   - `bun test --coverage`
   - `bun run lint` (currently aliases typecheck)
-  - `bun quorum ...`
+  - `quorum ...`
 - CI/CD:
   - GitHub Actions runs checkout, Bun 1.3.3 setup, frozen install, typecheck, and tests in `.github/workflows/ci.yml:21`.
 - Docker/deployment:
