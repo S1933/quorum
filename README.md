@@ -41,7 +41,7 @@ Works as a Bun CLI.
 ```bash
 git clone https://github.com/S1933/quorum.git
 cd quorum
-bun install
+bun install && bun link
 ```
 
 ## Use Quorum CLI
@@ -55,7 +55,7 @@ Run anywhere in your repo. If no `quorum.yaml` exists, the first command copies 
 #### Add a reviewer
 
 ```
-bun quorum reviewer add \
+quorum reviewer add \
   --provider=<type> \
   --persona=<name> \
   --model=<model> \
@@ -75,62 +75,62 @@ bun quorum reviewer add \
 
 ```bash
 # OpenRouter
-bun quorum reviewer add \
+quorum reviewer add \
   --provider=openrouter \
   --persona=security \
   --model=anthropic/claude-sonnet-4
 
 # Claude Code
-bun quorum reviewer add \
+quorum reviewer add \
   --provider=claude-code \
   --persona=security \
   --model=sonnet
 
 # Codex CLI
-bun quorum reviewer add \
+quorum reviewer add \
   --provider=codex-cli \
   --persona=security \
   --model=gpt-5-codex
 
 # Continue.dev
-bun quorum reviewer add \
+quorum reviewer add \
   --provider=continue-dev \
   --persona=security \
   --model=claude-sonnet-4
 
 # Cursor Agent CLI
-bun quorum reviewer add \
+quorum reviewer add \
   --provider=cursor-agent \
   --persona=security \
   --model=composer-2.5-fast
 
 # Gemini CLI
-bun quorum reviewer add \
+quorum reviewer add \
   --provider=gemini-cli \
   --persona=security \
   --model=gemini-2.5-pro
 
 # Kilo Code CLI
-bun quorum reviewer add \
+quorum reviewer add \
   --provider=kilo-code \
   --persona=security \
   --model=anthropic/claude-sonnet-4
 
 # OpenCode Go
-bun quorum reviewer add \
+quorum reviewer add \
   --provider=opencode-go \
   --persona=security \
   --model=opencode-go/deepseek-v4-pro
 
 # Ollama
-bun quorum reviewer add \
+quorum reviewer add \
   --provider=ollama \
   --persona=security \
   --model=qwen2.5-coder
 ```
 
 ```bash
-bun quorum reviewer add \
+quorum reviewer add \
   --provider=claude-code \
   --persona=backend-senior \
   --model=sonnet \
@@ -143,7 +143,7 @@ bun quorum reviewer add \
 #### Run a review pipeline
 
 ```
-bun quorum review [--pipeline=<id>] [flags]
+quorum review [--pipeline=<id>] [flags]
 ```
 
 | Flag | Description |
@@ -160,19 +160,19 @@ bun quorum review [--pipeline=<id>] [flags]
 | `--config` | Path to `quorum.yaml` |
 
 ```bash
-bun quorum review                                       # default pipeline
-bun quorum review --pipeline ci                         # named pipeline
-bun quorum review --json                                # JSON to stdout
-bun quorum review --json --report .quorum/review.json   # JSON to file
-bun quorum review --base origin/main                    # specific git ref
-bun quorum review --include "src/**/*.ts"               # filter by glob
-bun quorum review --no-preview --no-color               # quiet mode
+quorum review                                       # default pipeline
+quorum review --pipeline ci                         # named pipeline
+quorum review --json                                # JSON to stdout
+quorum review --json --report .quorum/review.json   # JSON to file
+quorum review --base origin/main                    # specific git ref
+quorum review --include "src/**/*.ts"               # filter by glob
+quorum review --no-preview --no-color               # quiet mode
 ```
 
 #### List personas, reviewers, and pipelines
 
 ```
-bun quorum reviewers [--config=<path>]
+quorum reviewers [--config=<path>]
 ```
 
 #### Install a git pre-commit hook
@@ -180,13 +180,13 @@ bun quorum reviewers [--config=<path>]
 The hook blocks commits with `critical` or `high` findings. Bypass with `QUORUM_BYPASS=1`.
 
 ```
-bun quorum pre-commit true|false [--pipeline=<id>]
+quorum pre-commit true|false [--pipeline=<id>]
 ```
 
 ```bash
-bun quorum pre-commit true
-bun quorum pre-commit true --pipeline ci
-bun quorum pre-commit false
+quorum pre-commit true
+quorum pre-commit true --pipeline ci
+quorum pre-commit false
 ```
 
 ## Consensus
