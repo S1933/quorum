@@ -2,8 +2,9 @@ import type { ReviewResult, WorkspaceInfo } from '../core/task.ts';
 import type { Pipeline, PipelineResult, ReviewerError, ConsensusResult } from '../core/pipeline.ts';
 import type { EventBus } from '../core/events.ts';
 import type { BoundReviewer } from '../reviewers/reviewer.ts';
-import type { ConsensusRegistry, MetaReviewFn, ConsensusContext } from '../consensus/registry.ts';
+import type { ConsensusRegistry, ConsensusContext, MetaReviewFn } from '../consensus/registry.ts';
 import type { PluginCtx } from '../runtime/plugin.ts';
+import type { ProviderRegistry } from '../providers/registry.ts';
 import { ReviewerExecError } from '../core/errors.ts';
 import { BudgetTracker } from './budget.ts';
 
@@ -15,13 +16,14 @@ export interface PipelineRunInput {
   taskId: string;
   bus: EventBus;
   consensus: ConsensusRegistry;
+  providers: ProviderRegistry;
   pluginCtx: PluginCtx;
   signal?: AbortSignal;
 }
 
 export class PipelineExecutor {
   async run(input: PipelineRunInput): Promise<PipelineResult> {
-    const { pipeline, reviewers, bus, signal, workspace, instruction, taskId, consensus, pluginCtx } = input;
+    const { pipeline, reviewers, bus, signal, workspace, instruction, taskId, consensus, providers, pluginCtx } = input;
     const started = Date.now();
 
     bus.emit({
@@ -110,7 +112,7 @@ export class PipelineExecutor {
       if (signal) signal.removeEventListener('abort', onParentAbort);
     }
 
-    const consensusResult = await computeConsensus(reviews.filter(Boolean), pipeline, consensus, pluginCtx);
+    const consensusResult = await computeConsensus(reviews.filter(Boolean), pipeline, consensus, providers, pluginCtx);
 
     const result: PipelineResult = {
       pipelineId: pipeline.id,
@@ -148,6 +150,7 @@ async function computeConsensus(
   reviews: ReviewResult[],
   pipeline: Pipeline,
   registry: ConsensusRegistry,
+  providers: ProviderRegistry,
   pluginCtx: PluginCtx,
 ): Promise<ConsensusResult> {
   if (!pipeline.consensus) {
@@ -161,79 +164,24 @@ async function computeConsensus(
   }
   const strategy = registry.resolve(pipeline.consensus.strategy);
 
-  const ctx: ConsensusContext | undefined =
-    pipeline.consensus.metaReviewerProvider
-      ? {
-          metaReview: createMetaReviewFn(pipeline.consensus.metaReviewerProvider as Record<string, unknown>, pluginCtx),
-        }
-      : undefined;
+  const metaReview = pipeline.consensus.metaReviewerProvider
+    ? resolveMetaReviewer(pipeline.consensus.metaReviewerProvider as Record<string, unknown>, providers, pluginCtx)
+    : undefined;
+
+  const ctx: ConsensusContext | undefined = metaReview ? { metaReview } : undefined;
 
   const result = strategy.aggregate(reviews, pipeline.consensus, ctx);
   return result instanceof Promise ? await result : result;
 }
 
-function createMetaReviewFn(
+function resolveMetaReviewer(
   providerCfg: Record<string, unknown>,
+  providers: ProviderRegistry,
   pluginCtx: PluginCtx,
-): MetaReviewFn {
-  const type = String(providerCfg.type ?? 'claude-code');
-  const model = String(providerCfg.model ?? '');
-
-  return async (prompt: string): Promise<string> => {
-    const args = buildMetaReviewArgs(type, model, prompt);
-    const proc = Bun.spawn({
-      cmd: args,
-      stdout: 'pipe',
-      stderr: 'pipe',
-      env: pluginCtx.env as Record<string, string>,
-    });
-
-    const chunks: string[] = [];
-    for await (const chunk of proc.stdout) {
-      chunks.push(typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk));
-    }
-
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      const stderr = await new Response(proc.stderr).text();
-      throw new Error(`Meta-review provider "${type}" exited with code ${exitCode}: ${stderr.slice(0, 500)}`);
-    }
-
-    return chunks.join('').trim() || '{}';
-  };
-}
-
-function buildMetaReviewArgs(type: string, model: string, prompt: string): string[] {
-  switch (type) {
-    case 'claude-code':
-      return model ? ['claude', '-p', prompt, '--model', model] : ['claude', '-p', prompt];
-    case 'codex-cli':
-      return model
-        ? ['codex', 'exec', '--prompt', prompt, '--model', model]
-        : ['codex', 'exec', '--prompt', prompt];
-    case 'gemini-cli':
-      return model
-        ? ['gemini', '-p', prompt, '--model', model]
-        : ['gemini', '-p', prompt];
-    case 'opencode':
-      return model
-        ? ['opencode', 'ask', prompt, '--model', model]
-        : ['opencode', 'ask', prompt];
-    case 'opencode-go':
-      return model
-        ? ['opencode', 'ask', prompt, '--model', model]
-        : ['opencode', 'ask', prompt];
-    case 'cursor-agent':
-      return model
-        ? ['cursor-agent', '-p', prompt, '--model', model]
-        : ['cursor-agent', '-p', prompt];
-    case 'kilo-code':
-      return model
-        ? ['kilo-code', '-p', prompt, '--model', model]
-        : ['kilo-code', '-p', prompt];
-    default:
-      return model
-        ? [type, '-p', prompt, '--model', model]
-        : [type, '-p', prompt];
-  }
+): MetaReviewFn | undefined {
+  const type = String(providerCfg.type ?? '');
+  if (!type) return undefined;
+  const factory = providers.resolve(type);
+  if (!factory?.createMetaReviewer) return undefined;
+  return factory.createMetaReviewer(providerCfg, pluginCtx);
 }

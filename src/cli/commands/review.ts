@@ -99,6 +99,7 @@ export async function cmdReview(
           taskId: `review-${deps.now()}`,
           bus: runtime.bus,
           consensus: runtime.consensus,
+          providers: runtime.providers,
           pluginCtx: runtime.pluginCtx,
         }, io)
       : await executor.run({
@@ -109,6 +110,7 @@ export async function cmdReview(
           taskId: `review-${deps.now()}`,
           bus: runtime.bus,
           consensus: runtime.consensus,
+          providers: runtime.providers,
           pluginCtx: runtime.pluginCtx,
         });
 

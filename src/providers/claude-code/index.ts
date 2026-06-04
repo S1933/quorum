@@ -2,9 +2,10 @@ import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provide
 import type { ReviewTask, ReviewResult } from '../../core/task.ts';
 import type { ProviderFactory } from '../registry.ts';
 import type { PluginCtx } from '../../runtime/plugin.ts';
+import type { MetaReviewFn } from '../../consensus/registry.ts';
 import { ClaudeCodeConfigSchema, type ClaudeCodeConfig } from './schema.ts';
 import { REVIEW_OUTPUT_INSTRUCTIONS } from '../../reviewers/output.ts';
-import { runSubprocess, buildSubprocessReviewResult } from '../subprocess.ts';
+import { runSubprocess, buildSubprocessReviewResult, createSubprocessMetaReviewer } from '../subprocess.ts';
 
 const PROVIDER_TYPE = 'claude-code';
 
@@ -37,6 +38,7 @@ class ClaudeCodeProvider implements Provider {
       providerLabel: 'claude',
       reviewerId: task.reviewerId,
       binary: this.cfg.binary,
+      allowProjectBinary: this.cfg.allow_project_binary,
       args,
       cwd: this.cfg.cwd ?? this.pluginCtx.workspaceRoot,
       stdin: task.instruction,
@@ -54,5 +56,14 @@ export const claudeCodeFactory: ProviderFactory = {
   schema: ClaudeCodeConfigSchema,
   async create(instanceId, config, ctx) {
     return new ClaudeCodeProvider(instanceId, config as ClaudeCodeConfig, ctx);
+  },
+  createMetaReviewer(config, ctx): MetaReviewFn | undefined {
+    const cfg = config as ClaudeCodeConfig;
+    return createSubprocessMetaReviewer(
+      cfg.binary,
+      () => ['--print', '--model', cfg.model],
+      cfg.cwd ?? ctx.workspaceRoot,
+      cfg.timeout_ms,
+    );
   },
 };

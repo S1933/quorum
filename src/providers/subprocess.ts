@@ -1,7 +1,10 @@
 import type { EventBus } from '../core/events.ts';
 import type { ReviewTask, ReviewResult } from '../core/task.ts';
+import type { MetaReviewFn } from '../consensus/registry.ts';
 import { ProviderRuntimeError } from '../core/errors.ts';
 import { parseFindings } from '../reviewers/output.ts';
+import { InMemoryEventBus } from '../runtime/bus.ts';
+import { isAbsolute, relative, resolve } from 'node:path';
 
 export interface SubprocessRunOptions {
   providerId: string;
@@ -17,6 +20,7 @@ export interface SubprocessRunOptions {
   bus: EventBus;
   maxStdoutBytes?: number;
   maxStderrBytes?: number;
+  allowProjectBinary?: boolean;
 }
 
 export const DEFAULT_SUBPROCESS_STDOUT_MAX_BYTES = 1024 * 1024;
@@ -37,6 +41,7 @@ const DEFAULT_ENV_ALLOWLIST = [
 ] as const;
 
 export async function runSubprocess(opts: SubprocessRunOptions): Promise<string> {
+  assertTrustedBinary(opts);
   const proc = Bun.spawn({
     cmd: [opts.binary, ...opts.args],
     cwd: opts.cwd,
@@ -110,6 +115,28 @@ export async function runSubprocess(opts: SubprocessRunOptions): Promise<string>
     clearTimeout(timer);
     opts.signal.removeEventListener('abort', onAbort);
   }
+}
+
+function assertTrustedBinary(opts: SubprocessRunOptions): void {
+  if (!isPathLikeBinary(opts.binary)) return;
+  const resolvedCwd = resolve(opts.cwd);
+  const resolvedBinary = isAbsolute(opts.binary)
+    ? resolve(opts.binary)
+    : resolve(resolvedCwd, opts.binary);
+  if (opts.allowProjectBinary || !isInside(resolvedCwd, resolvedBinary)) return;
+  throw new ProviderRuntimeError(
+    opts.providerId,
+    `Refusing to execute project-local provider binary "${opts.binary}". Set allow_project_binary: true only for trusted repositories.`,
+  );
+}
+
+function isPathLikeBinary(binary: string): boolean {
+  return isAbsolute(binary) || binary.includes('/') || binary.includes('\\');
+}
+
+function isInside(root: string, path: string): boolean {
+  const rel = relative(root, path);
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
 }
 
 export function buildSubprocessEnv(extra: Record<string, string | undefined> = {}): Record<string, string> {
@@ -258,4 +285,30 @@ export async function readLimitedText(
   const tail = decoder.decode();
   if (tail) chunks.push(tail);
   return chunks.join('');
+}
+
+export function createSubprocessMetaReviewer(
+  binary: string,
+  buildArgs: () => string[],
+  cwd: string,
+  timeoutMs: number,
+  env?: Record<string, string | undefined>,
+): MetaReviewFn {
+  return async (prompt: string): Promise<string> => {
+    const opts: SubprocessRunOptions = {
+      providerId: 'meta-review',
+      providerLabel: binary,
+      reviewerId: 'meta-review',
+      binary,
+      args: buildArgs(),
+      cwd,
+      stdin: prompt,
+      timeoutMs,
+      signal: new AbortController().signal,
+      bus: new InMemoryEventBus(),
+    };
+    if (env) opts.env = env;
+    const raw = await runSubprocess(opts);
+    return raw.trim() || '{}';
+  };
 }

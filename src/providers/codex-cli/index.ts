@@ -2,9 +2,10 @@ import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provide
 import type { ReviewTask, ReviewResult } from '../../core/task.ts';
 import type { ProviderFactory } from '../registry.ts';
 import type { PluginCtx } from '../../runtime/plugin.ts';
+import type { MetaReviewFn } from '../../consensus/registry.ts';
 import { ProviderRuntimeError } from '../../core/errors.ts';
 import { REVIEW_OUTPUT_INSTRUCTIONS } from '../../reviewers/output.ts';
-import { runSubprocess, buildSubprocessReviewResult } from '../subprocess.ts';
+import { runSubprocess, buildSubprocessReviewResult, createSubprocessMetaReviewer } from '../subprocess.ts';
 import { CodexCliConfigSchema, type CodexCliConfig } from './schema.ts';
 
 const PROVIDER_TYPE = 'codex-cli';
@@ -60,6 +61,7 @@ class CodexCliProvider implements Provider {
       providerLabel: 'codex',
       reviewerId: task.reviewerId,
       binary: this.cfg.binary,
+      allowProjectBinary: this.cfg.allow_project_binary,
       args: this.buildArgs(ctx, cwd),
       cwd,
       stdin: prompt,
@@ -77,5 +79,14 @@ export const codexCliFactory: ProviderFactory = {
   schema: CodexCliConfigSchema,
   async create(instanceId, config, ctx) {
     return new CodexCliProvider(instanceId, config as CodexCliConfig, ctx);
+  },
+  createMetaReviewer(config, ctx): MetaReviewFn | undefined {
+    const cfg = config as CodexCliConfig;
+    return createSubprocessMetaReviewer(
+      cfg.binary,
+      () => ['exec', '--sandbox', cfg.sandbox, '--color', 'never', '-'],
+      cfg.cwd ?? ctx.workspaceRoot,
+      cfg.timeout_ms,
+    );
   },
 };

@@ -1,6 +1,7 @@
 import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provider.ts';
 import type { ReviewTask, ReviewResult, UsageInfo } from '../../core/task.ts';
 import type { ProviderFactory } from '../registry.ts';
+import type { MetaReviewFn } from '../../consensus/registry.ts';
 import { ProviderRuntimeError } from '../../core/errors.ts';
 import { OpenRouterConfigSchema, type OpenRouterConfig } from './schema.ts';
 import { OpenRouterClient, type ChatMessage } from './client.ts';
@@ -150,5 +151,21 @@ export const openRouterFactory: ProviderFactory = {
   schema: OpenRouterConfigSchema,
   async create(instanceId, config, _ctx) {
     return new OpenRouterProvider(instanceId, config as OpenRouterConfig);
+  },
+  createMetaReviewer(config, _ctx): MetaReviewFn | undefined {
+    const cfg = config as OpenRouterConfig;
+    const client = new OpenRouterClient(cfg, 'meta-review');
+    return async (prompt: string): Promise<string> => {
+      const chunks: string[] = [];
+      const req: Parameters<OpenRouterClient['chat']>[0] = {
+        model: cfg.model,
+        messages: [{ role: 'user', content: prompt }],
+      };
+      if (cfg.max_tokens !== undefined) req.max_tokens = cfg.max_tokens;
+      for await (const event of client.chatStream(req, new AbortController().signal)) {
+        if (event.type === 'token') chunks.push(event.text);
+      }
+      return chunks.join('').trim() || '{}';
+    };
   },
 };

@@ -2,8 +2,9 @@ import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provide
 import type { ReviewTask, ReviewResult } from '../../core/task.ts';
 import type { ProviderFactory } from '../registry.ts';
 import type { PluginCtx } from '../../runtime/plugin.ts';
+import type { MetaReviewFn } from '../../consensus/registry.ts';
 import { REVIEW_OUTPUT_INSTRUCTIONS } from '../../reviewers/output.ts';
-import { runSubprocess, buildSubprocessReviewResult, normaliseSubprocessOutput } from '../subprocess.ts';
+import { runSubprocess, buildSubprocessReviewResult, normaliseSubprocessOutput, createSubprocessMetaReviewer } from '../subprocess.ts';
 import { ContinueDevConfigSchema, type ContinueDevConfig } from './schema.ts';
 
 const PROVIDER_TYPE = 'continue-dev';
@@ -44,6 +45,7 @@ class ContinueDevProvider implements Provider {
       providerLabel: 'continue.dev',
       reviewerId: task.reviewerId,
       binary: this.cfg.binary,
+      allowProjectBinary: this.cfg.allow_project_binary,
       args: this.buildArgs(),
       cwd: this.cfg.cwd ?? this.pluginCtx.workspaceRoot,
       stdin: prompt,
@@ -61,5 +63,14 @@ export const continueDevFactory: ProviderFactory = {
   schema: ContinueDevConfigSchema,
   async create(instanceId, config, ctx) {
     return new ContinueDevProvider(instanceId, config as ContinueDevConfig, ctx);
+  },
+  createMetaReviewer(config, ctx): MetaReviewFn | undefined {
+    const cfg = config as ContinueDevConfig;
+    return createSubprocessMetaReviewer(
+      cfg.binary,
+      () => ['-p', 'Read stdin and respond with JSON.', ...(cfg.silent ? ['--silent'] : [])],
+      cfg.cwd ?? ctx.workspaceRoot,
+      cfg.timeout_ms,
+    );
   },
 };

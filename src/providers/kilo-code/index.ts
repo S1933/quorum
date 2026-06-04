@@ -2,8 +2,9 @@ import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provide
 import type { ReviewTask, ReviewResult } from '../../core/task.ts';
 import type { ProviderFactory } from '../registry.ts';
 import type { PluginCtx } from '../../runtime/plugin.ts';
+import type { MetaReviewFn } from '../../consensus/registry.ts';
 import { REVIEW_OUTPUT_INSTRUCTIONS } from '../../reviewers/output.ts';
-import { runSubprocess, buildSubprocessReviewResult, normaliseSubprocessOutput } from '../subprocess.ts';
+import { runSubprocess, buildSubprocessReviewResult, normaliseSubprocessOutput, createSubprocessMetaReviewer } from '../subprocess.ts';
 import { KiloCodeConfigSchema, type KiloCodeConfig } from './schema.ts';
 
 const PROVIDER_TYPE = 'kilo-code';
@@ -48,6 +49,7 @@ class KiloCodeProvider implements Provider {
       providerLabel: 'kilo',
       reviewerId: task.reviewerId,
       binary: this.cfg.binary,
+      allowProjectBinary: this.cfg.allow_project_binary,
       args: this.buildArgs(ctx),
       cwd: this.cfg.cwd ?? this.pluginCtx.workspaceRoot,
       stdin: prompt,
@@ -65,5 +67,14 @@ export const kiloCodeFactory: ProviderFactory = {
   schema: KiloCodeConfigSchema,
   async create(instanceId, config, ctx) {
     return new KiloCodeProvider(instanceId, config as KiloCodeConfig, ctx);
+  },
+  createMetaReviewer(config, ctx): MetaReviewFn | undefined {
+    const cfg = config as KiloCodeConfig;
+    return createSubprocessMetaReviewer(
+      cfg.binary,
+      () => ['run', '--', 'Read stdin and respond with JSON.'],
+      cfg.cwd ?? ctx.workspaceRoot,
+      cfg.timeout_ms,
+    );
   },
 };

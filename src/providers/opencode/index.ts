@@ -2,8 +2,9 @@ import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provide
 import type { ReviewTask, ReviewResult } from '../../core/task.ts';
 import type { ProviderFactory } from '../registry.ts';
 import type { PluginCtx } from '../../runtime/plugin.ts';
+import type { MetaReviewFn } from '../../consensus/registry.ts';
 import { REVIEW_OUTPUT_INSTRUCTIONS } from '../../reviewers/output.ts';
-import { runSubprocess, buildSubprocessReviewResult, normaliseSubprocessOutput } from '../subprocess.ts';
+import { runSubprocess, buildSubprocessReviewResult, normaliseSubprocessOutput, createSubprocessMetaReviewer } from '../subprocess.ts';
 import { OpenCodeConfigSchema, type OpenCodeConfig } from './schema.ts';
 
 const PROVIDER_TYPE = 'opencode';
@@ -58,6 +59,7 @@ class OpenCodeProvider implements Provider {
       providerLabel: 'opencode',
       reviewerId: task.reviewerId,
       binary: this.cfg.binary,
+      allowProjectBinary: this.cfg.allow_project_binary,
       args: this.buildArgs(ctx),
       cwd: this.cfg.cwd ?? this.pluginCtx.workspaceRoot,
       stdin: prompt,
@@ -76,6 +78,13 @@ export const openCodeFactory: ProviderFactory = {
   async create(instanceId, config, ctx) {
     return new OpenCodeProvider(instanceId, config as OpenCodeConfig, ctx);
   },
+  createMetaReviewer(config, ctx): MetaReviewFn | undefined {
+    const cfg = config as OpenCodeConfig;
+    const args = cfg.command_style === 'run'
+      ? ['run', ...(cfg.quiet ? ['--log-level', 'ERROR'] : []), 'Read stdin and respond with JSON.']
+      : ['--prompt', 'Read stdin and respond with JSON.', ...(cfg.quiet ? ['-q'] : [])];
+    return createSubprocessMetaReviewer(cfg.binary, () => args, cfg.cwd ?? ctx.workspaceRoot, cfg.timeout_ms);
+  },
 };
 
 export const openCodeGoAliasFactory: ProviderFactory = {
@@ -83,5 +92,12 @@ export const openCodeGoAliasFactory: ProviderFactory = {
   schema: OpenCodeConfigSchema,
   async create(instanceId, config, ctx) {
     return new OpenCodeProvider(instanceId, config as OpenCodeConfig, ctx);
+  },
+  createMetaReviewer(config, ctx): MetaReviewFn | undefined {
+    const cfg = config as OpenCodeConfig;
+    const args = cfg.command_style === 'run'
+      ? ['run', ...(cfg.quiet ? ['--log-level', 'ERROR'] : []), 'Read stdin and respond with JSON.']
+      : ['--prompt', 'Read stdin and respond with JSON.', ...(cfg.quiet ? ['-q'] : [])];
+    return createSubprocessMetaReviewer(cfg.binary, () => args, cfg.cwd ?? ctx.workspaceRoot, cfg.timeout_ms);
   },
 };

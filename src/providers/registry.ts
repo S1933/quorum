@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type { Provider } from '../core/provider.ts';
 import type { PluginCtx } from '../runtime/plugin.ts';
+import type { MetaReviewFn } from '../consensus/registry.ts';
 import { ConfigError } from '../core/errors.ts';
 import { resolveLazy } from '../config/interpolate.ts';
 
@@ -8,6 +9,7 @@ export interface ProviderFactory {
   type: string;
   schema: z.ZodTypeAny;
   create(instanceId: string, config: unknown, ctx: PluginCtx): Promise<Provider>;
+  createMetaReviewer?(config: unknown, ctx: PluginCtx): MetaReviewFn | undefined;
 }
 
 export class ProviderRegistry {
