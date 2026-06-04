@@ -5,6 +5,7 @@ export const OpenCodeConfigSchema = z
     type: z.union([z.literal('opencode'), z.literal('opencode-go')]),
     model: z.string().min(1).optional(),
     binary: z.string().min(1).default('opencode'),
+    allow_project_binary: z.boolean().default(false),
     command_style: z.enum(['prompt', 'run']).default('run'),
     output_format: z.enum(['text', 'json']).default('text'),
     quiet: z.boolean().default(true),

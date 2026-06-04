@@ -27,6 +27,7 @@ describe('kilo-code provider', () => {
       {
         type: 'kilo-code',
         binary,
+        allow_project_binary: true,
         model: 'anthropic/claude-opus-4-8',
         format: 'default',
         extra_args: [],
@@ -62,6 +63,7 @@ describe('kilo-code provider', () => {
       {
         type: 'kilo-code',
         binary,
+        allow_project_binary: true,
         model: 'anthropic/claude-haiku-4-20250514',
         agent: 'reviewer',
         variant: 'high',

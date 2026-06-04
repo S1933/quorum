@@ -28,6 +28,7 @@ describe('opencode provider', () => {
       {
         type: 'opencode',
         binary,
+        allow_project_binary: true,
         command_style: 'prompt',
         output_format: 'text',
         quiet: true,
@@ -71,6 +72,7 @@ describe('opencode provider', () => {
       {
         type: 'opencode',
         binary,
+        allow_project_binary: true,
         command_style: 'prompt',
         output_format: 'text',
         quiet: true,
@@ -115,6 +117,7 @@ describe('opencode provider', () => {
       {
         type: 'opencode',
         binary,
+        allow_project_binary: true,
         command_style: 'prompt',
         output_format: 'text',
         quiet: true,

@@ -27,6 +27,7 @@ describe('continue-dev provider', () => {
       {
         type: 'continue-dev',
         binary,
+        allow_project_binary: true,
         config: 'continuedev/default-cli-config',
         silent: true,
         format: 'text',
@@ -66,6 +67,7 @@ describe('continue-dev provider', () => {
       {
         type: 'continue-dev',
         binary,
+        allow_project_binary: true,
         config: 'my-org/review-assistant',
         silent: true,
         format: 'json',

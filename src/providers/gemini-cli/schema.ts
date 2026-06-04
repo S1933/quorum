@@ -9,6 +9,7 @@ export const GeminiCliConfigSchema = z
     type: z.literal('gemini-cli'),
     model: z.string().min(1).optional(),
     binary: z.string().min(1).default('gemini'),
+    allow_project_binary: z.boolean().default(false),
     approval_mode: z.enum(['default', 'auto_edit', 'plan']).default('plan'),
     sandbox: z.boolean().default(true),
     skip_trust: z.boolean().default(true),

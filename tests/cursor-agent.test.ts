@@ -27,6 +27,7 @@ describe('cursor-agent provider', () => {
       {
         type: 'cursor-agent',
         binary,
+        allow_project_binary: true,
         model: 'gpt-5',
         output_format: 'text',
         extra_args: [],
@@ -66,6 +67,7 @@ describe('cursor-agent provider', () => {
       {
         type: 'cursor-agent',
         binary,
+        allow_project_binary: true,
         api_key: 'secret-cursor-key',
         model: 'auto',
         output_format: 'json',
@@ -111,6 +113,7 @@ describe('cursor-agent provider', () => {
       {
         type: 'cursor-agent',
         binary,
+        allow_project_binary: true,
         api_key: 'secret-cursor-key',
         output_format: 'text',
         extra_args: [],

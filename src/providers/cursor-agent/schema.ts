@@ -5,6 +5,7 @@ export const CursorAgentConfigSchema = z
     type: z.literal('cursor-agent'),
     model: z.string().min(1).optional(),
     binary: z.string().min(1).default('cursor-agent'),
+    allow_project_binary: z.boolean().default(false),
     api_key: z.string().min(1).optional(),
     output_format: z.enum(['text', 'json', 'stream-json']).default('text'),
     extra_args: z.array(z.never()).default([]),

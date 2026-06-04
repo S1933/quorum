@@ -63,7 +63,7 @@ describe('cli', () => {
     const runtime = fakeRuntime();
 
     const code = await main(
-      ['review', '--config', '/repo/quorum.yaml', '--report', reportPath, '--no-color'],
+      ['review', '--config', '/repo/quorum.yaml', '--report', reportPath, '--allow-report-outside-root', '--no-color'],
       deps({
         loadConfigFromPath: async () => config(),
         inferRepoRoot: async () => '/repo',
@@ -146,7 +146,7 @@ describe('cli', () => {
     const reportPath = join(tmp, 'review.json');
 
     const code = await main(
-      ['review', '--config', '/repo/quorum.yaml', '--json', '--report', reportPath],
+      ['review', '--config', '/repo/quorum.yaml', '--json', '--report', reportPath, '--allow-report-outside-root'],
       deps({
         loadConfigFromPath: async () => config(),
         inferRepoRoot: async () => '/repo',
@@ -168,6 +168,32 @@ describe('cli', () => {
     expect(reportJson).toEqual(stdoutJson);
     expect(reportJson.schemaVersion).toBe(1);
     expect(reportJson.reviews[0].findings[0].title).toBe('Fake finding');
+  });
+
+  test('review refuses to write reports outside the repository by default', async () => {
+    const io = captureIo();
+    const tmp = await mkdtemp(join(tmpdir(), 'quorum-cli-report-test-'));
+    const reportPath = join(tmp, 'review.md');
+
+    const code = await main(
+      ['review', '--config', '/repo/quorum.yaml', '--report', reportPath, '--no-color'],
+      deps({
+        loadConfigFromPath: async () => config(),
+        inferRepoRoot: async () => '/repo',
+        probeWorkspace: async () => ({
+          root: '/repo',
+          baseRef: 'main',
+          diff: 'diff --git a/src/app.ts b/src/app.ts\n+++ b/src/app.ts\n@@ -1 +1,2 @@\n+change',
+          files: ['src/app.ts'],
+        }),
+        createRuntime: async () => fakeRuntime(),
+        now: () => 123,
+      }),
+      io,
+    );
+
+    expect(code).toBe(1);
+    expect(io.stderrText()).toContain('Refusing to write report outside repository');
   });
 
 });

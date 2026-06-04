@@ -9,6 +9,7 @@ export const KiloCodeConfigSchema = z
     type: z.literal('kilo-code'),
     model: z.string().min(1).optional(),
     binary: z.string().min(1).default('kilo'),
+    allow_project_binary: z.boolean().default(false),
     agent: z.string().min(1).optional(),
     variant: z.string().min(1).optional(),
     format: z.enum(['default', 'json']).default('default'),

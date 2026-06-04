@@ -8,6 +8,7 @@ export const ContinueDevConfigSchema = z
   .object({
     type: z.literal('continue-dev'),
     binary: z.string().min(1).default('cn'),
+    allow_project_binary: z.boolean().default(false),
     config: z.string().min(1).optional(),
     silent: z.boolean().default(true),
     format: z.enum(['text', 'json']).default('text'),

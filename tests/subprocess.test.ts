@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { buildSubprocessEnv, readLimitedText, readPreviewedStdout } from '../src/providers/subprocess.ts';
+import { buildSubprocessEnv, readLimitedText, readPreviewedStdout, runSubprocess } from '../src/providers/subprocess.ts';
 
 describe('subprocess security boundaries', () => {
   test('caps previewed stdout before buffering unbounded provider output', async () => {
@@ -41,4 +41,31 @@ describe('subprocess security boundaries', () => {
     expect(env.OPENAI_API_KEY).toBeUndefined();
     expect(env.PATH).toBe(process.env.PATH);
   });
+
+  test('refuses project-local provider binaries unless explicitly allowed', async () => {
+    await expect(runSubprocess({
+      providerId: 'local-provider',
+      providerLabel: 'local',
+      reviewerId: 'reviewer',
+      binary: './tool',
+      args: [],
+      cwd: '/repo',
+      stdin: '',
+      timeoutMs: 1000,
+      signal: new AbortController().signal,
+      bus: captureBus(),
+    })).rejects.toThrow('Refusing to execute project-local provider binary');
+  });
 });
+
+function captureBus() {
+  return {
+    emit() {},
+    on() {
+      return () => {};
+    },
+    onAny() {
+      return () => {};
+    },
+  };
+}

@@ -27,6 +27,7 @@ describe('gemini-cli provider', () => {
       {
         type: 'gemini-cli',
         binary,
+        allow_project_binary: true,
         model: 'gemini-2.5-pro',
         approval_mode: 'plan',
         sandbox: true,
@@ -67,6 +68,7 @@ describe('gemini-cli provider', () => {
       {
         type: 'gemini-cli',
         binary,
+        allow_project_binary: true,
         model: 'gemini-2.5-flash',
         approval_mode: 'plan',
         sandbox: true,

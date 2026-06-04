@@ -13,6 +13,7 @@ export const CodexCliConfigSchema = z
     type: z.literal('codex-cli'),
     model: z.string().min(1).optional(),
     binary: z.string().min(1).default('codex'),
+    allow_project_binary: z.boolean().default(false),
     sandbox: z.enum(['read-only', 'workspace-write', 'danger-full-access']).default('read-only'),
     approval_policy: z.enum(['untrusted', 'on-request', 'never']).default('on-request'),
     extra_args: z.array(SafeExtraArgSchema).default([]),

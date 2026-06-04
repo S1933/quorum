@@ -27,6 +27,7 @@ describe('codex-cli provider', () => {
       {
         type: 'codex-cli',
         binary,
+        allow_project_binary: true,
         model: 'gpt-5-codex',
         sandbox: 'read-only',
         approval_policy: 'on-request',
@@ -60,6 +61,7 @@ describe('codex-cli provider', () => {
       {
         type: 'codex-cli',
         binary,
+        allow_project_binary: true,
         model: 'gpt-5',
         sandbox: 'read-only',
         approval_policy: 'on-request',
@@ -103,6 +105,7 @@ describe('codex-cli provider', () => {
       {
         type: 'codex-cli',
         binary,
+        allow_project_binary: true,
         model: 'gpt-5',
         sandbox: 'read-only',
         approval_policy: 'on-request',
@@ -198,6 +201,7 @@ describe('codex-cli provider', () => {
       {
         type: 'codex-cli',
         binary,
+        allow_project_binary: true,
         sandbox: 'read-only',
         approval_policy: 'never',
         extra_args: [],

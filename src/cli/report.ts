@@ -21,5 +21,5 @@ export function resolveConfigPath(
 export function assertPathInside(root: string, path: string): void {
   const rel = relative(resolve(root), resolve(path));
   if (rel === '' || (!rel.startsWith('..') && !rel.startsWith('/'))) return;
-  throw new ConfigError(`Refusing to write config outside repository: ${path}`);
+  throw new ConfigError(`Refusing to write report outside repository: ${path}`);
 }
