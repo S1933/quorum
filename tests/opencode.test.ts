@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import type { EventBus } from '../src/core/events.ts';
 import type { ReviewTask } from '../src/core/task.ts';
 import { createRuntime } from '../src/runtime/runtime.ts';
-import { openCodeGoFactory } from '../src/providers/opencode-go/index.ts';
+import { openCodeFactory } from '../src/providers/opencode/index.ts';
 
 const tmpRoots: string[] = [];
 
@@ -13,7 +13,7 @@ afterAll(async () => {
   await Promise.all(tmpRoots.map((root) => rm(root, { recursive: true, force: true })));
 });
 
-describe('opencode-go provider', () => {
+describe('opencode provider', () => {
   test('runs the prompt-style CLI and parses structured findings', async () => {
     const root = await mkdtemp(join(tmpdir(), 'quorum-opencode-'));
     tmpRoots.push(root);
@@ -23,10 +23,10 @@ describe('opencode-go provider', () => {
     const events: unknown[] = [];
     const bus = captureBus(events);
 
-    const provider = await openCodeGoFactory.create(
+    const provider = await openCodeFactory.create(
       'opencode-local',
       {
-        type: 'opencode-go',
+        type: 'opencode',
         binary,
         command_style: 'prompt',
         output_format: 'text',
@@ -66,10 +66,10 @@ describe('opencode-go provider', () => {
     await Bun.write(binary, `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\ncat > '${stdinFile}'\nprintf '{"findings":[]}'\n`);
     await chmod(binary, 0o755);
 
-    const provider = await openCodeGoFactory.create(
+    const provider = await openCodeFactory.create(
       'opencode-local',
       {
-        type: 'opencode-go',
+        type: 'opencode',
         binary,
         command_style: 'prompt',
         output_format: 'text',
@@ -110,10 +110,10 @@ describe('opencode-go provider', () => {
     await Bun.write(binary, '#!/bin/sh\nsleep 1\nprintf \'{"findings":[]}\'\n');
     await chmod(binary, 0o755);
 
-    const provider = await openCodeGoFactory.create(
+    const provider = await openCodeFactory.create(
       'opencode-local',
       {
-        type: 'opencode-go',
+        type: 'opencode',
         binary,
         command_style: 'prompt',
         output_format: 'text',
@@ -148,7 +148,7 @@ describe('opencode-go provider', () => {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: { type: 'opencode-go', extra_args: ['--trust-all'] } },
+          sec: { persona: 'security', provider: { type: 'opencode', extra_args: ['--trust-all'] } },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -158,6 +158,30 @@ describe('opencode-go provider', () => {
     });
 
     await expect(runtime.resolveReviewer('sec')).rejects.toThrow('extra_args.0');
+  });
+
+  test('keeps opencode-go as a legacy provider alias', async () => {
+    const runtime = await createRuntime({
+      config: {
+        version: 1,
+        personas: {
+          security: { description: 'Security', system: 'Review security.' },
+        },
+        reviewers: {
+          sec: { persona: 'security', provider: { type: 'opencode-go', model: 'opencode-go/deepseek-v4-pro' } },
+        },
+        pipelines: {
+          default: { parallel: true, reviewers: ['sec'] },
+        },
+      },
+      pluginCtx: { workspaceRoot: '.', env: {} },
+    });
+
+    const reviewer = await runtime.resolveReviewer('sec');
+
+    expect(reviewer.provider.id).toBe('sec:provider');
+    expect(runtime.providers.list()).toContain('opencode');
+    expect(runtime.providers.list()).toContain('opencode-go');
   });
 });
 

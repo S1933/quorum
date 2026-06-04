@@ -140,6 +140,41 @@ describe('reviewer add', () => {
     expect(io.stderrText()).toContain('Invalid --temperature flag');
   });
 
+  test('normalizes legacy opencode-go provider flag to opencode', async () => {
+    const { configPath, deps } = await repoDeps();
+    const io = captureIo();
+
+    const code = await main(
+      [
+        'reviewer',
+        'add',
+        '--provider',
+        'opencode-go',
+        '--persona',
+        'security',
+        '--model',
+        'opencode-go/deepseek-v4-pro',
+        '--config',
+        configPath,
+      ],
+      deps,
+      io,
+    );
+
+    expect(code).toBe(0);
+    const id = addedReviewerId(io);
+    expect(id).toMatch(/^[a-z0-9]+-security-opencode$/);
+
+    const updated = parseYaml(await Bun.file(configPath).text());
+    expect(updated.reviewers[id]).toEqual({
+      persona: 'security',
+      provider: {
+        type: 'opencode',
+        model: 'opencode-go/deepseek-v4-pro',
+      },
+    });
+  });
+
   test('uses another name prefix when the first generated reviewer id has different config', async () => {
     const { configPath, deps } = await repoDeps();
     const firstIo = captureIo();

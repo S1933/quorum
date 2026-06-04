@@ -14,9 +14,12 @@ const SUPPORTED_PROVIDERS = [
   'cursor-agent',
   'gemini-cli',
   'kilo-code',
-  'opencode-go',
+  'opencode',
   'ollama',
 ] as const;
+const LEGACY_PROVIDER_ALIASES: Record<string, typeof SUPPORTED_PROVIDERS[number]> = {
+  'opencode-go': 'opencode',
+};
 
 const REVIEWER_ADD_USAGE = 'Usage: quorum reviewer add --provider=<type> --persona=<name> --model=<model> [--id=<reviewer-id>] [--ext=<ext1,ext2,...>] [--fileExtensions=<ext1,ext2,...>] [--temperature=<0..2>] [--pipeline=<id>] [--config=<path>]\n';
 
@@ -55,7 +58,8 @@ async function cmdReviewerAdd(
 
   const config = await deps.loadConfigFromPath(configPath);
 
-  const provider = typeof flags.provider === 'string' ? flags.provider : null;
+  const providerFlag = typeof flags.provider === 'string' ? flags.provider : null;
+  const provider = providerFlag ? LEGACY_PROVIDER_ALIASES[providerFlag] ?? providerFlag : null;
   const persona = typeof flags.persona === 'string' ? flags.persona : null;
   const model = typeof flags.model === 'string' ? flags.model : null;
   const extensions = parseExtensions(flags);
@@ -79,7 +83,7 @@ async function cmdReviewerAdd(
   }
 
   if (!(SUPPORTED_PROVIDERS as readonly string[]).includes(provider)) {
-    io.stderr.write(`Unknown provider type "${provider}". Supported: ${SUPPORTED_PROVIDERS.join(', ')}\n`);
+    io.stderr.write(`Unknown provider type "${providerFlag}". Supported: ${SUPPORTED_PROVIDERS.join(', ')}\n`);
     return 1;
   }
 

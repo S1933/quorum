@@ -4,16 +4,17 @@ import type { ProviderFactory } from '../registry.ts';
 import type { PluginCtx } from '../../runtime/plugin.ts';
 import { REVIEW_OUTPUT_INSTRUCTIONS } from '../../reviewers/output.ts';
 import { runSubprocess, buildSubprocessReviewResult, normaliseSubprocessOutput } from '../subprocess.ts';
-import { OpenCodeGoConfigSchema, type OpenCodeGoConfig } from './schema.ts';
+import { OpenCodeConfigSchema, type OpenCodeConfig } from './schema.ts';
 
-const PROVIDER_TYPE = 'opencode-go';
+const PROVIDER_TYPE = 'opencode';
+const LEGACY_PROVIDER_TYPE = 'opencode-go';
 const STDIN_PROMPT = 'Read the review instructions from stdin and return only the requested output.';
 
-class OpenCodeGoProvider implements Provider {
+class OpenCodeProvider implements Provider {
 
   constructor(
     readonly id: string,
-    private readonly cfg: OpenCodeGoConfig,
+    private readonly cfg: OpenCodeConfig,
     private readonly pluginCtx: PluginCtx,
   ) {}
 
@@ -69,10 +70,18 @@ class OpenCodeGoProvider implements Provider {
   }
 }
 
-export const openCodeGoFactory: ProviderFactory = {
+export const openCodeFactory: ProviderFactory = {
   type: PROVIDER_TYPE,
-  schema: OpenCodeGoConfigSchema,
+  schema: OpenCodeConfigSchema,
   async create(instanceId, config, ctx) {
-    return new OpenCodeGoProvider(instanceId, config as OpenCodeGoConfig, ctx);
+    return new OpenCodeProvider(instanceId, config as OpenCodeConfig, ctx);
+  },
+};
+
+export const openCodeGoAliasFactory: ProviderFactory = {
+  type: LEGACY_PROVIDER_TYPE,
+  schema: OpenCodeConfigSchema,
+  async create(instanceId, config, ctx) {
+    return new OpenCodeProvider(instanceId, config as OpenCodeConfig, ctx);
   },
 };

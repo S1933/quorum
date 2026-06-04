@@ -14,7 +14,7 @@ import { continueDevFactory } from '../providers/continue-dev/index.ts';
 import { cursorAgentFactory } from '../providers/cursor-agent/index.ts';
 import { geminiCliFactory } from '../providers/gemini-cli/index.ts';
 import { kiloCodeFactory } from '../providers/kilo-code/index.ts';
-import { openCodeGoFactory } from '../providers/opencode-go/index.ts';
+import { openCodeFactory, openCodeGoAliasFactory } from '../providers/opencode/index.ts';
 import { ollamaFactory } from '../providers/ollama/index.ts';
 import { overlapV1 } from '../consensus/overlap-v1.ts';
 import { majorityV1 } from '../consensus/majority-v1.ts';
@@ -52,7 +52,8 @@ export async function createRuntime(opts: CreateRuntimeOptions): Promise<Runtime
   providers.register(cursorAgentFactory);
   providers.register(geminiCliFactory);
   providers.register(kiloCodeFactory);
-  providers.register(openCodeGoFactory);
+  providers.register(openCodeFactory);
+  providers.register(openCodeGoAliasFactory);
   providers.register(ollamaFactory);
   consensus.register(overlapV1);
   consensus.register(majorityV1);

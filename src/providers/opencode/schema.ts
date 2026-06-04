@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-export const OpenCodeGoConfigSchema = z
+export const OpenCodeConfigSchema = z
   .object({
-    type: z.literal('opencode-go'),
+    type: z.union([z.literal('opencode'), z.literal('opencode-go')]),
     model: z.string().min(1).optional(),
     binary: z.string().min(1).default('opencode'),
     command_style: z.enum(['prompt', 'run']).default('run'),
@@ -14,4 +14,4 @@ export const OpenCodeGoConfigSchema = z
   })
   .strict();
 
-export type OpenCodeGoConfig = z.infer<typeof OpenCodeGoConfigSchema>;
+export type OpenCodeConfig = z.infer<typeof OpenCodeConfigSchema>;

@@ -29,7 +29,7 @@ Works as a Bun CLI.
 | 🟢 → | Cursor Agent CLI | `cursor-agent` |
 | 🟢 → | Gemini CLI | `gemini-cli` |
 | 🟢 → | Kilo Code CLI | `kilo-code` |
-| 🟢 → | OpenCode Go | `opencode-go` |
+| 🟢 → | OpenCode | `opencode` |
 | 🟢 → | Ollama | `ollama` |
 
 ## Requirements
@@ -64,7 +64,7 @@ quorum reviewer add \
 
 | Flag | Description |
 |------|-------------|
-| `--provider` *required* | `openrouter`, `claude-code`, `codex-cli`, `continue-dev`, `cursor-agent`, `gemini-cli`, `kilo-code`, `opencode-go`, `ollama` |
+| `--provider` *required* | `openrouter`, `claude-code`, `codex-cli`, `continue-dev`, `cursor-agent`, `gemini-cli`, `kilo-code`, `opencode`, `ollama` |
 | `--persona` *required* | Persona defined in `quorum.yaml` |
 | `--model` *required* | Model for this provider (see examples above) |
 | `--id` | Custom reviewer ID (default: `<name>-<persona>-<provider>`) |
@@ -116,11 +116,12 @@ quorum reviewer add \
   --persona=security \
   --model=anthropic/claude-sonnet-4
 
-# OpenCode Go
+# OpenCode
 quorum reviewer add \
-  --provider=opencode-go \
+  --provider=opencode \
   --persona=security \
   --model=opencode-go/deepseek-v4-pro
+# Legacy configs using provider type opencode-go are still accepted.
 
 # Ollama
 quorum reviewer add \
