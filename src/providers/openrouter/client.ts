@@ -21,6 +21,7 @@ export interface ChatUsage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+  cost?: number;
 }
 
 export interface ChatChoice {

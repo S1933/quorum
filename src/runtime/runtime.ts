@@ -132,6 +132,8 @@ function toPipeline(id: string, cfg: PipelineConfig): Pipeline {
   if (consensus) pipeline.consensus = consensus;
   if (cfg.timeoutMs) pipeline.timeoutMs = cfg.timeoutMs;
   if (cfg.maxConcurrency) pipeline.maxConcurrency = cfg.maxConcurrency;
+  if (cfg.maxReviewers) pipeline.maxReviewers = cfg.maxReviewers;
+  if (cfg.maxTotalCostUsd) pipeline.maxTotalCostUsd = cfg.maxTotalCostUsd;
   return pipeline;
 }
 

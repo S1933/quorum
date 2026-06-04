@@ -16,6 +16,7 @@ export type QuorumEvent =
   | { type: 'reviewer.failed'; reviewerId: string; error: ReviewerError }
   | { type: 'pipeline.finished'; result: PipelineResult }
   | { type: 'pipeline.timeout' }
+  | { type: 'pipeline.budget_exceeded'; spent: number; limit: number }
   | { type: 'questions.collected'; count: number }
   | { type: 'questions.waiting' }
   | { type: 'questions.answered'; count: number };

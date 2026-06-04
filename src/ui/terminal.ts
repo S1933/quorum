@@ -90,6 +90,12 @@ export class TerminalRenderer {
       }),
     );
     unsubs.push(
+      bus.on('pipeline.budget_exceeded', (e) => {
+        this.line(`${this.c('red', '💰')}  budget exceeded: $${e.spent.toFixed(4)} / $${e.limit.toFixed(2)} — cancelling remaining reviewers`);
+        this.line('');
+      }),
+    );
+    unsubs.push(
       bus.on('pipeline.finished', (e) => {
         this.line('');
         this.renderSummary(e.result.consensus.groups, e.result.consensus.unique, e.result.errors.length);

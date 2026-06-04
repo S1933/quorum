@@ -46,6 +46,8 @@ export const PipelineConfigSchema = z
     consensus: ConsensusConfigSchema.optional(),
     timeoutMs: z.number().int().positive().optional(),
     maxConcurrency: z.number().int().positive().optional(),
+    maxReviewers: z.number().int().positive().optional(),
+    maxTotalCostUsd: z.number().positive().optional(),
   })
   .strict();
 

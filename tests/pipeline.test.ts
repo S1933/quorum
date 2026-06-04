@@ -3,7 +3,7 @@ import type { QuorumEvent } from '../src/core/events.ts';
 import type { Finding } from '../src/core/finding.ts';
 import type { Pipeline } from '../src/core/pipeline.ts';
 import type { Provider } from '../src/core/provider.ts';
-import type { ReviewResult } from '../src/core/task.ts';
+import type { ReviewResult, UsageInfo } from '../src/core/task.ts';
 import { overlapV1 } from '../src/consensus/overlap-v1.ts';
 import { ConsensusRegistry } from '../src/consensus/registry.ts';
 import { PipelineExecutor } from '../src/pipelines/executor.ts';
@@ -159,6 +159,67 @@ describe('PipelineExecutor', () => {
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]?.reviewerId).toBe('slow');
   });
+
+  test('emits budget_exceeded and aborts remaining reviewers', async () => {
+    const events: QuorumEvent[] = [];
+    const bus = new InMemoryEventBus();
+    bus.onAny((e) => events.push(e));
+
+    const result = await runPipeline({
+      parallel: false,
+      maxTotalCostUsd: 0.001,
+      reviewers: ['expensive', 'never-runs'],
+      boundReviewers: [
+        reviewer('expensive', async () => reviewResultWithUsage('expensive', [], { inputTokens: 1000, outputTokens: 500, costUsd: 0.50 })),
+        reviewer('never-runs', async () => reviewResult('never-runs')),
+      ],
+      bus,
+    });
+
+    expect(events.some((e) => e.type === 'pipeline.budget_exceeded')).toBe(true);
+    expect(result.budgetExceeded).toBe(true);
+    expect(result.reviews).toHaveLength(1);
+    expect(result.reviews[0]?.reviewerId).toBe('expensive');
+    expect(result.totalCostUsd).toBe(0.50);
+  });
+
+  test('aborts remaining reviewers when budget exceeded (mid-pipeline)', async () => {
+    const events: QuorumEvent[] = [];
+    const bus = new InMemoryEventBus();
+    bus.onAny((e) => events.push(e));
+
+    const result = await runPipeline({
+      parallel: false,
+      maxTotalCostUsd: 0.001,
+      reviewers: ['expensive', 'never-runs'],
+      boundReviewers: [
+        reviewer('expensive', async () => reviewResultWithUsage('expensive', [], { inputTokens: 1000, outputTokens: 500, costUsd: 0.50 })),
+        reviewer('never-runs', async () => reviewResult('never-runs')),
+      ],
+      bus,
+    });
+
+    expect(events.some((e) => e.type === 'pipeline.budget_exceeded')).toBe(true);
+    expect(result.budgetExceeded).toBe(true);
+    expect(result.reviews).toHaveLength(1);
+    expect(result.reviews[0]?.reviewerId).toBe('expensive');
+    expect(result.totalCostUsd).toBe(0.50);
+  });
+
+  test('reports totalCostUsd on result when cost was tracked', async () => {
+    const result = await runPipeline({
+      parallel: true,
+      maxTotalCostUsd: 5,
+      reviewers: ['a', 'b'],
+      boundReviewers: [
+        reviewer('a', async () => reviewResultWithUsage('a', [], { inputTokens: 100, outputTokens: 50, costUsd: 0.05 })),
+        reviewer('b', async () => reviewResultWithUsage('b', [], { inputTokens: 200, outputTokens: 75, costUsd: 0.08 })),
+      ],
+    });
+
+    expect(result.budgetExceeded).toBeUndefined();
+    expect(result.totalCostUsd).toBe(0.13);
+  });
 });
 
 async function runPipeline(opts: {
@@ -167,6 +228,7 @@ async function runPipeline(opts: {
   boundReviewers: BoundReviewer[];
   timeoutMs?: number;
   maxConcurrency?: number;
+  maxTotalCostUsd?: number;
   bus?: InMemoryEventBus;
 }) {
   const pipeline: Pipeline = {
@@ -175,6 +237,7 @@ async function runPipeline(opts: {
     reviewers: opts.reviewers,
     ...(opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}),
     ...(opts.maxConcurrency ? { maxConcurrency: opts.maxConcurrency } : {}),
+    ...(opts.maxTotalCostUsd ? { maxTotalCostUsd: opts.maxTotalCostUsd } : {}),
   };
   const consensus = new ConsensusRegistry();
   consensus.register(overlapV1);
@@ -225,6 +288,17 @@ function reviewResult(reviewerId: string, findings: Finding[] = []): ReviewResul
     findings,
     rawOutput: '{"findings":[]}',
     durationMs: 1,
+  };
+}
+
+function reviewResultWithUsage(
+  reviewerId: string,
+  findings: Finding[],
+  usage: UsageInfo,
+): ReviewResult {
+  return {
+    ...reviewResult(reviewerId, findings),
+    usage,
   };
 }
 

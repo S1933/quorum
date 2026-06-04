@@ -52,15 +52,23 @@ class OpenRouterProvider implements Provider {
           reviewerId: task.reviewerId,
           event: { type: 'log', level: 'warn', msg: `skipped malformed chunk: ${event.raw}` },
         });
-      } else {
+      } else if (event.usage) {
+        const costUsd = event.usage.cost;
         usage = {
           inputTokens: event.usage.prompt_tokens,
           outputTokens: event.usage.completion_tokens,
         };
+        if (costUsd !== undefined) usage.costUsd = costUsd;
+        const usageEvent: { type: 'usage'; inputTokens: number; outputTokens: number; costUsd?: number } = {
+          type: 'usage',
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+        };
+        if (costUsd !== undefined) usageEvent.costUsd = costUsd;
         ctx.bus.emit({
           type: 'reviewer.event',
           reviewerId: task.reviewerId,
-          event: { type: 'usage', inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+          event: usageEvent,
         });
       }
     }

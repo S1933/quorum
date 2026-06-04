@@ -29,6 +29,8 @@ export interface Pipeline {
   consensus?: ConsensusConfig;
   timeoutMs?: number;
   maxConcurrency?: number;
+  maxReviewers?: number;
+  maxTotalCostUsd?: number;
 }
 
 export interface ReviewerError {
@@ -51,4 +53,6 @@ export interface PipelineResult {
   consensus: ConsensusResult;
   durationMs: number;
   errors: ReviewerError[];
+  budgetExceeded?: boolean;
+  totalCostUsd?: number;
 }

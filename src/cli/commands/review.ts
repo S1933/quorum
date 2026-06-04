@@ -60,11 +60,17 @@ export async function cmdReview(
     await runtime.dispose();
     return 0;
   }
+
+  let cappedReviewerIds = reviewerIds;
+  if (pipeline.maxReviewers && pipeline.maxReviewers < reviewerIds.length) {
+    cappedReviewerIds = reviewerIds.slice(0, pipeline.maxReviewers);
+  }
+
   const filteredPipeline =
-    reviewerIds.length === pipeline.reviewers.length
+    cappedReviewerIds.length === pipeline.reviewers.length
       ? pipeline
-      : { ...pipeline, reviewers: reviewerIds };
-  const reviewers = await runtime.resolveReviewers(reviewerIds);
+      : { ...pipeline, reviewers: cappedReviewerIds };
+  const reviewers = await runtime.resolveReviewers(cappedReviewerIds);
 
   const detach =
     format === 'text'
@@ -80,6 +86,10 @@ export async function cmdReview(
   const interactive = flags.interactive === true;
 
   try {
+    if (filteredPipeline.maxTotalCostUsd && format === 'text') {
+      io.stderr.write(`💰  pipeline budget: $${filteredPipeline.maxTotalCostUsd.toFixed(2)}\n`);
+    }
+
     const result = interactive
       ? await runInteractive(executor, {
           pipeline: filteredPipeline,
@@ -115,6 +125,10 @@ export async function cmdReview(
         : `${root}/.quorum/last-review.md`;
       await writeReport(reportPath, renderMarkdownReport(result));
       io.stdout.write(`\nreport: ${reportPath}\n`);
+      if (result.totalCostUsd) {
+        const over = result.budgetExceeded ? ' (budget exceeded)' : '';
+        io.stdout.write(`💰  total cost: $${result.totalCostUsd.toFixed(4)}${over}\n`);
+      }
     }
     return result.errors.length > 0 && result.reviews.length === 0 ? 1 : 0;
   } finally {

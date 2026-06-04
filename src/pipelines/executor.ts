@@ -5,6 +5,7 @@ import type { BoundReviewer } from '../reviewers/reviewer.ts';
 import type { ConsensusRegistry, MetaReviewFn, ConsensusContext } from '../consensus/registry.ts';
 import type { PluginCtx } from '../runtime/plugin.ts';
 import { ReviewerExecError } from '../core/errors.ts';
+import { BudgetTracker } from './budget.ts';
 
 export interface PipelineRunInput {
   pipeline: Pipeline;
@@ -36,6 +37,12 @@ export class PipelineExecutor {
       else signal.addEventListener('abort', onParentAbort, { once: true });
     }
 
+    let budgetExceeded = false;
+    let budgetSpent = 0;
+    const budgetTracker = new BudgetTracker(
+      pipeline.maxTotalCostUsd !== undefined ? { maxTotalCostUsd: pipeline.maxTotalCostUsd } : {},
+    );
+
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
     if (pipeline.timeoutMs) {
@@ -58,6 +65,19 @@ export class PipelineExecutor {
             { bus, signal: controller.signal, workspace },
           );
           reviews[index] = result;
+
+          const state = budgetTracker.record(result.usage);
+          if (state.exceeded && !budgetExceeded) {
+            budgetExceeded = true;
+            budgetSpent = state.totalCostUsd;
+            bus.emit({
+              type: 'pipeline.budget_exceeded',
+              spent: budgetSpent,
+              limit: pipeline.maxTotalCostUsd ?? 0,
+            });
+            controller.abort();
+          }
+
           bus.emit({ type: 'reviewer.finished', reviewerId: rev.id, result });
         } catch (err) {
           const message =
@@ -98,6 +118,8 @@ export class PipelineExecutor {
       consensus: consensusResult,
       durationMs: Date.now() - started,
       errors: errors.filter(Boolean),
+      ...(budgetExceeded ? { budgetExceeded: true } : {}),
+      ...(budgetTracker.state().totalCostUsd > 0 ? { totalCostUsd: budgetTracker.state().totalCostUsd } : {}),
     };
     bus.emit({ type: 'pipeline.finished', result });
     if (timedOut) {
