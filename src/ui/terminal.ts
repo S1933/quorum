@@ -15,6 +15,13 @@ const COLORS = {
   gray: '\x1b[90m',
 };
 
+const ANSI_SEQUENCE = /\x1B(?:\][^\x07]*(?:\x07|\x1B\\)|\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])/g;
+const CONTROL_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g;
+
+export function sanitizeTerminalText(text: string): string {
+  return text.replace(ANSI_SEQUENCE, '').replace(CONTROL_CHARS, '');
+}
+
 export interface WriteStreamLike {
   write(chunk: string): unknown;
 }
@@ -43,14 +50,14 @@ export class TerminalRenderer {
 
     unsubs.push(
       bus.on('pipeline.started', (e) => {
-        this.line(`${this.c('cyan', '🧭')}  pipeline ${this.c('bold', e.pipelineId)} · ${e.reviewers.length} reviewer(s)`);
-        this.line(this.c('dim', `    ${e.reviewers.join(', ')}`));
+        this.line(`${this.c('cyan', '🧭')}  pipeline ${this.c('bold', this.safe(e.pipelineId))} · ${e.reviewers.length} reviewer(s)`);
+        this.line(this.c('dim', `    ${e.reviewers.map((id) => this.safe(id)).join(', ')}`));
         this.line('');
       }),
     );
     unsubs.push(
       bus.on('reviewer.started', (e) => {
-        this.line(`${this.c('dim', '  ⏳')} ${e.reviewerId} started`);
+        this.line(`${this.c('dim', '  ⏳')} ${this.safe(e.reviewerId)} started`);
       }),
     );
     unsubs.push(
@@ -58,22 +65,22 @@ export class TerminalRenderer {
         if (e.event.type === 'token' && this.showTokens) {
           this.renderPreview(e.reviewerId, e.event.text);
         } else if (e.event.type === 'finding') {
-          this.line(`${this.c('dim', '   ·')} ${e.reviewerId}: ${this.severityIcon(e.event.finding.severity)} ${e.event.finding.title} ${this.c('dim', `(${e.event.finding.file}:${e.event.finding.lineRange.start})`)}`);
+          this.line(`${this.c('dim', '   ·')} ${this.safe(e.reviewerId)}: ${this.severityIcon(e.event.finding.severity)} ${this.safe(e.event.finding.title)} ${this.c('dim', `(${this.safe(e.event.finding.file)}:${e.event.finding.lineRange.start})`)}`);
         } else if (e.event.type === 'log') {
-          this.line(`${this.c('gray', `   [${e.reviewerId}]`)} ${e.event.msg}`);
+          this.line(`${this.c('gray', `   [${this.safe(e.reviewerId)}]`)} ${this.safe(e.event.msg)}`);
         }
       }),
     );
     unsubs.push(
       bus.on('reviewer.finished', (e) => {
         const n = e.result.findings.length;
-        this.line(`${this.c('green', '  ✅')} ${e.reviewerId} finished · ${n} finding${n === 1 ? '' : 's'} ${this.c('dim', `(${this.formatDuration(e.result.durationMs)})`)}`);
+        this.line(`${this.c('green', '  ✅')} ${this.safe(e.reviewerId)} finished · ${n} finding${n === 1 ? '' : 's'} ${this.c('dim', `(${this.formatDuration(e.result.durationMs)})`)}`);
         this.line('');
       }),
     );
     unsubs.push(
       bus.on('reviewer.failed', (e) => {
-        this.line(`${this.c('red', '  ❌')} ${e.reviewerId} failed: ${e.error.message}`);
+        this.line(`${this.c('red', '  ❌')} ${this.safe(e.reviewerId)} failed: ${this.safe(e.error.message)}`);
         this.line('');
       }),
     );
@@ -90,7 +97,7 @@ export class TerminalRenderer {
         this.line(this.c('bold', '── 🔎 Findings by priority ──'));
         this.renderConsensus(e.result.consensus.groups, e.result.consensus.unique);
         this.line('');
-        this.line(this.c('dim', `pipeline ${e.result.pipelineId} done in ${this.formatDuration(e.result.durationMs)} (${e.result.reviews.length} reviews, ${e.result.errors.length} errors)`));
+        this.line(this.c('dim', `pipeline ${this.safe(e.result.pipelineId)} done in ${this.formatDuration(e.result.durationMs)} (${e.result.reviews.length} reviews, ${e.result.errors.length} errors)`));
       }),
     );
     unsubs.push(
@@ -154,20 +161,20 @@ export class TerminalRenderer {
       for (const g of priorityGroups) {
         const f = g.representative;
         const badge = this.c('magenta', `🤝 ${g.reviewers.length} agreed`);
-        this.line(`  ${this.severityIcon(f.severity)} ${this.c('bold', f.title)} ${badge}`);
-        this.line(this.c('dim', `     ${f.file}:${f.lineRange.start}-${f.lineRange.end}`));
-        if (f.body) this.line(`     ${f.body.replace(/\n/g, '\n     ')}`);
+        this.line(`  ${this.severityIcon(f.severity)} ${this.c('bold', this.safe(f.title))} ${badge}`);
+        this.line(this.c('dim', `     ${this.safe(f.file)}:${f.lineRange.start}-${f.lineRange.end}`));
+        if (f.body) this.line(`     ${this.safeBlock(f.body)}`);
         this.line('');
         this.line(this.c('dim', `     ${this.categoryIcon(f.category)} ${f.category}`));
-        this.line(this.c('dim', `     reviewers: ${g.reviewers.join(', ')}`));
+        this.line(this.c('dim', `     reviewers: ${g.reviewers.map((id) => this.safe(id)).join(', ')}`));
         this.line('');
       }
       for (const f of priorityUnique) {
-        this.line(`  ${this.severityIcon(f.severity)} ${this.c('bold', f.title)}`);
-        this.line(this.c('dim', `     ${f.file}:${f.lineRange.start}-${f.lineRange.end}`));
-        if (f.body) this.line(`     ${f.body.replace(/\n/g, '\n     ')}`);
+        this.line(`  ${this.severityIcon(f.severity)} ${this.c('bold', this.safe(f.title))}`);
+        this.line(this.c('dim', `     ${this.safe(f.file)}:${f.lineRange.start}-${f.lineRange.end}`));
+        if (f.body) this.line(`     ${this.safeBlock(f.body)}`);
         this.line('');
-        this.line(this.c('dim', `     ${this.categoryIcon(f.category)} ${f.category} · ${f.reviewer}`));
+        this.line(this.c('dim', `     ${this.categoryIcon(f.category)} ${f.category} · ${this.safe(f.reviewer)}`));
         this.line('');
       }
     }
@@ -203,7 +210,7 @@ export class TerminalRenderer {
   }
 
   private renderPreview(reviewerId: string, chunk: string): void {
-    const next = `${this.previews.get(reviewerId) ?? ''}${chunk}`;
+    const next = `${this.previews.get(reviewerId) ?? ''}${this.safe(chunk)}`;
     this.previews.set(reviewerId, next);
 
     const now = Date.now();
@@ -216,7 +223,15 @@ export class TerminalRenderer {
       .trim()
       .slice(-220);
     if (!preview) return;
-    this.line(`${this.c('gray', `   [${reviewerId}]`)} ${preview}`);
+    this.line(`${this.c('gray', `   [${this.safe(reviewerId)}]`)} ${preview}`);
+  }
+
+  private safe(text: string): string {
+    return sanitizeTerminalText(text);
+  }
+
+  private safeBlock(text: string): string {
+    return this.safe(text).replace(/\n/g, '\n     ');
   }
 
   private c(name: keyof typeof COLORS, text: string): string {

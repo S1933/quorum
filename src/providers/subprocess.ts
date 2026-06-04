@@ -15,7 +15,26 @@ export interface SubprocessRunOptions {
   timeoutMs: number;
   signal: AbortSignal;
   bus: EventBus;
+  maxStdoutBytes?: number;
+  maxStderrBytes?: number;
 }
+
+export const DEFAULT_SUBPROCESS_STDOUT_MAX_BYTES = 1024 * 1024;
+export const DEFAULT_SUBPROCESS_STDERR_MAX_BYTES = 64 * 1024;
+const DEFAULT_ENV_ALLOWLIST = [
+  'PATH',
+  'HOME',
+  'USER',
+  'LOGNAME',
+  'SHELL',
+  'TMPDIR',
+  'TEMP',
+  'TMP',
+  'TERM',
+  'XDG_CONFIG_HOME',
+  'XDG_CACHE_HOME',
+  'XDG_DATA_HOME',
+] as const;
 
 export async function runSubprocess(opts: SubprocessRunOptions): Promise<string> {
   const proc = Bun.spawn({
@@ -24,7 +43,7 @@ export async function runSubprocess(opts: SubprocessRunOptions): Promise<string>
     stdin: 'pipe',
     stdout: 'pipe',
     stderr: 'pipe',
-    ...(opts.env ? { env: opts.env } : {}),
+    env: buildSubprocessEnv(opts.env),
   });
 
   const writer = proc.stdin as unknown as { write: (s: string) => void; end: () => void };
@@ -45,8 +64,14 @@ export async function runSubprocess(opts: SubprocessRunOptions): Promise<string>
   }, opts.timeoutMs);
 
   try {
+    const maxStdoutBytes = opts.maxStdoutBytes ?? DEFAULT_SUBPROCESS_STDOUT_MAX_BYTES;
+    const maxStderrBytes = opts.maxStderrBytes ?? DEFAULT_SUBPROCESS_STDERR_MAX_BYTES;
     const [stdout, stderr, exitCode] = await Promise.all([
       readPreviewedStdout(proc.stdout, {
+        providerId: opts.providerId,
+        maxBytes: maxStdoutBytes,
+        onLimit: () => proc.kill(),
+        limitLabel: `${opts.providerLabel} stdout`,
         onToken: (text) => {
           opts.bus.emit({
             type: 'reviewer.event',
@@ -55,7 +80,12 @@ export async function runSubprocess(opts: SubprocessRunOptions): Promise<string>
           });
         },
       }),
-      new Response(proc.stderr).text(),
+      readLimitedText(proc.stderr, {
+        providerId: opts.providerId,
+        maxBytes: maxStderrBytes,
+        onLimit: () => proc.kill(),
+        limitLabel: `${opts.providerLabel} stderr`,
+      }),
       proc.exited,
     ]);
 
@@ -73,10 +103,25 @@ export async function runSubprocess(opts: SubprocessRunOptions): Promise<string>
       );
     }
     return stdout;
+  } catch (err) {
+    proc.kill();
+    throw err;
   } finally {
     clearTimeout(timer);
     opts.signal.removeEventListener('abort', onAbort);
   }
+}
+
+export function buildSubprocessEnv(extra: Record<string, string | undefined> = {}): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const key of DEFAULT_ENV_ALLOWLIST) {
+    const value = process.env[key];
+    if (value) env[key] = value;
+  }
+  for (const [key, value] of Object.entries(extra)) {
+    if (value !== undefined) env[key] = value;
+  }
+  return env;
 }
 
 export function buildSubprocessReviewResult(
@@ -151,18 +196,63 @@ function unwrapJsonOutput(value: Record<string, unknown>, keys: string[]): strin
 
 export async function readPreviewedStdout(
   stream: ReadableStream<Uint8Array>,
-  opts: { onToken(text: string): void },
+  opts: {
+    onToken(text: string): void;
+    providerId?: string;
+    maxBytes?: number;
+    onLimit?: () => void;
+    limitLabel?: string;
+  },
 ): Promise<string> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   const chunks: string[] = [];
+  const maxBytes = opts.maxBytes ?? DEFAULT_SUBPROCESS_STDOUT_MAX_BYTES;
+  let bytes = 0;
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
+    bytes += value.byteLength;
+    if (bytes > maxBytes) {
+      opts.onLimit?.();
+      throw new ProviderRuntimeError(
+        opts.providerId ?? 'subprocess',
+        `${opts.limitLabel ?? 'subprocess stdout'} exceeded ${maxBytes} bytes`,
+      );
+    }
     const chunk = decoder.decode(value, { stream: true });
     chunks.push(chunk);
     opts.onToken(chunk);
+  }
+
+  const tail = decoder.decode();
+  if (tail) chunks.push(tail);
+  return chunks.join('');
+}
+
+export async function readLimitedText(
+  stream: ReadableStream<Uint8Array>,
+  opts: { providerId?: string; maxBytes?: number; onLimit?: () => void; limitLabel?: string },
+): Promise<string> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  const chunks: string[] = [];
+  const maxBytes = opts.maxBytes ?? DEFAULT_SUBPROCESS_STDERR_MAX_BYTES;
+  let bytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    if (bytes > maxBytes) {
+      opts.onLimit?.();
+      throw new ProviderRuntimeError(
+        opts.providerId ?? 'subprocess',
+        `${opts.limitLabel ?? 'subprocess stderr'} exceeded ${maxBytes} bytes`,
+      );
+    }
+    chunks.push(decoder.decode(value, { stream: true }));
   }
 
   const tail = decoder.decode();

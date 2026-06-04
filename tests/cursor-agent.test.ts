@@ -95,6 +95,39 @@ describe('cursor-agent provider', () => {
     expect(await Bun.file(envFile).text()).toBe('secret-cursor-key');
   });
 
+  test('does not forward ambient plugin environment to cursor-agent', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'quorum-cursor-'));
+    tmpRoots.push(root);
+    const binary = join(root, 'cursor-agent');
+    const envFile = join(root, 'env.txt');
+    await Bun.write(
+      binary,
+      `#!/bin/sh\nprintf '%s|%s' "$CURSOR_API_KEY" "$OPENAI_API_KEY" > '${envFile}'\nprintf '{"findings":[]}'\n`,
+    );
+    await chmod(binary, 0o755);
+
+    const provider = await cursorAgentFactory.create(
+      'cursor-local',
+      {
+        type: 'cursor-agent',
+        binary,
+        api_key: 'secret-cursor-key',
+        output_format: 'text',
+        extra_args: [],
+        timeout_ms: 5_000,
+      },
+      { workspaceRoot: root, env: { OPENAI_API_KEY: 'ambient-openai-secret' } },
+    );
+
+    await provider.review!(task(root), {
+      bus: captureBus(),
+      signal: new AbortController().signal,
+      workspace: { root },
+    });
+
+    expect(await Bun.file(envFile).text()).toBe('secret-cursor-key|');
+  });
+
   test('runtime registers cursor-agent as a built-in provider', async () => {
     const runtime = await createRuntime({
       config: {

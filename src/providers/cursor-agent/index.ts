@@ -52,10 +52,7 @@ class CursorAgentProvider implements Provider {
       args: this.buildArgs(ctx),
       cwd: this.cfg.cwd ?? this.pluginCtx.workspaceRoot,
       stdin: prompt,
-      env: {
-        ...this.pluginCtx.env,
-        ...(this.cfg.api_key ? { CURSOR_API_KEY: this.cfg.api_key } : {}),
-      },
+      env: this.cfg.api_key ? { CURSOR_API_KEY: this.cfg.api_key } : {},
       timeoutMs: this.cfg.timeout_ms,
       signal: ctx.signal,
       bus: ctx.bus,
