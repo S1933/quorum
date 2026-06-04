@@ -96,6 +96,19 @@ personas:
       practical measurement or fix. Cite file and line references whenever possible.
 
 reviewers: {}
+#   # CI reviewers (API-based providers only — subprocess CLIs are not available in CI):
+#   ci-security:
+#     persona: security
+#     provider:
+#       type: openrouter
+#       model: anthropic/claude-sonnet-4
+#       api_key: env:OPENROUTER_API_KEY
+#   ci-backend:
+#     persona: backend-senior
+#     provider:
+#       type: openrouter
+#       model: anthropic/claude-sonnet-4
+#       api_key: env:OPENROUTER_API_KEY
 
 pipelines:
   default:
@@ -115,3 +128,11 @@ pipelines:
     #                 raises the floor for every severity; per-severity overrides
     #                 via severityThresholds.
     consensus: { strategy: overlap-v1 }
+#   # CI pipeline (used by quorum-review GitHub Action — only API-based reviewers work in CI):
+#   ci:
+#     parallel: true
+#     reviewers:
+#       - ci-security
+#       - ci-backend
+#     consensus:
+#       strategy: severity-aware-v1

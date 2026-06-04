@@ -1,0 +1,26 @@
+name: Quorum Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    name: Quorum review
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run quorum review
+        uses: ./
+        with:
+          fail_on: high
+          openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}

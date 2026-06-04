@@ -1,0 +1,150 @@
+name: Quorum Review
+description: Run quorum consensus review on PR diffs and report findings
+
+inputs:
+  pipeline:
+    description: Pipeline ID in quorum.yaml
+    required: false
+    default: ci
+  config:
+    description: Path to quorum config file
+    required: false
+    default: quorum.yaml
+  fail_on:
+    description: Minimum severity to fail the check (critical, high, medium, never)
+    required: false
+    default: critical
+  max_diff_bytes:
+    description: Maximum diff size in bytes
+    required: false
+    default: '200000'
+  openrouter_api_key:
+    description: OpenRouter API key for LLM access
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: '1.3.3'
+
+    - name: Install quorum dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: bun install --frozen-lockfile
+
+    - name: Run quorum review
+      id: review
+      shell: bash
+      continue-on-error: true
+      env:
+        OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
+        GITHUB_ACTION_PATH: ${{ github.action_path }}
+      run: |
+        if [ -z "$OPENROUTER_API_KEY" ]; then
+          mkdir -p .quorum
+          touch .quorum/.review-skipped
+          {
+            echo '<!-- quorum:report -->'
+            echo '## 🧭 Quorum Review'
+            echo ''
+            echo '⚠️ **SKIPPED** — no OpenRouter API key available'
+            echo ''
+            echo 'Quorum requires an `OPENROUTER_API_KEY` to run reviews in CI. This usually means:'
+            echo '- The PR is from a fork (GitHub does not pass secrets to fork PRs)'
+            echo '- The `OPENROUTER_API_KEY` secret has not been configured'
+            echo ''
+            echo 'Add `OPENROUTER_API_KEY` to your repository secrets and re-run.'
+            echo ''
+            echo '---'
+            echo '*[Quorum](https://github.com/S1933/quorum)*'
+          } > .quorum/skip-comment.md
+          exit 0
+        fi
+
+        bun run "$GITHUB_ACTION_PATH/src/cli/index.ts" review \
+          --pipeline '${{ inputs.pipeline }}' \
+          --config '${{ inputs.config }}' \
+          --json \
+          --report .quorum/report.json \
+          --max-diff-bytes '${{ inputs.max_diff_bytes }}'
+
+    - name: Check report
+      id: check
+      shell: bash
+      continue-on-error: true
+      env:
+        QUORUM_COMMENT_FILE: .quorum/pr-comment.md
+        GITHUB_ACTION_PATH: ${{ github.action_path }}
+      run: |
+        if [ -f .quorum/.review-skipped ]; then
+          cp .quorum/skip-comment.md "$QUORUM_COMMENT_FILE"
+          exit 0
+        fi
+
+        if [ ! -f .quorum/report.json ]; then
+          mkdir -p .quorum
+          {
+            echo '<!-- quorum:report -->'
+            echo '## 🧭 Quorum Review'
+            echo ''
+            echo '⚠️ **ERROR** — quorum review failed'
+            echo ''
+            echo 'The review did not produce a report. Check the workflow run logs for details.'
+            echo ''
+            echo '---'
+            echo '*[Quorum](https://github.com/S1933/quorum)*'
+          } > "$QUORUM_COMMENT_FILE"
+          exit 2
+        fi
+
+        bun run "$GITHUB_ACTION_PATH/src/ci/report-check.ts" \
+          .quorum/report.json \
+          --fail-on '${{ inputs.fail_on }}'
+
+    - name: Post PR comment
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const commentFile = '.quorum/pr-comment.md';
+
+          if (!fs.existsSync(commentFile)) {
+            core.warning('No Quorum comment file found — skipping PR comment');
+            return;
+          }
+
+          const body = fs.readFileSync(commentFile, 'utf8');
+          const marker = '<!-- quorum:report -->';
+
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const existing = comments.find(c => c.body && c.body.includes(marker));
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+          }
+
+    - name: Fail if blocked
+      if: steps.check.outcome == 'failure'
+      shell: bash
+      run: exit 1
