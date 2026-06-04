@@ -9,6 +9,7 @@ import { ConsensusRegistry } from '../src/consensus/registry.ts';
 import { PipelineExecutor } from '../src/pipelines/executor.ts';
 import type { BoundReviewer } from '../src/reviewers/reviewer.ts';
 import { InMemoryEventBus } from '../src/runtime/bus.ts';
+import { defaultPluginCtx } from '../src/runtime/plugin.ts';
 
 describe('PipelineExecutor', () => {
   test('keeps partial results when one reviewer fails', async () => {
@@ -186,6 +187,7 @@ async function runPipeline(opts: {
     taskId: 'task',
     bus: opts.bus ?? new InMemoryEventBus(),
     consensus,
+    pluginCtx: defaultPluginCtx('/repo'),
   });
 }
 

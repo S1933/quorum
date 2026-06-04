@@ -8,7 +8,7 @@ import { renderJsonReport } from '../../ui/json.ts';
 import { ConfigError } from '../../core/errors.ts';
 import type { PipelineResult } from '../../core/pipeline.ts';
 import type { CliDeps, CliIo } from '../types.ts';
-import { writeReport } from '../report.ts';
+import { assertPathInside, writeReport } from '../report.ts';
 import {
   QUESTIONS_PROMPT,
   buildFindingsWithQAInstruction,
@@ -18,6 +18,7 @@ import {
   deduplicateQuestions,
   promptQuestions,
 } from '../../interactive/qa.ts';
+import { isAbsolute, resolve } from 'node:path';
 
 export async function cmdReview(
   positional: string[],
@@ -88,6 +89,7 @@ export async function cmdReview(
           taskId: `review-${deps.now()}`,
           bus: runtime.bus,
           consensus: runtime.consensus,
+          pluginCtx: runtime.pluginCtx,
         }, io)
       : await executor.run({
           pipeline: filteredPipeline,
@@ -97,16 +99,20 @@ export async function cmdReview(
           taskId: `review-${deps.now()}`,
           bus: runtime.bus,
           consensus: runtime.consensus,
+          pluginCtx: runtime.pluginCtx,
         });
 
     if (format === 'json') {
       const json = renderJsonReport(result);
       if (typeof flags.report === 'string') {
-        await writeReport(flags.report, json);
+        const reportPath = resolveReportPath(root, flags.report, flags);
+        await writeReport(reportPath, json);
       }
       io.stdout.write(json);
     } else {
-      const reportPath = typeof flags.report === 'string' ? flags.report : `${root}/.quorum/last-review.md`;
+      const reportPath = typeof flags.report === 'string'
+        ? resolveReportPath(root, flags.report, flags)
+        : `${root}/.quorum/last-review.md`;
       await writeReport(reportPath, renderMarkdownReport(result));
       io.stdout.write(`\nreport: ${reportPath}\n`);
     }
@@ -115,6 +121,18 @@ export async function cmdReview(
     detach();
     await runtime.dispose();
   }
+}
+
+function resolveReportPath(
+  root: string,
+  reportPath: string,
+  flags: Record<string, string | boolean>,
+): string {
+  const resolved = isAbsolute(reportPath) ? reportPath : resolve(root, reportPath);
+  if (flags['allow-report-outside-root'] !== true) {
+    assertPathInside(root, resolved);
+  }
+  return resolved;
 }
 
 async function runInteractive(

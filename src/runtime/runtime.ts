@@ -19,6 +19,7 @@ import { ollamaFactory } from '../providers/ollama/index.ts';
 import { overlapV1 } from '../consensus/overlap-v1.ts';
 import { majorityV1 } from '../consensus/majority-v1.ts';
 import { severityAwareV1 } from '../consensus/severity-aware-v1.ts';
+import { semanticV2 } from '../consensus/semantic-v2.ts';
 import { ConfigError } from '../core/errors.ts';
 import type { EventBus } from '../core/events.ts';
 
@@ -58,6 +59,7 @@ export async function createRuntime(opts: CreateRuntimeOptions): Promise<Runtime
   consensus.register(overlapV1);
   consensus.register(majorityV1);
   consensus.register(severityAwareV1);
+  consensus.register(semanticV2);
 
   const providerCache = new Map<string, Provider>();
 

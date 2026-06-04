@@ -2,9 +2,19 @@ import type { ReviewResult } from '../core/task.ts';
 import type { ConsensusResult, ConsensusConfig } from '../core/pipeline.ts';
 import { ConfigError } from '../core/errors.ts';
 
+export type MetaReviewFn = (prompt: string) => Promise<string>;
+
+export interface ConsensusContext {
+  metaReview?: MetaReviewFn;
+}
+
 export interface ConsensusStrategy {
   id: string;
-  aggregate(reviews: ReviewResult[], cfg: ConsensusConfig): ConsensusResult;
+  aggregate(
+    reviews: ReviewResult[],
+    cfg: ConsensusConfig,
+    ctx?: ConsensusContext,
+  ): ConsensusResult | Promise<ConsensusResult>;
 }
 
 export class ConsensusRegistry {
