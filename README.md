@@ -309,3 +309,7 @@ Example (`overlap-v1`, default threshold):
 - Result: one single-reviewer finding
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the deeper design notes.
+
+## Credits
+
+Created by [S1933](https://github.com/S1933). Licensed under MIT — do whatever you want with it.
