@@ -50,6 +50,8 @@ Combined: ~500 lines across 7 providers, ~300 lines across 7 test files.
 
 ### 3. Unify ReviewerOverrides/ModelConfig — single type
 
+**Status:** ✅ DONE
+
 **Files:** `src/config/schema.ts:11-18`, `src/core/pipeline.ts:4-9`, `src/core/task.ts:10-15`, `src/runtime/runtime.ts:138-146`, `src/reviewers/reviewer.ts:66-77`
 
 **Problem:** Four representations of the same "reviewer overrides" concept:
@@ -60,10 +62,10 @@ Combined: ~500 lines across 7 providers, ~300 lines across 7 test files.
 
 `ReviewerOverrides` and `ModelConfig` are structurally identical (`temperature?`, `maxTokens?`, `topP?`, `model?`). The transforms `toReviewerOverrides()` and `overridesToModelConfig()` copy field-by-field solely because two otherwise-identical types serve different roles.
 
-**Solution:** Collapse to a single `ModelConfig` type. Remove `ReviewerOverrides` entirely. `ReviewerConfig.overrides` becomes `ModelConfig`. `toReviewerOverrides()` and `overridesToModelConfig()` become no-ops.
+**Solution:** Collapsed to a single `ModelConfig` type. Removed `ReviewerOverrides` entirely. Renamed `ReviewerOverridesSchema` → `ModelConfigSchema`. Renamed `toReviewerOverrides()` → `toModelConfig()`. Deleted `overridesToModelConfig()` (became a no-op since `ReviewerRef.overrides` is already `ModelConfig`). `ReviewerConfig.overrides` now uses `ModelConfigSchema`. Field-by-field copy retained in `toModelConfig()` due to `exactOptionalPropertyTypes: true`.
 
 **Benefits:**
-- **Depth:** ~40 lines deleted. One type instead of four representations.
+- **Depth:** ~30 lines deleted. One type instead of four representations + one transform function eliminated.
 - **Locality:** No more field-by-field copying between layers. Change one field, change one type.
 
 ---

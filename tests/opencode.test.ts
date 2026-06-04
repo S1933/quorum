@@ -2,10 +2,9 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { chmod, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { EventBus } from '../src/core/events.ts';
-import type { ReviewTask } from '../src/core/task.ts';
 import { createRuntime } from '../src/runtime/runtime.ts';
 import { openCodeFactory } from '../src/providers/opencode/index.ts';
+import { task, captureBus, tokenText } from './helpers/subprocess.ts';
 
 const tmpRoots: string[] = [];
 
@@ -38,16 +37,7 @@ describe('opencode provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    const task: ReviewTask = {
-      kind: 'review',
-      id: 'task-1',
-      reviewerId: 'security-open',
-      systemPrompt: 'Review security issues.',
-      instruction: 'Review this diff.',
-      workspace: { root },
-    };
-
-    const result = await provider.review!(task, {
+    const result = await provider.review!(task(root, 'security-open'), {
       bus,
       signal: new AbortController().signal,
       workspace: { root },
@@ -82,16 +72,10 @@ describe('opencode provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    const task: ReviewTask = {
-      kind: 'review',
-      id: 'task-1',
-      reviewerId: 'security-open',
-      systemPrompt: 'Review security issues.',
-      instruction: 'Review this diff.\n--dangerous\n$(touch /tmp/should-not-run)',
-      workspace: { root },
-    };
+    const reviewTask = task(root, 'security-open');
+    reviewTask.instruction = 'Review this diff.\n--dangerous\n$(touch /tmp/should-not-run)';
 
-    await provider.review!(task, {
+    await provider.review!(reviewTask, {
       bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
@@ -101,8 +85,8 @@ describe('opencode provider', () => {
     const args = await Bun.file(argsFile).text();
     const stdin = await Bun.file(stdinFile).text();
     expect(args).toContain('--model\nanthropic/claude-sonnet-4');
-    expect(args).not.toContain(task.instruction);
-    expect(stdin).toContain(task.instruction);
+    expect(args).not.toContain(reviewTask.instruction);
+    expect(stdin).toContain(reviewTask.instruction);
   });
 
   test('reports timeout errors distinctly from process failures', async () => {
@@ -127,16 +111,7 @@ describe('opencode provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    const task: ReviewTask = {
-      kind: 'review',
-      id: 'task-1',
-      reviewerId: 'security-open',
-      systemPrompt: 'Review security issues.',
-      instruction: 'Review this diff.',
-      workspace: { root },
-    };
-
-    await expect(provider.review!(task, {
+    await expect(provider.review!(task(root, 'security-open'), {
       bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
@@ -187,25 +162,3 @@ describe('opencode provider', () => {
     expect(runtime.providers.list()).toContain('opencode-go');
   });
 });
-
-function captureBus(events: unknown[] = []): EventBus {
-  return {
-    emit(e) {
-      events.push(e);
-    },
-    on() {
-      return () => {};
-    },
-    onAny() {
-      return () => {};
-    },
-  };
-}
-
-function tokenText(events: unknown[]): string {
-  return events
-    .map((event) => event as { event?: { type?: string; text?: string } })
-    .filter((event) => event.event?.type === 'token')
-    .map((event) => event.event?.text ?? '')
-    .join('');
-}

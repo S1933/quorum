@@ -8,12 +8,12 @@ export const PersonaConfigSchema = z.object({
   outputSchemaHint: z.string().optional(),
 });
 
-export const ReviewerOverridesSchema = z
+export const ModelConfigSchema = z
   .object({
+    model: z.string().optional(),
     temperature: z.number().min(0).max(2).optional(),
     maxTokens: z.number().int().positive().optional(),
     topP: z.number().min(0).max(1).optional(),
-    model: z.string().optional(),
   })
   .strict();
 
@@ -27,7 +27,7 @@ export const ReviewerConfigSchema = z
   .object({
     persona: NonEmpty,
     provider: ProviderConfigSchema,
-    overrides: ReviewerOverridesSchema.optional(),
+    overrides: ModelConfigSchema.optional(),
     fileExtensions: z.array(NonEmpty).optional(),
   })
   .strict();

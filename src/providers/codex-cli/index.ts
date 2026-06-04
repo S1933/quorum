@@ -1,92 +1,30 @@
-import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provider.ts';
-import type { ReviewTask, ReviewResult } from '../../core/task.ts';
-import type { ProviderFactory } from '../registry.ts';
-import type { PluginCtx } from '../../runtime/plugin.ts';
 import type { MetaReviewFn } from '../../consensus/registry.ts';
 import { ProviderRuntimeError } from '../../core/errors.ts';
-import { REVIEW_OUTPUT_INSTRUCTIONS } from '../../reviewers/output.ts';
-import { runSubprocess, buildSubprocessReviewResult, createSubprocessMetaReviewer } from '../subprocess.ts';
+import { createSubprocessMetaReviewer } from '../subprocess.ts';
+import { createSubprocessProvider } from '../base-subprocess.ts';
 import { CodexCliConfigSchema, type CodexCliConfig } from './schema.ts';
 
-const PROVIDER_TYPE = 'codex-cli';
-
-class CodexCliProvider implements Provider {
-  readonly kind = 'subprocess' as const;
-
-  constructor(
-    readonly id: string,
-    private readonly cfg: CodexCliConfig,
-    private readonly pluginCtx: PluginCtx,
-  ) {}
-
-  capabilities(): ProviderCapabilities {
-    return {
-      review: true,
-      streaming: false,
-      tools: true,
-      mcp: true,
-      localExecution: true,
-    };
-  }
-
-  private buildArgs(ctx: ExecCtx, cwd: string): string[] {
-    const model = ctx.modelOverride?.model ?? this.cfg.model;
-    const args = [
-      'exec',
-      '--sandbox',
-      this.cfg.sandbox,
-      '--color',
-      'never',
-      '-C',
-      cwd,
-      ...this.cfg.extra_args,
-    ];
-
-    if (this.cfg.approval_policy === 'never') {
-      throw new ProviderRuntimeError(this.id, 'Unsafe no-approval Codex mode is disabled');
+export const codexCliFactory = createSubprocessProvider({
+  type: 'codex-cli',
+  label: 'codex',
+  schema: CodexCliConfigSchema,
+  processOutput: (raw) => raw.trim(),
+  buildArgs: (cfg, ctx, _task, cwd) => {
+    const c = cfg as CodexCliConfig;
+    const model = ctx.modelOverride?.model ?? c.model;
+    const args = ['exec', '--sandbox', c.sandbox, '--color', 'never', '-C', cwd, ...c.extra_args];
+    if (c.approval_policy === 'never') {
+      throw new ProviderRuntimeError('codex-cli', 'Unsafe no-approval Codex mode is disabled');
     }
-
     if (model) args.push('--model', model);
     args.push('-');
     return args;
-  }
-
-  async review(task: ReviewTask, ctx: ExecCtx): Promise<ReviewResult> {
-    const started = Date.now();
-    const cwd = this.cfg.cwd ?? this.pluginCtx.workspaceRoot;
-    const prompt = [task.systemPrompt, REVIEW_OUTPUT_INSTRUCTIONS, task.instruction].join('\n\n');
-
-    const raw = await runSubprocess({
-      providerId: this.id,
-      providerLabel: 'codex',
-      reviewerId: task.reviewerId,
-      binary: this.cfg.binary,
-      allowProjectBinary: this.cfg.allow_project_binary,
-      args: this.buildArgs(ctx, cwd),
-      cwd,
-      stdin: prompt,
-      timeoutMs: this.cfg.timeout_ms,
-      signal: ctx.signal,
-      bus: ctx.bus,
-    });
-
-    return buildSubprocessReviewResult(task, raw.trim(), started, ctx.bus);
-  }
-}
-
-export const codexCliFactory: ProviderFactory = {
-  type: PROVIDER_TYPE,
-  schema: CodexCliConfigSchema,
-  async create(instanceId, config, ctx) {
-    return new CodexCliProvider(instanceId, config as CodexCliConfig, ctx);
   },
-  createMetaReviewer(config, ctx): MetaReviewFn | undefined {
-    const cfg = config as CodexCliConfig;
+  createMetaReviewer: (config, ctx): MetaReviewFn | undefined => {
+    const c = config as CodexCliConfig;
     return createSubprocessMetaReviewer(
-      cfg.binary,
-      () => ['exec', '--sandbox', cfg.sandbox, '--color', 'never', '-'],
-      cfg.cwd ?? ctx.workspaceRoot,
-      cfg.timeout_ms,
+      c.binary, () => ['exec', '--sandbox', c.sandbox, '--color', 'never', '-'],
+      c.cwd ?? ctx.workspaceRoot, c.timeout_ms,
     );
   },
-};
+});

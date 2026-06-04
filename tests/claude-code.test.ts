@@ -2,10 +2,9 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { chmod, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { EventBus } from '../src/core/events.ts';
-import type { ReviewTask } from '../src/core/task.ts';
 import { createRuntime } from '../src/runtime/runtime.ts';
 import { claudeCodeFactory } from '../src/providers/claude-code/index.ts';
+import { task, captureBus, tokenText } from './helpers/subprocess.ts';
 
 const tmpRoots: string[] = [];
 
@@ -35,7 +34,7 @@ describe('claude-code provider', () => {
     );
 
     const events: unknown[] = [];
-    const result = await provider.review!(task(root), {
+    const result = await provider.review!(task(root, 'security-claude'), {
       bus: captureBus(events),
       signal: new AbortController().signal,
       workspace: { root },
@@ -114,44 +113,11 @@ describe('claude-code provider', () => {
     );
 
     await expect(
-      provider.review!(task(root), {
-        bus: { emit() {}, on() { return () => {}; }, onAny() { return () => {}; } },
+      provider.review!(task(root, 'security-claude'), {
+        bus: captureBus(),
         signal: new AbortController().signal,
         workspace: { root },
       }),
     ).rejects.toThrow(/timed out/);
   });
 });
-
-function task(root: string): ReviewTask {
-  return {
-    kind: 'review',
-    id: 'task-1',
-    reviewerId: 'security-claude',
-    systemPrompt: 'Review security issues.',
-    instruction: 'Review this diff.',
-    workspace: { root },
-  };
-}
-
-function captureBus(events: unknown[]): EventBus {
-  return {
-    emit(e) {
-      events.push(e);
-    },
-    on() {
-      return () => {};
-    },
-    onAny() {
-      return () => {};
-    },
-  };
-}
-
-function tokenText(events: unknown[]): string {
-  return events
-    .map((event) => event as { event?: { type?: string; text?: string } })
-    .filter((event) => event.event?.type === 'token')
-    .map((event) => event.event?.text ?? '')
-    .join('');
-}

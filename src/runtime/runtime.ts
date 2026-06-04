@@ -1,6 +1,7 @@
 import type { Persona } from '../core/persona.ts';
 import type { Provider } from '../core/provider.ts';
-import type { ConsensusConfig, Pipeline, ReviewerOverrides, ReviewerRef } from '../core/pipeline.ts';
+import type { ConsensusConfig, Pipeline, ReviewerRef } from '../core/pipeline.ts';
+import type { ModelConfig } from '../core/task.ts';
 import type { QuorumConfig, ReviewerConfig, PersonaConfig, PipelineConfig } from '../config/schema.ts';
 import type { PluginCtx } from './plugin.ts';
 import { ProviderRegistry } from '../providers/registry.ts';
@@ -110,7 +111,7 @@ function toReviewerRef(id: string, cfg: ReviewerConfig | undefined): ReviewerRef
     providerId: `${id}:provider`,
     providerConfig: cfg.provider,
   };
-  const overrides = toReviewerOverrides(cfg.overrides);
+  const overrides = toModelConfig(cfg.overrides);
   if (overrides) ref.overrides = overrides;
   return ref;
 }
@@ -137,13 +138,13 @@ function toPipeline(id: string, cfg: PipelineConfig): Pipeline {
   return pipeline;
 }
 
-function toReviewerOverrides(cfg: ReviewerConfig['overrides']): ReviewerOverrides | undefined {
+function toModelConfig(cfg: ReviewerConfig['overrides']): ModelConfig | undefined {
   if (!cfg) return undefined;
-  const out: ReviewerOverrides = {};
+  const out: ModelConfig = {};
+  if (cfg.model !== undefined) out.model = cfg.model;
   if (cfg.temperature !== undefined) out.temperature = cfg.temperature;
   if (cfg.maxTokens !== undefined) out.maxTokens = cfg.maxTokens;
   if (cfg.topP !== undefined) out.topP = cfg.topP;
-  if (cfg.model !== undefined) out.model = cfg.model;
   return Object.keys(out).length > 0 ? out : undefined;
 }
 

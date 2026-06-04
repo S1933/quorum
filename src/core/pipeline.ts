@@ -1,19 +1,12 @@
-import type { ReviewResult } from './task.ts';
+import type { ReviewResult, ModelConfig } from './task.ts';
 import type { Finding, FindingGroup } from './finding.ts';
-
-export interface ReviewerOverrides {
-  temperature?: number;
-  maxTokens?: number;
-  topP?: number;
-  model?: string;
-}
 
 export interface ReviewerRef {
   id: string;
   personaId: string;
   providerId: string;
   providerConfig: unknown;
-  overrides?: ReviewerOverrides;
+  overrides?: ModelConfig;
 }
 
 export interface ConsensusConfig {

@@ -1,69 +1,27 @@
-import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provider.ts';
-import type { ReviewTask, ReviewResult } from '../../core/task.ts';
-import type { ProviderFactory } from '../registry.ts';
-import type { PluginCtx } from '../../runtime/plugin.ts';
 import type { MetaReviewFn } from '../../consensus/registry.ts';
-import { ClaudeCodeConfigSchema, type ClaudeCodeConfig } from './schema.ts';
 import { REVIEW_OUTPUT_INSTRUCTIONS } from '../../reviewers/output.ts';
-import { runSubprocess, buildSubprocessReviewResult, createSubprocessMetaReviewer } from '../subprocess.ts';
+import { createSubprocessMetaReviewer } from '../subprocess.ts';
+import { createSubprocessProvider } from '../base-subprocess.ts';
+import { ClaudeCodeConfigSchema, type ClaudeCodeConfig } from './schema.ts';
 
-const PROVIDER_TYPE = 'claude-code';
-
-class ClaudeCodeProvider implements Provider {
-  readonly kind = 'subprocess' as const;
-
-  constructor(
-    readonly id: string,
-    private readonly cfg: ClaudeCodeConfig,
-    private readonly pluginCtx: PluginCtx,
-  ) {}
-
-  capabilities(): ProviderCapabilities {
-    return {
-      review: true,
-      streaming: false,
-      tools: true,
-      mcp: true,
-      localExecution: true,
-    };
-  }
-
-  async review(task: ReviewTask, ctx: ExecCtx): Promise<ReviewResult> {
-    const started = Date.now();
-    const system = `${task.systemPrompt}\n\n${REVIEW_OUTPUT_INSTRUCTIONS}`;
-    const args = ['--print', '--model', this.cfg.model, ...this.cfg.extra_args, '--append-system-prompt', system];
-
-    const raw = await runSubprocess({
-      providerId: this.id,
-      providerLabel: 'claude',
-      reviewerId: task.reviewerId,
-      binary: this.cfg.binary,
-      allowProjectBinary: this.cfg.allow_project_binary,
-      args,
-      cwd: this.cfg.cwd ?? this.pluginCtx.workspaceRoot,
-      stdin: task.instruction,
-      timeoutMs: this.cfg.timeout_ms,
-      signal: ctx.signal,
-      bus: ctx.bus,
-    });
-
-    return buildSubprocessReviewResult(task, raw, started, ctx.bus);
-  }
-}
-
-export const claudeCodeFactory: ProviderFactory = {
-  type: PROVIDER_TYPE,
+export const claudeCodeFactory = createSubprocessProvider({
+  type: 'claude-code',
+  label: 'claude',
   schema: ClaudeCodeConfigSchema,
-  async create(instanceId, config, ctx) {
-    return new ClaudeCodeProvider(instanceId, config as ClaudeCodeConfig, ctx);
+  buildStdin: (_, task) => task.instruction,
+  processOutput: (raw) => raw,
+  buildArgs: (cfg, _ctx, task) => {
+    const c = cfg as ClaudeCodeConfig;
+    return [
+      '--print', '--model', c.model, ...c.extra_args,
+      '--append-system-prompt', `${task.systemPrompt}\n\n${REVIEW_OUTPUT_INSTRUCTIONS}`,
+    ];
   },
-  createMetaReviewer(config, ctx): MetaReviewFn | undefined {
-    const cfg = config as ClaudeCodeConfig;
+  createMetaReviewer: (config, ctx): MetaReviewFn | undefined => {
+    const c = config as ClaudeCodeConfig;
     return createSubprocessMetaReviewer(
-      cfg.binary,
-      () => ['--print', '--model', cfg.model],
-      cfg.cwd ?? ctx.workspaceRoot,
-      cfg.timeout_ms,
+      c.binary, () => ['--print', '--model', c.model],
+      c.cwd ?? ctx.workspaceRoot, c.timeout_ms,
     );
   },
-};
+});

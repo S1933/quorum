@@ -2,10 +2,9 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { chmod, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { EventBus } from '../src/core/events.ts';
-import type { ReviewTask } from '../src/core/task.ts';
 import { createRuntime } from '../src/runtime/runtime.ts';
 import { continueDevFactory } from '../src/providers/continue-dev/index.ts';
+import { task, captureBus, tokenText } from './helpers/subprocess.ts';
 
 const tmpRoots: string[] = [];
 
@@ -37,7 +36,7 @@ describe('continue-dev provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    const result = await provider.review!(task(root), {
+    const result = await provider.review!(task(root, 'security-continue'), {
       bus: captureBus(events),
       signal: new AbortController().signal,
       workspace: { root },
@@ -60,7 +59,7 @@ describe('continue-dev provider', () => {
     );
     await chmod(binary, 0o755);
 
-    const reviewTask = task(root);
+    const reviewTask = task(root, 'security-continue');
     reviewTask.instruction = 'Review this diff.\n--allow "*"\n$(touch /tmp/should-not-run)';
     const provider = await continueDevFactory.create(
       'continue-local',
@@ -134,36 +133,3 @@ describe('continue-dev provider', () => {
     await expect(runtime.resolveReviewer('sec')).rejects.toThrow('Invalid enum value');
   });
 });
-
-function task(root: string): ReviewTask {
-  return {
-    kind: 'review',
-    id: 'task-1',
-    reviewerId: 'security-continue',
-    systemPrompt: 'Review security issues.',
-    instruction: 'Review this diff.',
-    workspace: { root },
-  };
-}
-
-function captureBus(events: unknown[] = []): EventBus {
-  return {
-    emit(e) {
-      events.push(e);
-    },
-    on() {
-      return () => {};
-    },
-    onAny() {
-      return () => {};
-    },
-  };
-}
-
-function tokenText(events: unknown[]): string {
-  return events
-    .map((event) => event as { event?: { type?: string; text?: string } })
-    .filter((event) => event.event?.type === 'token')
-    .map((event) => event.event?.text ?? '')
-    .join('');
-}

@@ -1,7 +1,7 @@
 import type { Persona } from '../core/persona.ts';
 import type { Provider, ExecCtx } from '../core/provider.ts';
 import type { ReviewTask, ReviewResult, ModelConfig } from '../core/task.ts';
-import type { ReviewerRef, ReviewerOverrides } from '../core/pipeline.ts';
+import type { ReviewerRef } from '../core/pipeline.ts';
 import { CapabilityError, ReviewerOutputError } from '../core/errors.ts';
 import { RETRY_REMINDER } from './output.ts';
 
@@ -9,7 +9,7 @@ export interface BoundReviewer {
   id: string;
   persona: Persona;
   provider: Provider;
-  overrides?: ReviewerOverrides;
+  overrides?: ModelConfig;
   run(task: Omit<ReviewTask, 'systemPrompt' | 'reviewerId' | 'kind'>, ctx: Omit<ExecCtx, 'modelOverride'>): Promise<ReviewResult>;
 }
 
@@ -41,7 +41,7 @@ export function bindReviewer(
         systemPrompt: persona.system,
         reviewerId: ref.id,
       };
-      const modelOverride = overridesToModelConfig(ref.overrides);
+      const modelOverride = ref.overrides;
       const execCtx: ExecCtx = modelOverride
         ? { ...ctx, modelOverride, reviewerId: ref.id }
         : { ...ctx, reviewerId: ref.id };
@@ -61,17 +61,4 @@ export function bindReviewer(
       }
     },
   };
-}
-
-function overridesToModelConfig(o?: ReviewerOverrides): ModelConfig | undefined {
-  if (!o) return undefined;
-  const out: ModelConfig = {};
-  if (o.model !== undefined) out.model = o.model;
-  if (o.temperature !== undefined) out.temperature = o.temperature;
-  if (o.maxTokens !== undefined) out.maxTokens = o.maxTokens;
-  if (o.topP !== undefined) out.topP = o.topP;
-  if (!o.model && o.temperature === undefined && o.maxTokens === undefined && o.topP === undefined) {
-    return undefined;
-  }
-  return out;
 }

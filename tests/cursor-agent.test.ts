@@ -2,10 +2,9 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { chmod, mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { EventBus } from '../src/core/events.ts';
-import type { ReviewTask } from '../src/core/task.ts';
 import { createRuntime } from '../src/runtime/runtime.ts';
 import { cursorAgentFactory } from '../src/providers/cursor-agent/index.ts';
+import { task, captureBus, tokenText } from './helpers/subprocess.ts';
 
 const tmpRoots: string[] = [];
 
@@ -36,7 +35,7 @@ describe('cursor-agent provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    const result = await provider.review!(task(root), {
+    const result = await provider.review!(task(root, 'security-cursor'), {
       bus: captureBus(events),
       signal: new AbortController().signal,
       workspace: { root },
@@ -60,7 +59,7 @@ describe('cursor-agent provider', () => {
     );
     await chmod(binary, 0o755);
 
-    const reviewTask = task(root);
+    const reviewTask = task(root, 'security-cursor');
     reviewTask.instruction = 'Review this diff.\n--force\n$(touch /tmp/should-not-run)';
     const provider = await cursorAgentFactory.create(
       'cursor-local',
@@ -122,7 +121,7 @@ describe('cursor-agent provider', () => {
       { workspaceRoot: root, env: { OPENAI_API_KEY: 'ambient-openai-secret' } },
     );
 
-    await provider.review!(task(root), {
+    await provider.review!(task(root, 'security-cursor'), {
       bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
@@ -171,36 +170,3 @@ describe('cursor-agent provider', () => {
     await expect(runtime.resolveReviewer('sec')).rejects.toThrow();
   });
 });
-
-function task(root: string): ReviewTask {
-  return {
-    kind: 'review',
-    id: 'task-1',
-    reviewerId: 'security-cursor',
-    systemPrompt: 'Review security issues.',
-    instruction: 'Review this diff.',
-    workspace: { root },
-  };
-}
-
-function captureBus(events: unknown[] = []): EventBus {
-  return {
-    emit(e) {
-      events.push(e);
-    },
-    on() {
-      return () => {};
-    },
-    onAny() {
-      return () => {};
-    },
-  };
-}
-
-function tokenText(events: unknown[]): string {
-  return events
-    .map((event) => event as { event?: { type?: string; text?: string } })
-    .filter((event) => event.event?.type === 'token')
-    .map((event) => event.event?.text ?? '')
-    .join('');
-}
