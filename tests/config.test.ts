@@ -249,6 +249,69 @@ pipelines:
     await expect(loadConfigFromString(source)).rejects.toThrow(/requireAgreement.*exceeds/);
   });
 
+  test('accepts typed strategy-specific consensus config', async () => {
+    const source = `
+version: 1
+personas:
+  sec: { description: d, system: s }
+reviewers:
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
+pipelines:
+  default:
+    reviewers: [r]
+    consensus:
+      strategy: semantic-v2
+      similarityThreshold: 0.4
+      enableContradictions: true
+      metaReviewerProvider:
+        type: openrouter
+        api_key: k
+        model: m
+`;
+    const cfg = await loadConfigFromString(source);
+    expect(cfg.pipelines.default?.consensus).toEqual({
+      strategy: 'semantic-v2',
+      similarityThreshold: 0.4,
+      enableContradictions: true,
+      metaReviewerProvider: { type: 'openrouter', api_key: 'k', model: 'm' },
+    });
+  });
+
+  test('rejects typoed consensus strategy-specific keys', async () => {
+    const source = `
+version: 1
+personas:
+  sec: { description: d, system: s }
+reviewers:
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
+pipelines:
+  default:
+    reviewers: [r]
+    consensus:
+      strategy: semantic-v2
+      enableContradiction: true
+`;
+    await expect(loadConfigFromString(source)).rejects.toThrow(/enableContradiction/);
+  });
+
+  test('rejects invalid consensus strategy-specific values', async () => {
+    const source = `
+version: 1
+personas:
+  sec: { description: d, system: s }
+reviewers:
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
+pipelines:
+  default:
+    reviewers: [r]
+    consensus:
+      strategy: severity-aware-v1
+      severityThresholds:
+        critical: 0
+`;
+    await expect(loadConfigFromString(source)).rejects.toThrow(/critical/);
+  });
+
   test('resolves env:VAR lazily during config parse', async () => {
     const source = MINIMAL_YAML.replace('api_key: test-key', 'api_key: env:MY_API_KEY');
     const cfg = await loadConfigFromString(source, { env: { MY_API_KEY: 'secret-123' } });

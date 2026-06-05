@@ -150,10 +150,25 @@ function toModelConfig(cfg: ReviewerConfig['overrides']): ModelConfig | undefine
 
 function toConsensusConfig(cfg: PipelineConfig['consensus']): ConsensusConfig | undefined {
   if (!cfg) return undefined;
-  const out: ConsensusConfig = { strategy: cfg.strategy };
-  for (const [key, value] of Object.entries(cfg)) {
-    if (key === 'strategy') continue;
-    if (value !== undefined) out[key] = value;
+  const base = cfg.requireAgreement !== undefined ? { requireAgreement: cfg.requireAgreement } : {};
+  switch (cfg.strategy) {
+    case 'overlap-v1':
+      return { strategy: cfg.strategy, ...base };
+    case 'majority-v1':
+      return { strategy: cfg.strategy, ...base };
+    case 'severity-aware-v1':
+      return {
+        strategy: cfg.strategy,
+        ...base,
+        ...(cfg.severityThresholds !== undefined ? { severityThresholds: cfg.severityThresholds } : {}),
+      };
+    case 'semantic-v2':
+      return {
+        strategy: cfg.strategy,
+        ...base,
+        ...(cfg.similarityThreshold !== undefined ? { similarityThreshold: cfg.similarityThreshold } : {}),
+        ...(cfg.enableContradictions !== undefined ? { enableContradictions: cfg.enableContradictions } : {}),
+        ...(cfg.metaReviewerProvider !== undefined ? { metaReviewerProvider: cfg.metaReviewerProvider } : {}),
+      };
   }
-  return out;
 }

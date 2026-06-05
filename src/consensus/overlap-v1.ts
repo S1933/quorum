@@ -1,8 +1,8 @@
-import type { ConsensusResult } from '../core/pipeline.ts';
+import type { ConsensusResult, OverlapV1ConsensusConfig } from '../core/pipeline.ts';
 import type { ConsensusStrategy } from './registry.ts';
 import { buildGroups } from './grouping.ts';
 
-export const overlapV1: ConsensusStrategy = {
+export const overlapV1: ConsensusStrategy<OverlapV1ConsensusConfig> = {
   id: 'overlap-v1',
   aggregate(reviews, cfg): ConsensusResult {
     const groups = buildGroups(reviews);

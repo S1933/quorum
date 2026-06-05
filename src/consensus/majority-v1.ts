@@ -1,4 +1,4 @@
-import type { ConsensusResult } from '../core/pipeline.ts';
+import type { ConsensusResult, MajorityV1ConsensusConfig } from '../core/pipeline.ts';
 import type { ConsensusStrategy } from './registry.ts';
 import { buildGroups } from './grouping.ts';
 
@@ -12,7 +12,7 @@ import { buildGroups } from './grouping.ts';
  * (e.g. when all-but-one reviewer times out). An optional `requireAgreement`
  * raises this floor further.
  */
-export const majorityV1: ConsensusStrategy = {
+export const majorityV1: ConsensusStrategy<MajorityV1ConsensusConfig> = {
   id: 'majority-v1',
   aggregate(reviews, cfg): ConsensusResult {
     const groups = buildGroups(reviews);

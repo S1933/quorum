@@ -1,4 +1,4 @@
-import type { ConsensusResult } from '../core/pipeline.ts';
+import type { ConsensusResult, SeverityAwareV1ConsensusConfig } from '../core/pipeline.ts';
 import type { Severity } from '../core/finding.ts';
 import type { ConsensusStrategy } from './registry.ts';
 import { buildGroups } from './grouping.ts';
@@ -30,7 +30,7 @@ export const DEFAULT_SEVERITY_THRESHOLDS: Record<Severity, number> = {
  * can demand corroboration even for critical findings (e.g. requireAgreement: 2).
  * Per-severity overrides can be supplied via `cfg.severityThresholds`.
  */
-export const severityAwareV1: ConsensusStrategy = {
+export const severityAwareV1: ConsensusStrategy<SeverityAwareV1ConsensusConfig> = {
   id: 'severity-aware-v1',
   aggregate(reviews, cfg): ConsensusResult {
     const groups = buildGroups(reviews);
@@ -38,7 +38,7 @@ export const severityAwareV1: ConsensusStrategy = {
     const agreement: Record<string, number> = {};
     for (const g of groups) agreement[g.id] = g.reviewers.length;
 
-    const overrides = (cfg.severityThresholds as Partial<Record<Severity, number>> | undefined) ?? {};
+    const overrides = cfg.severityThresholds ?? {};
     const floor = cfg.requireAgreement ?? 1;
     const thresholdFor = (severity: Severity): number => {
       const base = overrides[severity] ?? DEFAULT_SEVERITY_THRESHOLDS[severity];

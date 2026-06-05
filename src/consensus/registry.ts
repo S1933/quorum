@@ -8,11 +8,11 @@ export interface ConsensusContext {
   metaReview?: MetaReviewFn;
 }
 
-export interface ConsensusStrategy {
-  id: string;
+export interface ConsensusStrategy<C extends ConsensusConfig = ConsensusConfig> {
+  id: C['strategy'];
   aggregate(
     reviews: ReviewResult[],
-    cfg: ConsensusConfig,
+    cfg: C,
     ctx?: ConsensusContext,
   ): ConsensusResult | Promise<ConsensusResult>;
 }

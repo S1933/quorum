@@ -164,8 +164,8 @@ async function computeConsensus(
   }
   const strategy = registry.resolve(pipeline.consensus.strategy);
 
-  const metaReview = pipeline.consensus.metaReviewerProvider
-    ? resolveMetaReviewer(pipeline.consensus.metaReviewerProvider as Record<string, unknown>, providers, pluginCtx)
+  const metaReview = pipeline.consensus.strategy === 'semantic-v2' && pipeline.consensus.metaReviewerProvider
+    ? resolveMetaReviewer(pipeline.consensus.metaReviewerProvider, providers, pluginCtx)
     : undefined;
 
   const ctx: ConsensusContext | undefined = metaReview ? { metaReview } : undefined;

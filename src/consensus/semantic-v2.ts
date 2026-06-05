@@ -1,4 +1,4 @@
-import type { ConsensusResult } from '../core/pipeline.ts';
+import type { ConsensusResult, SemanticV2ConsensusConfig } from '../core/pipeline.ts';
 import type { ConsensusStrategy } from './registry.ts';
 import { buildSemanticGroups } from './grouping-v2.ts';
 import { detectContradictions } from './contradictions.ts';
@@ -6,10 +6,10 @@ import { resolveContradictions } from './meta-reviewer.ts';
 
 const DEFAULT_THRESHOLD = 0.6;
 
-export const semanticV2: ConsensusStrategy = {
+export const semanticV2: ConsensusStrategy<SemanticV2ConsensusConfig> = {
   id: 'semantic-v2',
   async aggregate(reviews, cfg, ctx): Promise<ConsensusResult> {
-    const threshold = (cfg.similarityThreshold as number | undefined) ?? DEFAULT_THRESHOLD;
+    const threshold = cfg.similarityThreshold ?? DEFAULT_THRESHOLD;
     const groups = buildSemanticGroups(reviews, { similarityThreshold: threshold });
 
     const agreement: Record<string, number> = {};

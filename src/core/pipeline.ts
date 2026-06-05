@@ -1,5 +1,5 @@
 import type { ReviewResult, ModelConfig } from './task.ts';
-import type { Finding, FindingGroup } from './finding.ts';
+import type { Finding, FindingGroup, Severity } from './finding.ts';
 
 export interface ReviewerRef {
   id: string;
@@ -9,11 +9,35 @@ export interface ReviewerRef {
   overrides?: ModelConfig;
 }
 
-export interface ConsensusConfig {
-  strategy: string;
+export interface ConsensusBaseConfig {
   requireAgreement?: number;
-  [key: string]: unknown;
 }
+
+export interface OverlapV1ConsensusConfig extends ConsensusBaseConfig {
+  strategy: 'overlap-v1';
+}
+
+export interface MajorityV1ConsensusConfig extends ConsensusBaseConfig {
+  strategy: 'majority-v1';
+}
+
+export interface SeverityAwareV1ConsensusConfig extends ConsensusBaseConfig {
+  strategy: 'severity-aware-v1';
+  severityThresholds?: Partial<Record<Severity, number>>;
+}
+
+export interface SemanticV2ConsensusConfig extends ConsensusBaseConfig {
+  strategy: 'semantic-v2';
+  similarityThreshold?: number;
+  enableContradictions?: boolean;
+  metaReviewerProvider?: { type: string; [key: string]: unknown };
+}
+
+export type ConsensusConfig =
+  | OverlapV1ConsensusConfig
+  | MajorityV1ConsensusConfig
+  | SeverityAwareV1ConsensusConfig
+  | SemanticV2ConsensusConfig;
 
 export interface Pipeline {
   id: string;
