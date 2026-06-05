@@ -1,4 +1,10 @@
-export * from './core/index.ts';
+export * from './core/finding.ts';
+export * from './core/task.ts';
+export * from './core/persona.ts';
+export * from './core/provider.ts';
+export * from './core/events.ts';
+export * from './core/pipeline.ts';
+export * from './core/errors.ts';
 export { createRuntime, type Runtime } from './runtime/runtime.ts';
 export { InMemoryEventBus } from './runtime/bus.ts';
 export { defaultPluginCtx } from './runtime/plugin.ts';
