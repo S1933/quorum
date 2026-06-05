@@ -1,7 +1,15 @@
 import type { EventBus } from '../core/events.ts';
 import type { Finding, Severity } from '../core/finding.ts';
-
-const PRIORITIES: readonly Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
+import {
+  buildSeverityBuckets,
+  categoryIcon,
+  collectPipelineFindings,
+  countBySeverity,
+  formatDuration,
+  severityIcon,
+  severityLabel,
+  SEVERITY_ORDER,
+} from './report-model.ts';
 
 const COLORS = {
   reset: '\x1b[0m',
@@ -17,6 +25,20 @@ const COLORS = {
 
 const ANSI_SEQUENCE = /\x1B(?:\][^\x07]*(?:\x07|\x1B\\)|\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])/g;
 const CONTROL_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g;
+
+function severityColor(severity: Severity): keyof typeof COLORS {
+  switch (severity) {
+    case 'critical':
+    case 'high':
+      return 'red';
+    case 'medium':
+      return 'yellow';
+    case 'low':
+      return 'cyan';
+    case 'info':
+      return 'gray';
+  }
+}
 
 export function sanitizeTerminalText(text: string): string {
   return text.replace(ANSI_SEQUENCE, '').replace(CONTROL_CHARS, '');
@@ -74,7 +96,7 @@ export class TerminalRenderer {
     unsubs.push(
       bus.on('reviewer.finished', (e) => {
         const n = e.result.findings.length;
-        this.line(`${this.c('green', '  ✅')} ${this.safe(e.reviewerId)} finished · ${n} finding${n === 1 ? '' : 's'} ${this.c('dim', `(${this.formatDuration(e.result.durationMs)})`)}`);
+        this.line(`${this.c('green', '  ✅')} ${this.safe(e.reviewerId)} finished · ${n} finding${n === 1 ? '' : 's'} ${this.c('dim', `(${formatDuration(e.result.durationMs)})`)}`);
         this.line('');
       }),
     );
@@ -103,7 +125,7 @@ export class TerminalRenderer {
         this.line(this.c('bold', '── 🔎 Findings by priority ──'));
         this.renderConsensus(e.result.consensus.groups, e.result.consensus.unique);
         this.line('');
-        this.line(this.c('dim', `pipeline ${this.safe(e.result.pipelineId)} done in ${this.formatDuration(e.result.durationMs)} (${e.result.reviews.length} reviews, ${e.result.errors.length} errors)`));
+        this.line(this.c('dim', `pipeline ${this.safe(e.result.pipelineId)} done in ${formatDuration(e.result.durationMs)} (${e.result.reviews.length} reviews, ${e.result.errors.length} errors)`));
       }),
     );
     unsubs.push(
@@ -135,10 +157,11 @@ export class TerminalRenderer {
     unique: Finding[],
     errors: number,
   ): void {
-    const allFindings = [...groups.flatMap((g) => g.members), ...unique];
+    const allFindings = collectPipelineFindings(groups, unique);
     const total = allFindings.length;
-    const counts = PRIORITIES
-      .map((priority) => `${this.severityIcon(priority)} ${priority}:${allFindings.filter((f) => f.severity === priority).length}`)
+    const severityCounts = countBySeverity(allFindings);
+    const counts = SEVERITY_ORDER
+      .map((priority) => `${this.severityIcon(priority)} ${priority}:${severityCounts[priority]}`)
       .join('  ');
 
     this.line(this.c('bold', '── 📊 Review summary ──'));
@@ -155,64 +178,35 @@ export class TerminalRenderer {
       return;
     }
 
-    for (const priority of PRIORITIES) {
-      const priorityGroups = groups
-        .filter((g) => g.representative.severity === priority)
-        .sort((a, b) => b.reviewers.length - a.reviewers.length);
-      const priorityUnique = unique.filter((f) => f.severity === priority);
-      if (priorityGroups.length === 0 && priorityUnique.length === 0) continue;
+    for (const bucket of buildSeverityBuckets(groups, unique)) {
+      if (bucket.count === 0) continue;
 
       this.line('');
-      this.line(this.c('bold', `${this.severityIcon(priority)} ${this.severityLabel(priority)} (${priorityGroups.length + priorityUnique.length})`));
-      for (const g of priorityGroups) {
+      this.line(this.c('bold', `${this.severityIcon(bucket.severity)} ${severityLabel(bucket.severity)} (${bucket.count})`));
+      for (const g of bucket.groups) {
         const f = g.representative;
         const badge = this.c('magenta', `🤝 ${g.reviewers.length} agreed`);
         this.line(`  ${this.severityIcon(f.severity)} ${this.c('bold', this.safe(f.title))} ${badge}`);
         this.line(this.c('dim', `     ${this.safe(f.file)}:${f.lineRange.start}-${f.lineRange.end}`));
         if (f.body) this.line(`     ${this.safeBlock(f.body)}`);
         this.line('');
-        this.line(this.c('dim', `     ${this.categoryIcon(f.category)} ${f.category}`));
+        this.line(this.c('dim', `     ${categoryIcon(f.category)} ${f.category}`));
         this.line(this.c('dim', `     reviewers: ${g.reviewers.map((id) => this.safe(id)).join(', ')}`));
         this.line('');
       }
-      for (const f of priorityUnique) {
+      for (const f of bucket.unique) {
         this.line(`  ${this.severityIcon(f.severity)} ${this.c('bold', this.safe(f.title))}`);
         this.line(this.c('dim', `     ${this.safe(f.file)}:${f.lineRange.start}-${f.lineRange.end}`));
         if (f.body) this.line(`     ${this.safeBlock(f.body)}`);
         this.line('');
-        this.line(this.c('dim', `     ${this.categoryIcon(f.category)} ${f.category} · ${this.safe(f.reviewer)}`));
+        this.line(this.c('dim', `     ${categoryIcon(f.category)} ${f.category} · ${this.safe(f.reviewer)}`));
         this.line('');
       }
     }
   }
 
-  private severityIcon(s: Finding['severity']): string {
-    switch (s) {
-      case 'critical': return this.c('red', '🚨');
-      case 'high':     return this.c('red', '🔥');
-      case 'medium':   return this.c('yellow', '⚠️');
-      case 'low':      return this.c('cyan', '🧊');
-      case 'info':     return this.c('gray', 'ℹ️');
-    }
-  }
-
-  private severityLabel(s: Finding['severity']): string {
-    return s[0]!.toUpperCase() + s.slice(1);
-  }
-
-  private categoryIcon(category: Finding['category']): string {
-    switch (category) {
-      case 'security': return '🔐';
-      case 'performance': return '⚡';
-      case 'architecture': return '🏗️';
-      case 'correctness': return '✅';
-      case 'style': return '🎨';
-    }
-  }
-
-  private formatDuration(ms: number): string {
-    if (ms < 1000) return `${ms}ms`;
-    return `${(ms / 1000).toFixed(1)}s`;
+  private severityIcon(severity: Severity): string {
+    return this.c(severityColor(severity), severityIcon(severity));
   }
 
   private renderPreview(reviewerId: string, chunk: string): void {

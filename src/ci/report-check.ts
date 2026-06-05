@@ -2,82 +2,18 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-
-interface Finding {
-  file: string;
-  lineRange: { start: number; end: number };
-  severity: 'info' | 'low' | 'medium' | 'high' | 'critical';
-  category: 'security' | 'performance' | 'architecture' | 'correctness' | 'style';
-  title: string;
-  body: string;
-  reviewer: string;
-}
-
-interface JsonReport {
-  schemaVersion: number;
-  pipeline: {
-    id: string;
-    durationMs: number;
-    reviewCount: number;
-    errorCount: number;
-  };
-  reviews: Array<{
-    taskId: string;
-    reviewerId: string;
-    durationMs: number;
-    findings: Finding[];
-  }>;
-  consensus: {
-    strategyId: string;
-    groups: Array<{
-      id: string;
-      representative: Finding;
-      members: Finding[];
-      reviewers: string[];
-      agreement: number;
-    }>;
-    unique: Finding[];
-    contradictions: Array<{
-      groupId: string;
-      reviewerA: string;
-      reviewerB: string;
-      note: string;
-    }>;
-  };
-  errors: Array<{ reviewerId: string; message: string }>;
-}
-
-interface AugmentedFinding {
-  finding: Finding;
-  agreement?: number;
-  groupId?: string;
-}
-
-const SEVERITY_RANK: Record<string, number> = {
-  critical: 4,
-  high: 3,
-  medium: 2,
-  low: 1,
-  info: 0,
-};
-
-const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info'] as const;
-
-const SEVERITY_ICON: Record<string, string> = {
-  critical: '\u{1F6A8}',
-  high: '\u{1F525}',
-  medium: '\u{26A0}\u{FE0F}',
-  low: '\u{1F9CA}',
-  info: '\u{2139}\u{FE0F}',
-};
-
-const CATEGORY_ICON: Record<string, string> = {
-  security: '\u{1F510}',
-  performance: '\u{26A1}',
-  architecture: '\u{1F3D7}\u{FE0F}',
-  correctness: '\u{2705}',
-  style: '\u{1F3A8}',
-};
+import type { Severity } from '../core/finding.ts';
+import type { JsonReport, ReportFinding } from '../ui/report-model.ts';
+import {
+  categoryIcon,
+  collectJsonReportFindings,
+  countBySeverity,
+  formatDuration,
+  severityIcon,
+  severityLabel,
+  SEVERITY_ORDER,
+  SEVERITY_RANK,
+} from '../ui/report-model.ts';
 
 function parseArgs(): { reportPath: string; failOn: string } {
   const args = process.argv.slice(2);
@@ -100,10 +36,6 @@ function parseArgs(): { reportPath: string; failOn: string } {
   return { reportPath, failOn };
 }
 
-function dedupKey(f: Finding): string {
-  return [f.reviewer, f.file, f.lineRange.start, f.lineRange.end, f.severity, f.title].join('\x00');
-}
-
 function escapeMd(s: string): string {
   return s.replace(/([\\`*_{}[\]()#+\-.!~|<>])/g, '\\$1');
 }
@@ -112,57 +44,13 @@ function escapeFilePath(p: string): string {
   return p.replace(/`/g, '\\`');
 }
 
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function severityLabel(s: string): string {
-  return s[0]!.toUpperCase() + s.slice(1);
-}
-
-function collectFindings(report: JsonReport): AugmentedFinding[] {
-  const seen = new Set<string>();
-  const out: AugmentedFinding[] = [];
-
-  for (const group of report.consensus.groups) {
-    for (const f of group.members) {
-      const k = dedupKey(f);
-      seen.add(k);
-      out.push({ finding: f, agreement: group.agreement, groupId: group.id });
-    }
-  }
-
-  for (const review of report.reviews) {
-    for (const f of review.findings) {
-      const k = dedupKey(f);
-      if (!seen.has(k)) {
-        seen.add(k);
-        out.push({ finding: f });
-      }
-    }
-  }
-
-  for (const f of report.consensus.unique) {
-    const k = dedupKey(f);
-    if (!seen.has(k)) {
-      seen.add(k);
-      out.push({ finding: f });
-    }
-  }
-
-  return out;
-}
-
-function emitAnnotations(findings: AugmentedFinding[], failOnRank: number): boolean {
+function emitAnnotations(findings: ReportFinding[], failOnRank: number): boolean {
   let blocked = false;
 
   for (const { finding: f } of findings) {
-    const rank = SEVERITY_RANK[f.severity] ?? 0;
-    const icon = SEVERITY_ICON[f.severity] ?? '';
-    const catIcon = CATEGORY_ICON[f.category] ?? '';
-    const title = `${icon} ${f.title}`;
-    const body = `${catIcon} ${f.category} \u00B7 ${f.body.replace(/\n/g, ' ')}`;
+    const rank = SEVERITY_RANK[f.severity];
+    const title = `${severityIcon(f.severity)} ${f.title}`;
+    const body = `${categoryIcon(f.category)} ${f.category} \u00B7 ${f.body.replace(/\n/g, ' ')}`;
 
     if (rank >= failOnRank) {
       console.log(`::error file=${f.file},line=${f.lineRange.start},title=${title}::${body}`);
@@ -177,7 +65,7 @@ function emitAnnotations(findings: AugmentedFinding[], failOnRank: number): bool
 
 function buildComment(
   report: JsonReport,
-  findings: AugmentedFinding[],
+  findings: ReportFinding[],
   failOnLabel: string,
   blocked: boolean,
 ): string {
@@ -203,7 +91,7 @@ function buildComment(
   }
 
   if (blocked) {
-    const blockedCount = findings.filter(({ finding: f }) => (SEVERITY_RANK[f.severity] ?? 0) >= SEVERITY_RANK[failOnLabel]!).length;
+    const blockedCount = findings.filter(({ finding: f }) => SEVERITY_RANK[f.severity] >= rankForFailOn(failOnLabel)).length;
     lines.push(`\u274C **BLOCKED** — ${blockedCount} finding(s) at or above **${failOnLabel}** severity`);
   } else if (totalCount > 0) {
     lines.push('\u2705 **PASSED** — no blocking findings');
@@ -228,13 +116,9 @@ function buildComment(
     return lines.join('\n');
   }
 
-  const counts: Record<string, number> = {};
-  for (const s of SEVERITY_ORDER) counts[s] = 0;
-  for (const { finding: f } of findings) {
-    counts[f.severity] = (counts[f.severity] ?? 0) + 1;
-  }
+  const counts = countBySeverity(findings.map(({ finding }) => finding));
 
-  const headers = SEVERITY_ORDER.map((s) => `${SEVERITY_ICON[s]} ${severityLabel(s)}`).join(' | ');
+  const headers = SEVERITY_ORDER.map((s) => `${severityIcon(s)} ${severityLabel(s)}`).join(' | ');
   const divider = SEVERITY_ORDER.map(() => '---:').join(' | ');
   const row = SEVERITY_ORDER.map((s) => String(counts[s])).join(' | ');
 
@@ -247,14 +131,12 @@ function buildComment(
     const items = findings.filter(({ finding: f }) => f.severity === severity);
     if (items.length === 0) continue;
 
-    const icon = SEVERITY_ICON[severity] ?? '';
     const open = severity === 'critical' || severity === 'high';
-    lines.push(`### ${icon} ${severityLabel(severity)} (${items.length})`);
+    lines.push(`### ${severityIcon(severity)} ${severityLabel(severity)} (${items.length})`);
     lines.push('');
 
     for (const { finding: f, agreement } of items) {
       const openTag = open ? ' open' : '';
-      const catIcon = CATEGORY_ICON[f.category] ?? '';
       const agreementText = agreement != null
         ? `\u{1F91D} ${agreement}/${reviewerCount} agreement`
         : '\u{1F464} single reviewer';
@@ -262,7 +144,7 @@ function buildComment(
 
       lines.push(`<details${openTag}><summary><strong>${escapeMd(f.title)}</strong> — \`${loc}\`</summary>`);
       lines.push('');
-      lines.push(`${catIcon} ${f.category} \u00B7 ${agreementText}`);
+      lines.push(`${categoryIcon(f.category)} ${f.category} \u00B7 ${agreementText}`);
       lines.push('');
       lines.push(f.body);
       lines.push('');
@@ -305,7 +187,7 @@ function writeErrorComment(commentFile: string, message: string): void {
 }
 
 const { reportPath, failOn } = parseArgs();
-const failOnRank = failOn === 'never' ? 999 : (SEVERITY_RANK[failOn] ?? 4);
+const failOnRank = rankForFailOn(failOn);
 const commentFile = process.env.QUORUM_COMMENT_FILE ?? '.quorum/pr-comment.md';
 
 if (!existsSync(reportPath)) {
@@ -315,13 +197,13 @@ if (!existsSync(reportPath)) {
 
 let report: JsonReport;
 try {
-  report = JSON.parse(readFileSync(reportPath, 'utf8'));
+  report = JSON.parse(readFileSync(reportPath, 'utf8')) as JsonReport;
 } catch {
   writeErrorComment(commentFile, 'failed to parse review report');
   process.exit(2);
 }
 
-const findings = collectFindings(report);
+const findings = collectJsonReportFindings(report);
 const blocked = emitAnnotations(findings, failOnRank);
 const comment = buildComment(report, findings, failOn, blocked);
 
@@ -330,3 +212,8 @@ if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 writeFileSync(commentFile, comment, 'utf8');
 
 process.exit(blocked ? 1 : 0);
+
+function rankForFailOn(label: string): number {
+  if (label === 'never') return 999;
+  return SEVERITY_RANK[label as Severity] ?? SEVERITY_RANK.critical;
+}

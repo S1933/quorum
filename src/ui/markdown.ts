@@ -1,11 +1,20 @@
 import type { PipelineResult } from '../core/pipeline.ts';
-import type { Finding, FindingGroup, Severity } from '../core/finding.ts';
-
-const PRIORITIES: readonly Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
+import type { Finding, FindingGroup } from '../core/finding.ts';
+import {
+  buildSeverityBuckets,
+  categoryIcon,
+  collectPipelineFindings,
+  countBySeverity,
+  formatDuration,
+  severityIcon,
+  severityLabel,
+  SEVERITY_ORDER,
+} from './report-model.ts';
 
 export function renderMarkdownReport(result: PipelineResult): string {
   const out: string[] = [];
-  const allFindings = [...result.consensus.groups.flatMap((g) => g.members), ...result.consensus.unique];
+  const allFindings = collectPipelineFindings(result.consensus.groups, result.consensus.unique);
+  const severityCounts = countBySeverity(allFindings);
   const agreedCount = result.consensus.groups.length;
   const uniqueCount = result.consensus.unique.length;
 
@@ -26,8 +35,8 @@ export function renderMarkdownReport(result: PipelineResult): string {
   out.push('');
   out.push('| Severity | Findings |');
   out.push('| --- | ---: |');
-  for (const severity of PRIORITIES) {
-    out.push(`| ${severityIcon(severity)} ${severityLabel(severity)} | ${countSeverity(allFindings, severity)} |`);
+  for (const severity of SEVERITY_ORDER) {
+    out.push(`| ${severityIcon(severity)} ${severityLabel(severity)} | ${severityCounts[severity]} |`);
   }
   out.push('');
 
@@ -52,16 +61,12 @@ function renderPriorityFindings(out: string[], groups: FindingGroup[], unique: F
     return;
   }
 
-  for (const priority of PRIORITIES) {
-    const priorityGroups = groups
-      .filter((g) => g.representative.severity === priority)
-      .sort((a, b) => b.reviewers.length - a.reviewers.length);
-    const priorityUnique = unique.filter((f) => f.severity === priority);
-    if (priorityGroups.length === 0 && priorityUnique.length === 0) continue;
+  for (const bucket of buildSeverityBuckets(groups, unique)) {
+    if (bucket.count === 0) continue;
 
-    out.push(`### ${severityIcon(priority)} ${severityLabel(priority)} (${priorityGroups.length + priorityUnique.length})`);
-    for (const g of priorityGroups) renderGroup(out, g);
-    for (const f of priorityUnique) renderFinding(out, f);
+    out.push(`### ${severityIcon(bucket.severity)} ${severityLabel(bucket.severity)} (${bucket.count})`);
+    for (const g of bucket.groups) renderGroup(out, g);
+    for (const f of bucket.unique) renderFinding(out, f);
   }
 }
 
@@ -90,39 +95,6 @@ function renderFindingMeta(out: string[], f: Finding, reviewerLine: string): voi
   out.push(`- **Location:** \`${escapeFilePath(f.file)}:${f.lineRange.start}-${f.lineRange.end}\``);
   out.push(`- **Category:** ${categoryIcon(f.category)} ${f.category}`);
   out.push(`- ${reviewerLine}`);
-}
-
-function countSeverity(findings: Finding[], severity: Severity): number {
-  return findings.filter((f) => f.severity === severity).length;
-}
-
-function severityIcon(s: Severity): string {
-  switch (s) {
-    case 'critical': return '🚨';
-    case 'high': return '🔥';
-    case 'medium': return '⚠️';
-    case 'low': return '🧊';
-    case 'info': return 'ℹ️';
-  }
-}
-
-function severityLabel(s: Severity): string {
-  return s[0]!.toUpperCase() + s.slice(1);
-}
-
-function categoryIcon(category: Finding['category']): string {
-  switch (category) {
-    case 'security': return '🔐';
-    case 'performance': return '⚡';
-    case 'architecture': return '🏗️';
-    case 'correctness': return '✅';
-    case 'style': return '🎨';
-  }
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 function escapeFilePath(p: string): string {
