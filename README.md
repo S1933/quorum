@@ -127,7 +127,6 @@ quorum reviewer add \
   --persona=security \
   --model=opencode-go/deepseek-v4-pro \
   --variant=high
-# Legacy configs using provider type opencode-go are still accepted.
 
 # Ollama
 quorum reviewer add \
