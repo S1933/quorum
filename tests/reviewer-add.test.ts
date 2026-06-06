@@ -70,6 +70,43 @@ describe('reviewer add', () => {
     expect(updated.pipelines.default.reviewers).toContain(id);
   });
 
+  test('adds reviewer with provider variant', async () => {
+    const { configPath, deps } = await repoDeps();
+    const io = captureIo();
+
+    const code = await main(
+      [
+        'reviewer',
+        'add',
+        '--provider',
+        'opencode',
+        '--persona',
+        'security',
+        '--model',
+        'opencode-go/deepseek-v4-pro',
+        '--variant',
+        'high',
+        '--config',
+        configPath,
+      ],
+      deps,
+      io,
+    );
+
+    expect(code).toBe(0);
+    const id = addedReviewerId(io);
+
+    const updated = parseYaml(await Bun.file(configPath).text());
+    expect(updated.reviewers[id]).toEqual({
+      persona: 'security',
+      provider: {
+        type: 'opencode',
+        model: 'opencode-go/deepseek-v4-pro',
+        variant: 'high',
+      },
+    });
+  });
+
   test('adds reviewer with temperature and fileExtensions', async () => {
     const { configPath, deps } = await repoDeps();
     const io = captureIo();

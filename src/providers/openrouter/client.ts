@@ -12,6 +12,7 @@ export interface ChatRequest {
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
+  reasoning?: { effort: string };
   response_format?: { type: 'json_object' };
   stream?: boolean;
   stream_options?: { include_usage?: boolean };

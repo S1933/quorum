@@ -131,6 +131,7 @@ function chatRequest(
   if (temperature !== undefined) req.temperature = temperature;
   if (maxTokens !== undefined) req.max_tokens = maxTokens;
   if (topP !== undefined) req.top_p = topP;
+  if (cfg.variant) req.reasoning = { effort: cfg.variant };
   return req;
 }
 
@@ -162,6 +163,7 @@ export const openRouterFactory: ProviderFactory = {
         messages: [{ role: 'user', content: prompt }],
       };
       if (cfg.max_tokens !== undefined) req.max_tokens = cfg.max_tokens;
+      if (cfg.variant) req.reasoning = { effort: cfg.variant };
       for await (const event of client.chatStream(req, new AbortController().signal)) {
         if (event.type === 'token') chunks.push(event.text);
       }

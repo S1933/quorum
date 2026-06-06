@@ -68,6 +68,39 @@ describe('claude-code provider', () => {
     await expect(runtime.resolveReviewer('sec')).rejects.toThrow('extra_args.0');
   });
 
+  test('passes effort variant to claude code', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'quorum-'));
+    tmpRoots.push(root);
+    const binary = join(root, 'claude');
+    const argsFile = join(root, 'args.txt');
+    await Bun.write(binary, `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\nprintf '{"findings":[]}'\n`);
+    await chmod(binary, 0o755);
+
+    const provider = await claudeCodeFactory.create(
+      'claude-local',
+      {
+        type: 'claude-code',
+        model: 'sonnet',
+        variant: 'high',
+        binary,
+        allow_project_binary: true,
+        extra_args: [],
+        timeout_ms: 5_000,
+      },
+      { workspaceRoot: root, env: {} },
+    );
+
+    await provider.review!(task(root, 'security-claude'), {
+      bus: captureBus(),
+      signal: new AbortController().signal,
+      workspace: { root },
+    });
+
+    const args = await Bun.file(argsFile).text();
+    expect(args).toContain('--model\nsonnet');
+    expect(args).toContain('--effort\nhigh');
+  });
+
   test('resolves reviewers with inline provider config', async () => {
     const runtime = await createRuntime({
       config: {

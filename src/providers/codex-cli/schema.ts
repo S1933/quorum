@@ -12,6 +12,7 @@ export const CodexCliConfigSchema = z
   .object({
     type: z.literal('codex-cli'),
     model: z.string().min(1).optional(),
+    variant: z.string().min(1).optional(),
     binary: z.string().min(1).default('codex'),
     allow_project_binary: z.boolean().default(false),
     sandbox: z.enum(['read-only', 'workspace-write', 'danger-full-access']).default('read-only'),

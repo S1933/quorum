@@ -5,6 +5,7 @@ export const OpenRouterConfigSchema = z
     type: z.literal('openrouter'),
     api_key: z.string().min(1),
     model: z.string().min(1),
+    variant: z.string().min(1).optional(),
     base_url: z.string().url().default('https://openrouter.ai/api/v1'),
     temperature: z.number().min(0).max(2).optional(),
     max_tokens: z.number().int().positive().optional(),

@@ -48,7 +48,7 @@ describe('opencode provider', () => {
     expect(tokenText(events)).toBe('{"findings":[]}');
   });
 
-  test('passes model overrides to the prompt-style CLI', async () => {
+  test('passes model overrides and variant to opencode run', async () => {
     const root = await mkdtemp(join(tmpdir(), 'quorum-opencode-'));
     tmpRoots.push(root);
     const binary = join(root, 'opencode');
@@ -63,9 +63,10 @@ describe('opencode provider', () => {
         type: 'opencode',
         binary,
         allow_project_binary: true,
-        command_style: 'prompt',
-        output_format: 'text',
+        command_style: 'run',
+        output_format: 'json',
         quiet: true,
+        variant: 'high',
         extra_args: [],
         timeout_ms: 5_000,
       },
@@ -84,7 +85,10 @@ describe('opencode provider', () => {
 
     const args = await Bun.file(argsFile).text();
     const stdin = await Bun.file(stdinFile).text();
+    expect(args).toContain('run\n');
     expect(args).toContain('--model\nanthropic/claude-sonnet-4');
+    expect(args).toContain('--variant\nhigh');
+    expect(args).toContain('--format\njson');
     expect(args).not.toContain(reviewTask.instruction);
     expect(stdin).toContain(reviewTask.instruction);
   });
@@ -136,6 +140,33 @@ describe('opencode provider', () => {
     });
 
     await expect(runtime.resolveReviewer('sec')).rejects.toThrow('extra_args.0');
+  });
+
+  test('rejects variant with prompt-style opencode', async () => {
+    const runtime = await createRuntime({
+      config: {
+        version: 1,
+        personas: {
+          security: { description: 'Security', system: 'Review security.' },
+        },
+        reviewers: {
+          sec: {
+            persona: 'security',
+            provider: {
+              type: 'opencode',
+              command_style: 'prompt',
+              variant: 'high',
+            },
+          },
+        },
+        pipelines: {
+          default: { parallel: true, reviewers: ['sec'] },
+        },
+      },
+      pluginCtx: { workspaceRoot: '.', env: {} },
+    });
+
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow('variant is only supported when command_style is run');
   });
 
   test('keeps opencode-go as a legacy provider alias', async () => {

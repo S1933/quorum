@@ -17,6 +17,7 @@ export const codexCliFactory = createSubprocessProvider({
       throw new ProviderRuntimeError('codex-cli', 'Unsafe no-approval Codex mode is disabled');
     }
     if (model) args.push('--model', model);
+    if (c.variant) args.push('-c', `model_reasoning_effort=${c.variant}`);
     args.push('-');
     return args;
   },

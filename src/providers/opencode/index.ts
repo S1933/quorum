@@ -10,6 +10,7 @@ const mkBuilder = () => ({
     if (cfg.command_style === 'run') {
       const args = ['run', ...cfg.extra_args];
       if (model) args.push('--model', model);
+      if (cfg.variant) args.push('--variant', cfg.variant);
       if (cfg.output_format === 'json') args.push('--format', 'json');
       if (cfg.quiet) args.push('--log-level', 'ERROR');
       args.push(STDIN_PROMPT);

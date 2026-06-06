@@ -47,7 +47,7 @@ describe('codex-cli provider', () => {
     expect(tokenText(events)).toBe('{"findings":[]}\n');
   });
 
-  test('passes model overrides and non-interactive defaults to codex exec', async () => {
+  test('passes model overrides, reasoning variant, and non-interactive defaults to codex exec', async () => {
     const root = await mkdtemp(join(tmpdir(), 'quorum-codex-'));
     tmpRoots.push(root);
     const binary = join(root, 'codex');
@@ -62,6 +62,7 @@ describe('codex-cli provider', () => {
         binary,
         allow_project_binary: true,
         model: 'gpt-5',
+        variant: 'high',
         sandbox: 'read-only',
         approval_policy: 'on-request',
         extra_args: ['--ephemeral'],
@@ -83,6 +84,7 @@ describe('codex-cli provider', () => {
     expect(args).not.toContain('--dangerously-bypass-approvals-and-sandbox');
     expect(args).toContain('--ephemeral');
     expect(args).toContain('--model\ngpt-5-codex');
+    expect(args).toContain('-c\nmodel_reasoning_effort=high');
   });
 
   test('passes review prompt through stdin instead of argv', async () => {

@@ -21,7 +21,7 @@ const LEGACY_PROVIDER_ALIASES: Record<string, typeof SUPPORTED_PROVIDERS[number]
   'opencode-go': 'opencode',
 };
 
-const REVIEWER_ADD_USAGE = 'Usage: quorum reviewer add --provider=<type> --persona=<name> --model=<model> [--id=<reviewer-id>] [--ext=<ext1,ext2,...>] [--fileExtensions=<ext1,ext2,...>] [--temperature=<0..2>] [--pipeline=<id>] [--config=<path>]\n';
+const REVIEWER_ADD_USAGE = 'Usage: quorum reviewer add --provider=<type> --persona=<name> --model=<model> [--variant=<variant>] [--id=<reviewer-id>] [--ext=<ext1,ext2,...>] [--fileExtensions=<ext1,ext2,...>] [--temperature=<0..2>] [--pipeline=<id>] [--config=<path>]\n';
 
 export async function cmdReviewer(
   positional: string[],
@@ -62,6 +62,7 @@ async function cmdReviewerAdd(
   const provider = providerFlag ? LEGACY_PROVIDER_ALIASES[providerFlag] ?? providerFlag : null;
   const persona = typeof flags.persona === 'string' ? flags.persona : null;
   const model = typeof flags.model === 'string' ? flags.model : null;
+  const variant = typeof flags.variant === 'string' && flags.variant.trim() !== '' ? flags.variant : null;
   const extensions = parseExtensions(flags);
   const temperature = parseTemperature(flags);
 
@@ -93,6 +94,7 @@ async function cmdReviewerAdd(
   }
 
   const providerEntry: Record<string, unknown> = { type: provider, model };
+  if (variant) providerEntry.variant = variant;
   const newEntry: Record<string, unknown> = { persona, provider: providerEntry };
   if (extensions) newEntry.fileExtensions = extensions;
   if (temperature !== null) newEntry.overrides = { temperature };

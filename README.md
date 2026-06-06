@@ -59,6 +59,7 @@ quorum reviewer add \
   --provider=<type> \
   --persona=<name> \
   --model=<model> \
+  [--variant=<variant>] \
   [flags]
 ```
 
@@ -67,6 +68,7 @@ quorum reviewer add \
 | `--provider` *required* | `openrouter`, `claude-code`, `codex-cli`, `continue-dev`, `cursor-agent`, `gemini-cli`, `kilo-code`, `opencode`, `ollama` |
 | `--persona` *required* | Persona defined in `quorum.yaml` |
 | `--model` *required* | Model for this provider (see examples above) |
+| `--variant` | Provider-specific model variant or reasoning effort (Claude Code maps to `--effort`; OpenCode maps to `--variant`; Codex CLI maps to `model_reasoning_effort`; OpenRouter maps to `reasoning.effort`) |
 | `--id` | Custom reviewer ID (default: `<name>-<persona>-<provider>`) |
 | `--ext`, `--fileExtensions` | File extension filter, comma-separated (e.g. `ts,tsx`) |
 | `--temperature` | Reviewer model temperature override, from `0` to `2` |
@@ -78,19 +80,22 @@ quorum reviewer add \
 quorum reviewer add \
   --provider=openrouter \
   --persona=security \
-  --model=anthropic/claude-sonnet-4
+  --model=anthropic/claude-sonnet-4 \
+  --variant=high
 
 # Claude Code
 quorum reviewer add \
   --provider=claude-code \
   --persona=security \
-  --model=sonnet
+  --model=sonnet \
+  --variant=high
 
 # Codex CLI
 quorum reviewer add \
   --provider=codex-cli \
   --persona=security \
-  --model=gpt-5-codex
+  --model=gpt-5-codex \
+  --variant=high
 
 # Continue.dev
 quorum reviewer add \
@@ -120,7 +125,8 @@ quorum reviewer add \
 quorum reviewer add \
   --provider=opencode \
   --persona=security \
-  --model=opencode-go/deepseek-v4-pro
+  --model=opencode-go/deepseek-v4-pro \
+  --variant=high
 # Legacy configs using provider type opencode-go are still accepted.
 
 # Ollama

@@ -12,10 +12,13 @@ export const claudeCodeFactory = createSubprocessProvider({
   processOutput: (raw) => raw,
   buildArgs: (cfg, _ctx, task) => {
     const c = cfg as ClaudeCodeConfig;
-    return [
-      '--print', '--model', c.model, ...c.extra_args,
+    const args = [
+      '--print', '--model', c.model,
+      ...(c.variant ? ['--effort', c.variant] : []),
+      ...c.extra_args,
       '--append-system-prompt', `${task.systemPrompt}\n\n${REVIEW_OUTPUT_INSTRUCTIONS}`,
     ];
+    return args;
   },
   createMetaReviewer: (config, ctx): MetaReviewFn | undefined => {
     const c = config as ClaudeCodeConfig;

@@ -35,6 +35,7 @@ describe('openrouter provider', () => {
         type: 'openrouter',
         api_key: 'test-key',
         model: 'anthropic/test',
+        variant: 'high',
         base_url: 'https://openrouter.test/api/v1',
       },
       { workspaceRoot: '/tmp/quorum', env: {} },
@@ -50,6 +51,7 @@ describe('openrouter provider', () => {
     expect(requestBody).toMatchObject({
       model: 'anthropic/test',
       stream: true,
+      reasoning: { effort: 'high' },
       response_format: { type: 'json_object' },
       stream_options: { include_usage: true },
     });
