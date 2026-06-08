@@ -13,6 +13,31 @@ afterAll(async () => {
 });
 
 describe('opencode provider', () => {
+  test('declares single-review concurrency to avoid shared opencode state locks', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'quorum-opencode-'));
+    tmpRoots.push(root);
+    const binary = join(root, 'opencode');
+    await Bun.write(binary, '#!/bin/sh\nprintf \'{"findings":[]}\'\n');
+    await chmod(binary, 0o755);
+
+    const provider = await openCodeFactory.create(
+      'opencode-local',
+      {
+        type: 'opencode',
+        binary,
+        allow_project_binary: true,
+        command_style: 'prompt',
+        output_format: 'text',
+        quiet: true,
+        extra_args: [],
+        timeout_ms: 5_000,
+      },
+      { workspaceRoot: root, env: {} },
+    );
+
+    expect(provider.capabilities().maxConcurrentReviews).toBe(1);
+  });
+
   test('runs the prompt-style CLI and parses structured findings', async () => {
     const root = await mkdtemp(join(tmpdir(), 'quorum-opencode-'));
     tmpRoots.push(root);

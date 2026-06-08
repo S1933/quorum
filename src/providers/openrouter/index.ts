@@ -5,7 +5,7 @@ import type { MetaReviewFn } from '../../consensus/registry.ts';
 import { ProviderRuntimeError } from '../../core/errors.ts';
 import { OpenRouterConfigSchema, type OpenRouterConfig } from './schema.ts';
 import { OpenRouterClient, type ChatMessage } from './client.ts';
-import { parseFindings, REVIEW_OUTPUT_INSTRUCTIONS } from '../../reviewers/output.ts';
+import { outputInstructionsForTask, parseReviewOutput } from '../../reviewers/output.ts';
 
 const PROVIDER_TYPE = 'openrouter';
 
@@ -30,7 +30,7 @@ class OpenRouterProvider implements Provider {
   async review(task: ReviewTask, ctx: ExecCtx): Promise<ReviewResult> {
     const started = Date.now();
     const messages: ChatMessage[] = [
-      { role: 'system', content: `${task.systemPrompt}\n\n${REVIEW_OUTPUT_INSTRUCTIONS}` },
+      { role: 'system', content: `${task.systemPrompt}\n\n${outputInstructionsForTask(task)}` },
       { role: 'user', content: task.instruction },
     ];
 
@@ -75,7 +75,8 @@ class OpenRouterProvider implements Provider {
     }
 
     const raw = chunks.join('');
-    const findings = parseFindings(raw, task.reviewerId);
+    const parsed = parseReviewOutput(raw, task.reviewerId);
+    const { findings } = parsed;
 
     for (const finding of findings) {
       ctx.bus.emit({
@@ -89,6 +90,7 @@ class OpenRouterProvider implements Provider {
       taskId: task.id,
       reviewerId: task.reviewerId,
       findings,
+      ...(parsed.verdict ? { verdict: parsed.verdict } : {}),
       rawOutput: raw,
       durationMs: Date.now() - started,
     };
@@ -97,7 +99,7 @@ class OpenRouterProvider implements Provider {
 
   async *stream(task: ReviewTask, ctx: ExecCtx) {
     const messages: ChatMessage[] = [
-      { role: 'system', content: `${task.systemPrompt}\n\n${REVIEW_OUTPUT_INSTRUCTIONS}` },
+      { role: 'system', content: `${task.systemPrompt}\n\n${outputInstructionsForTask(task)}` },
       { role: 'user', content: task.instruction },
     ];
 

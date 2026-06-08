@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { ReviewerOutputError } from '../src/core/errors.ts';
-import { parseFindings } from '../src/reviewers/output.ts';
+import { parseFindings, parseReviewOutput } from '../src/reviewers/output.ts';
 
 describe('parseFindings', () => {
   test('parses strict JSON findings', () => {
@@ -129,6 +129,53 @@ describe('parseFindings', () => {
       severity: 'medium',
       category: 'correctness',
       body: 'The current code drops this variant.\n\nAccept common JSON field aliases.',
+    });
+  });
+});
+
+describe('parseReviewOutput', () => {
+  test('parses plan review findings and verdict', () => {
+    const parsed = parseReviewOutput(
+      JSON.stringify({
+        verdict: {
+          decision: 'block',
+          summary: 'The rollout path is missing.',
+          confidence: 'high',
+        },
+        findings: [
+          {
+            file: 'docs/plan.md',
+            lineStart: 4,
+            severity: 'high',
+            category: 'architecture',
+            title: 'Missing rollout sequence',
+            body: 'Add an explicit rollout and rollback path.',
+          },
+        ],
+      }),
+      'arch',
+    );
+
+    expect(parsed.verdict).toEqual({
+      decision: 'block',
+      summary: 'The rollout path is missing.',
+      confidence: 'high',
+    });
+    expect(parsed.findings[0]?.file).toBe('docs/plan.md');
+  });
+
+  test('normalises invalid verdict without dropping findings', () => {
+    const parsed = parseReviewOutput(
+      JSON.stringify({
+        verdict: { decision: 'maybe', summary: '', confidence: 'certain' },
+        findings: [],
+      }),
+      'arch',
+    );
+
+    expect(parsed.verdict).toEqual({
+      decision: 'revise',
+      summary: 'No verdict summary provided.',
     });
   });
 });

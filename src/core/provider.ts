@@ -8,6 +8,7 @@ export interface ProviderCapabilities {
   tools: boolean;
   mcp: boolean;
   localExecution: boolean;
+  maxConcurrentReviews?: number;
 }
 
 export type ProviderEvent =

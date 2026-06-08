@@ -2,7 +2,7 @@ import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provide
 import type { ReviewTask, ReviewResult, UsageInfo } from '../../core/task.ts';
 import type { ProviderFactory } from '../registry.ts';
 import { ProviderRuntimeError } from '../../core/errors.ts';
-import { parseFindings, REVIEW_OUTPUT_INSTRUCTIONS } from '../../reviewers/output.ts';
+import { outputInstructionsForTask, parseReviewOutput } from '../../reviewers/output.ts';
 import { OllamaClient, type OllamaChatRequest, type OllamaMessage } from './client.ts';
 import { OllamaConfigSchema, type OllamaConfig } from './schema.ts';
 
@@ -62,7 +62,8 @@ class OllamaProvider implements Provider {
       throw new ProviderRuntimeError(this.id, 'Ollama returned no message content');
     }
 
-    const findings = parseFindings(raw, task.reviewerId);
+    const parsed = parseReviewOutput(raw, task.reviewerId);
+    const { findings } = parsed;
     for (const finding of findings) {
       ctx.bus.emit({
         type: 'reviewer.event',
@@ -75,6 +76,7 @@ class OllamaProvider implements Provider {
       taskId: task.id,
       reviewerId: task.reviewerId,
       findings,
+      ...(parsed.verdict ? { verdict: parsed.verdict } : {}),
       rawOutput: raw,
       durationMs: Date.now() - started,
     };
@@ -105,7 +107,7 @@ class OllamaProvider implements Provider {
 
 function messagesFor(task: ReviewTask): OllamaMessage[] {
   return [
-    { role: 'system', content: `${task.systemPrompt}\n\n${REVIEW_OUTPUT_INSTRUCTIONS}` },
+    { role: 'system', content: `${task.systemPrompt}\n\n${outputInstructionsForTask(task)}` },
     { role: 'user', content: task.instruction },
   ];
 }

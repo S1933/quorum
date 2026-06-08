@@ -1,4 +1,4 @@
-import type { ReviewResult, WorkspaceInfo } from '../core/task.ts';
+import type { ReviewResult, WorkspaceInfo, ReviewTask, PlanReviewVerdict } from '../core/task.ts';
 import type { Pipeline, PipelineResult, ReviewerError, ConsensusResult } from '../core/pipeline.ts';
 import type { EventBus } from '../core/events.ts';
 import type { BoundReviewer } from '../reviewers/reviewer.ts';
@@ -18,12 +18,14 @@ export interface PipelineRunInput {
   consensus: ConsensusRegistry;
   providers: ProviderRegistry;
   pluginCtx: PluginCtx;
+  taskKind?: ReviewTask['kind'];
   signal?: AbortSignal;
 }
 
 export class PipelineExecutor {
   async run(input: PipelineRunInput): Promise<PipelineResult> {
     const { pipeline, reviewers, bus, signal, workspace, instruction, taskId, consensus, providers, pluginCtx } = input;
+    const taskKind = input.taskKind ?? 'review';
     const started = Date.now();
 
     bus.emit({
@@ -63,7 +65,7 @@ export class PipelineExecutor {
         bus.emit({ type: 'reviewer.started', reviewerId: rev.id });
         try {
           const result = await rev.run(
-            { id: `${taskId}:${rev.id}`, instruction, workspace },
+            { kind: taskKind, id: `${taskId}:${rev.id}`, instruction, workspace },
             { bus, signal: controller.signal, workspace },
           );
           reviews[index] = result;
@@ -95,7 +97,7 @@ export class PipelineExecutor {
       };
 
       if (pipeline.parallel) {
-        const limit = pipeline.maxConcurrency;
+        const limit = effectiveConcurrencyLimit(pipeline, reviewers);
         if (limit && limit < reviewers.length) {
           await runWithConcurrencyLimit(reviewers, limit, runOne);
         } else {
@@ -120,6 +122,7 @@ export class PipelineExecutor {
       consensus: consensusResult,
       durationMs: Date.now() - started,
       errors: errors.filter(Boolean),
+      ...(taskKind === 'plan-review' ? { verdictSummary: buildVerdictSummary(reviews.filter(Boolean)) } : {}),
       ...(budgetExceeded ? { budgetExceeded: true } : {}),
       ...(budgetTracker.state().totalCostUsd > 0 ? { totalCostUsd: budgetTracker.state().totalCostUsd } : {}),
     };
@@ -129,6 +132,40 @@ export class PipelineExecutor {
     }
     return result;
   }
+}
+
+function effectiveConcurrencyLimit(pipeline: Pipeline, reviewers: BoundReviewer[]): number | undefined {
+  const providerLimits = reviewers
+    .map((reviewer) => reviewer.provider.capabilities().maxConcurrentReviews)
+    .filter((limit): limit is number => limit !== undefined);
+  const providerLimit = providerLimits.length > 0 ? Math.min(...providerLimits) : undefined;
+  if (pipeline.maxConcurrency === undefined) return providerLimit;
+  if (providerLimit === undefined) return pipeline.maxConcurrency;
+  return Math.min(pipeline.maxConcurrency, providerLimit);
+}
+
+function buildVerdictSummary(reviews: ReviewResult[]): NonNullable<PipelineResult['verdictSummary']> {
+  const counts: Record<PlanReviewVerdict['decision'], number> = {
+    approve: 0,
+    revise: 0,
+    block: 0,
+  };
+  const summaries: NonNullable<PipelineResult['verdictSummary']>['summaries'] = [];
+
+  for (const review of reviews) {
+    if (!review.verdict) continue;
+    counts[review.verdict.decision]++;
+    const item: NonNullable<PipelineResult['verdictSummary']>['summaries'][number] = {
+      reviewerId: review.reviewerId,
+      decision: review.verdict.decision,
+      summary: review.verdict.summary,
+    };
+    if (review.verdict.confidence) item.confidence = review.verdict.confidence;
+    summaries.push(item);
+  }
+
+  const decision = counts.block > 0 ? 'block' : counts.revise > 0 ? 'revise' : 'approve';
+  return { decision, counts, summaries };
 }
 
 async function runWithConcurrencyLimit(

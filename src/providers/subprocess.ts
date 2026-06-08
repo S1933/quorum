@@ -2,7 +2,7 @@ import type { EventBus } from '../core/events.ts';
 import type { ReviewTask, ReviewResult } from '../core/task.ts';
 import type { MetaReviewFn } from '../consensus/registry.ts';
 import { ProviderRuntimeError } from '../core/errors.ts';
-import { parseFindings } from '../reviewers/output.ts';
+import { parseReviewOutput } from '../reviewers/output.ts';
 import { InMemoryEventBus } from '../runtime/bus.ts';
 import { isAbsolute, relative, resolve } from 'node:path';
 
@@ -157,7 +157,8 @@ export function buildSubprocessReviewResult(
   started: number,
   bus: EventBus,
 ): ReviewResult {
-  const findings = parseFindings(raw, task.reviewerId);
+  const parsed = parseReviewOutput(raw, task.reviewerId);
+  const { findings } = parsed;
   for (const finding of findings) {
     bus.emit({
       type: 'reviewer.event',
@@ -169,6 +170,7 @@ export function buildSubprocessReviewResult(
     taskId: task.id,
     reviewerId: task.reviewerId,
     findings,
+    ...(parsed.verdict ? { verdict: parsed.verdict } : {}),
     rawOutput: raw,
     durationMs: Date.now() - started,
   };

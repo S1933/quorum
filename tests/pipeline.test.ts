@@ -137,6 +137,33 @@ describe('PipelineExecutor', () => {
     expect(result.reviews).toHaveLength(2);
   });
 
+  test('honors provider maxConcurrentReviews for parallel pipelines', async () => {
+    let active = 0;
+    let maxActive = 0;
+
+    const makeReviewer = (id: string) =>
+      reviewer(
+        id,
+        async () => {
+          active++;
+          if (active > maxActive) maxActive = active;
+          await Bun.sleep(5);
+          active--;
+          return reviewResult(id);
+        },
+        { maxConcurrentReviews: 1 },
+      );
+
+    const result = await runPipeline({
+      parallel: true,
+      reviewers: ['a', 'b', 'c'],
+      boundReviewers: ['a', 'b', 'c'].map(makeReviewer),
+    });
+
+    expect(result.reviews).toHaveLength(3);
+    expect(maxActive).toBe(1);
+  });
+
   test('aborts in-flight reviewers on timeout and emits timeout event', async () => {
     const events: QuorumEvent[] = [];
     const bus = new InMemoryEventBus();
@@ -259,16 +286,17 @@ async function runPipeline(opts: {
 function reviewer(
   id: string,
   run: BoundReviewer['run'],
+  capabilities: Partial<ReturnType<Provider['capabilities']>> = {},
 ): BoundReviewer {
   return {
     id,
     persona: { id: 'persona', description: 'Persona', system: 'Review.' },
-    provider: fakeProvider(id),
+    provider: fakeProvider(id, capabilities),
     run,
   };
 }
 
-function fakeProvider(id: string): Provider {
+function fakeProvider(id: string, capabilities: Partial<ReturnType<Provider['capabilities']>> = {}): Provider {
   return {
     id,
     capabilities() {
@@ -278,6 +306,7 @@ function fakeProvider(id: string): Provider {
         tools: false,
         mcp: false,
         localExecution: false,
+        ...capabilities,
       };
     },
   };

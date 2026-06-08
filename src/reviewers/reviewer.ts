@@ -5,12 +5,16 @@ import type { ReviewerRef } from '../core/pipeline.ts';
 import { CapabilityError, ReviewerOutputError } from '../core/errors.ts';
 import { RETRY_REMINDER } from './output.ts';
 
+type BoundReviewerTask = Omit<ReviewTask, 'systemPrompt' | 'reviewerId' | 'kind'> & {
+  kind?: ReviewTask['kind'];
+};
+
 export interface BoundReviewer {
   id: string;
   persona: Persona;
   provider: Provider;
   overrides?: ModelConfig;
-  run(task: Omit<ReviewTask, 'systemPrompt' | 'reviewerId' | 'kind'>, ctx: Omit<ExecCtx, 'modelOverride'>): Promise<ReviewResult>;
+  run(task: BoundReviewerTask, ctx: Omit<ExecCtx, 'modelOverride'>): Promise<ReviewResult>;
 }
 
 export function bindReviewer(
@@ -37,7 +41,7 @@ export function bindReviewer(
     async run(task, ctx) {
       const fullTask: ReviewTask = {
         ...task,
-        kind: 'review',
+        kind: task.kind ?? 'review',
         systemPrompt: persona.system,
         reviewerId: ref.id,
       };

@@ -1,4 +1,5 @@
 import type { Finding, Severity, Category } from '../core/finding.ts';
+import type { PlanReviewVerdict, ReviewTask } from '../core/task.ts';
 import { CATEGORIES, SEVERITIES } from '../core/finding.ts';
 import { ReviewerOutputError } from '../core/errors.ts';
 
@@ -18,6 +19,29 @@ export const REVIEW_OUTPUT_INSTRUCTIONS = `Respond with a single JSON object —
 }
 Do not invent files or line numbers — only cite what you were shown.
 This applies even when the code looks clean: if you find no issues, your entire reply must be exactly {"findings": []} — never a sentence such as "No issues found". The first character you output must be "{" and the last must be "}".`;
+
+export const PLAN_REVIEW_OUTPUT_INSTRUCTIONS = `Respond with a single JSON object — no prose, no preamble, no markdown fence, no thinking written outside the object — matching this shape:
+{
+  "verdict": {
+    "decision": "approve|revise|block",
+    "summary": "One or two sentences explaining the plan-level verdict.",
+    "confidence": "low|medium|high"
+  },
+  "findings": [
+    {
+      "file": "relative/path/to/plan.md",
+      "lineStart": 12,
+      "lineEnd": 18,
+      "severity": "low|medium|high|critical|info",
+      "category": "security|performance|architecture|correctness|style",
+      "title": "Short, concrete title",
+      "body": "One or two sentences. Cite the planning issue and suggest a fix."
+    }
+  ]
+}
+Use "approve" only when the plan is implementation-ready. Use "revise" when decisions, sequencing, tests, or acceptance criteria need improvement. Use "block" when the plan is unsafe, infeasible, or missing critical information.
+Anchor findings to the plan file and line numbers when possible. Do not invent files other than the plan file you were shown.
+If you find no issues, reply with a verdict and an empty findings array. The first character you output must be "{" and the last must be "}".`;
 
 // Appended to the prompt on a single automatic retry when a reviewer's first
 // reply could not be parsed as the JSON envelope above (e.g. it answered in prose).
@@ -69,28 +93,24 @@ interface RawFinding {
   recommendation?: unknown;
 }
 
+export interface ParsedReviewOutput {
+  findings: Finding[];
+  verdict?: PlanReviewVerdict;
+}
+
+export function outputInstructionsForTask(task: Pick<ReviewTask, 'kind'>): string {
+  return task.kind === 'plan-review' ? PLAN_REVIEW_OUTPUT_INSTRUCTIONS : REVIEW_OUTPUT_INSTRUCTIONS;
+}
+
 export function parseFindings(raw: string, reviewerId: string): Finding[] {
+  return parseReviewOutput(raw, reviewerId).findings;
+}
+
+export function parseReviewOutput(raw: string, reviewerId: string): ParsedReviewOutput {
   const text = stripFence(raw).trim();
   if (!text) throw new ReviewerOutputError(reviewerId, 'Reviewer returned empty output');
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch (err) {
-    const recovered = extractJsonObject(text);
-    if (!recovered) {
-      throw new ReviewerOutputError(reviewerId, 'Reviewer output did not contain JSON', err);
-    }
-    try {
-      parsed = JSON.parse(recovered);
-    } catch (recoveredErr) {
-      throw new ReviewerOutputError(
-        reviewerId,
-        'Reviewer output contained malformed JSON',
-        recoveredErr,
-      );
-    }
-  }
+  const parsed = parseOutputJson(text, reviewerId);
 
   if (typeof parsed !== 'object' || parsed === null) {
     throw new ReviewerOutputError(reviewerId, 'Reviewer output JSON must be an object');
@@ -108,7 +128,49 @@ export function parseFindings(raw: string, reviewerId: string): Finding[] {
     }
     out.push(normalised);
   }
-  return out;
+  const verdict = normaliseVerdict((parsed as { verdict?: unknown }).verdict);
+  return verdict ? { findings: out, verdict } : { findings: out };
+}
+
+function parseOutputJson(text: string, reviewerId: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    const recovered = extractJsonObject(text);
+    if (!recovered) {
+      throw new ReviewerOutputError(reviewerId, 'Reviewer output did not contain JSON', err);
+    }
+    try {
+      return JSON.parse(recovered);
+    } catch (recoveredErr) {
+      throw new ReviewerOutputError(
+        reviewerId,
+        'Reviewer output contained malformed JSON',
+        recoveredErr,
+      );
+    }
+  }
+}
+
+function normaliseVerdict(raw: unknown): PlanReviewVerdict | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const obj = raw as { decision?: unknown; summary?: unknown; confidence?: unknown };
+  const decisionRaw = typeof obj.decision === 'string' ? obj.decision.toLowerCase().trim() : '';
+  const decision = isDecision(decisionRaw) ? decisionRaw : 'revise';
+  const summary = typeof obj.summary === 'string' && obj.summary.trim()
+    ? obj.summary.trim()
+    : 'No verdict summary provided.';
+  const confidenceRaw = typeof obj.confidence === 'string' ? obj.confidence.toLowerCase().trim() : '';
+  const confidence = isConfidence(confidenceRaw) ? confidenceRaw : undefined;
+  return confidence ? { decision, summary, confidence } : { decision, summary };
+}
+
+function isDecision(value: string): value is PlanReviewVerdict['decision'] {
+  return value === 'approve' || value === 'revise' || value === 'block';
+}
+
+function isConfidence(value: string): value is NonNullable<PlanReviewVerdict['confidence']> {
+  return value === 'low' || value === 'medium' || value === 'high';
 }
 
 function normaliseFinding(item: RawFinding, reviewerId: string): Finding | null {

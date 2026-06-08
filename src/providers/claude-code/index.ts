@@ -1,5 +1,5 @@
 import type { MetaReviewFn } from '../../consensus/registry.ts';
-import { REVIEW_OUTPUT_INSTRUCTIONS } from '../../reviewers/output.ts';
+import { outputInstructionsForTask } from '../../reviewers/output.ts';
 import { createSubprocessMetaReviewer } from '../subprocess.ts';
 import { createSubprocessProvider } from '../base-subprocess.ts';
 import { ClaudeCodeConfigSchema, type ClaudeCodeConfig } from './schema.ts';
@@ -16,7 +16,7 @@ export const claudeCodeFactory = createSubprocessProvider({
       '--print', '--model', c.model,
       ...(c.variant ? ['--effort', c.variant] : []),
       ...c.extra_args,
-      '--append-system-prompt', `${task.systemPrompt}\n\n${REVIEW_OUTPUT_INSTRUCTIONS}`,
+      '--append-system-prompt', `${task.systemPrompt}\n\n${outputInstructionsForTask(task)}`,
     ];
     return args;
   },

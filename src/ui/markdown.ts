@@ -33,6 +33,16 @@ export function renderMarkdownReport(result: PipelineResult): string {
   out.push('');
   out.push('## 📊 Summary');
   out.push('');
+  if (result.verdictSummary) {
+    out.push(`**Plan verdict:** ${escapeMd(result.verdictSummary.decision.toUpperCase())}`);
+    out.push('');
+    out.push('| Decision | Reviewers |');
+    out.push('| --- | ---: |');
+    out.push(`| Approve | ${result.verdictSummary.counts.approve} |`);
+    out.push(`| Revise | ${result.verdictSummary.counts.revise} |`);
+    out.push(`| Block | ${result.verdictSummary.counts.block} |`);
+    out.push('');
+  }
   out.push('| Severity | Findings |');
   out.push('| --- | ---: |');
   for (const severity of SEVERITY_ORDER) {
@@ -43,6 +53,15 @@ export function renderMarkdownReport(result: PipelineResult): string {
   if (result.errors.length > 0) {
     out.push('## 🚨 Reviewer errors');
     for (const e of result.errors) out.push(`- **${escapeMd(e.reviewerId)}**: ${escapeMd(e.message)}`);
+    out.push('');
+  }
+
+  if (result.verdictSummary?.summaries.length) {
+    out.push('## 🧾 Reviewer verdicts');
+    for (const verdict of result.verdictSummary.summaries) {
+      const confidence = verdict.confidence ? ` · confidence: ${verdict.confidence}` : '';
+      out.push(`- **${escapeMd(verdict.reviewerId)}**: ${escapeMd(verdict.decision)}${escapeMd(confidence)} — ${escapeMd(verdict.summary)}`);
+    }
     out.push('');
   }
 

@@ -1,4 +1,4 @@
-import type { ReviewResult, ModelConfig } from './task.ts';
+import type { ReviewResult, ModelConfig, PlanReviewVerdict } from './task.ts';
 import type { Finding, FindingGroup, Severity } from './finding.ts';
 
 export interface ReviewerRef {
@@ -70,6 +70,16 @@ export interface PipelineResult {
   consensus: ConsensusResult;
   durationMs: number;
   errors: ReviewerError[];
+  verdictSummary?: {
+    decision: PlanReviewVerdict['decision'];
+    counts: Record<PlanReviewVerdict['decision'], number>;
+    summaries: Array<{
+      reviewerId: string;
+      decision: PlanReviewVerdict['decision'];
+      summary: string;
+      confidence?: NonNullable<PlanReviewVerdict['confidence']>;
+    }>;
+  };
   budgetExceeded?: boolean;
   totalCostUsd?: number;
 }

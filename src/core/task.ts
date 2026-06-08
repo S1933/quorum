@@ -15,12 +15,18 @@ export interface ModelConfig {
 }
 
 export interface ReviewTask {
-  kind: 'review';
+  kind: 'review' | 'plan-review';
   id: string;
   instruction: string;
   workspace: WorkspaceInfo;
   systemPrompt: string;
   reviewerId: string;
+}
+
+export interface PlanReviewVerdict {
+  decision: 'approve' | 'revise' | 'block';
+  summary: string;
+  confidence?: 'low' | 'medium' | 'high';
 }
 
 export interface UsageInfo {
@@ -33,6 +39,7 @@ export interface ReviewResult {
   taskId: string;
   reviewerId: string;
   findings: Finding[];
+  verdict?: PlanReviewVerdict;
   rawOutput: string;
   usage?: UsageInfo;
   durationMs: number;

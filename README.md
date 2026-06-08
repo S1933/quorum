@@ -176,6 +176,20 @@ quorum review --include "src/**/*.ts"               # filter by glob
 quorum review --no-preview --no-color               # quiet mode
 ```
 
+#### Review an implementation plan
+
+```
+quorum plan-review <plan-file> [--pipeline=<id>] [flags]
+```
+
+Runs the same multi-reviewer pipeline against a Markdown/text plan file. Reports include normal findings plus a plan verdict: `approve`, `revise`, or `block`.
+
+```bash
+quorum plan-review docs/plan.md
+quorum plan-review docs/plan.md --json
+quorum plan-review docs/plan.md --report .quorum/plan-review.md
+```
+
 #### List personas, reviewers, and pipelines
 
 ```

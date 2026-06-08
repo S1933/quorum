@@ -4,7 +4,7 @@ import type { ReviewTask, ReviewResult } from '../core/task.ts';
 import type { ProviderFactory } from './registry.ts';
 import type { PluginCtx } from '../runtime/plugin.ts';
 import type { MetaReviewFn } from '../consensus/registry.ts';
-import { REVIEW_OUTPUT_INSTRUCTIONS } from '../reviewers/output.ts';
+import { outputInstructionsForTask } from '../reviewers/output.ts';
 import { runSubprocess, buildSubprocessReviewResult } from './subprocess.ts';
 
 export const STDIN_PROMPT = 'Read the review instructions from stdin and return only the requested output.';
@@ -20,6 +20,7 @@ export interface SubprocessProviderOpts {
   type: string;
   label: string;
   schema: z.ZodTypeAny;
+  maxConcurrentReviews?: number;
   buildArgs(cfg: SubprocessBaseConfig, ctx: ExecCtx, task: ReviewTask, cwd: string): string[];
   buildStdin?(cfg: SubprocessBaseConfig, task: ReviewTask): string;
   processOutput?(raw: string, _cfg: SubprocessBaseConfig): string;
@@ -28,7 +29,7 @@ export interface SubprocessProviderOpts {
 }
 
 const DEFAULT_STDIN = (_cfg: SubprocessBaseConfig, task: ReviewTask): string =>
-  [task.systemPrompt, REVIEW_OUTPUT_INSTRUCTIONS, task.instruction].join('\n\n');
+  [task.systemPrompt, outputInstructionsForTask(task), task.instruction].join('\n\n');
 
 export function createSubprocessProvider(opts: SubprocessProviderOpts): ProviderFactory {
   const buildStdin = opts.buildStdin ?? DEFAULT_STDIN;
@@ -52,6 +53,7 @@ export function createSubprocessProvider(opts: SubprocessProviderOpts): Provider
         tools: true,
         mcp: true,
         localExecution: true,
+        ...(opts.maxConcurrentReviews ? { maxConcurrentReviews: opts.maxConcurrentReviews } : {}),
       };
     }
 

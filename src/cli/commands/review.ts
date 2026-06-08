@@ -139,7 +139,7 @@ export async function cmdReview(
   }
 }
 
-function resolveReportPath(
+export function resolveReportPath(
   root: string,
   reportPath: string,
   flags: Record<string, string | boolean>,
@@ -151,7 +151,7 @@ function resolveReportPath(
   return resolved;
 }
 
-async function runInteractive(
+export async function runInteractive(
   executor: PipelineExecutor,
   input: PipelineRunInput,
   io: CliIo,
@@ -283,7 +283,7 @@ function normaliseExtension(extension: string): string {
   return trimmed.startsWith('.') ? trimmed : `.${trimmed}`;
 }
 
-function reviewOutputFormat(flags: Record<string, string | boolean>): 'text' | 'json' {
+export function reviewOutputFormat(flags: Record<string, string | boolean>): 'text' | 'json' {
   if (flags.json === true) return 'json';
   if (flags.format === undefined) return 'text';
   if (flags.format === 'text' || flags.format === 'json') return flags.format;

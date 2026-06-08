@@ -1,5 +1,6 @@
 import type { Finding, FindingGroup, Severity } from '../core/finding.ts';
 import type { PipelineResult, ReviewerError } from '../core/pipeline.ts';
+import type { PlanReviewVerdict } from '../core/task.ts';
 
 export const SEVERITY_ORDER: readonly Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
 
@@ -44,6 +45,7 @@ export interface JsonReport {
       outputTokens: number;
       costUsd?: number;
     };
+    verdict?: PlanReviewVerdict;
     findings: Finding[];
   }>;
   consensus: {
@@ -52,6 +54,7 @@ export interface JsonReport {
     unique: Finding[];
     contradictions: PipelineResult['consensus']['contradictions'];
   };
+  verdictSummary?: PipelineResult['verdictSummary'];
   errors: Array<Pick<ReviewerError, 'reviewerId' | 'message'>>;
 }
 
@@ -127,6 +130,7 @@ export function toJsonReport(result: PipelineResult): JsonReport {
         findings: review.findings,
       };
       if (review.usage) out.usage = review.usage;
+      if (review.verdict) out.verdict = review.verdict;
       return out;
     }),
     consensus: {
@@ -138,6 +142,7 @@ export function toJsonReport(result: PipelineResult): JsonReport {
       unique: result.consensus.unique,
       contradictions: result.consensus.contradictions,
     },
+    ...(result.verdictSummary ? { verdictSummary: result.verdictSummary } : {}),
     errors: result.errors.map((error) => ({
       reviewerId: error.reviewerId,
       message: error.message,
