@@ -6,6 +6,8 @@ Quorum is a provider-agnostic review runtime for AI-assisted code changes. Its d
 
 This document defines the domain model, layer boundaries, interfaces, and V1 cut. It deliberately defers anything not load-bearing for the first working version.
 
+Accepted architecture decisions are tracked in [Architecture Decision Records](adr/README.md).
+
 ---
 
 ## 1. Design principles
