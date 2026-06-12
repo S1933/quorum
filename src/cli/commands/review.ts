@@ -8,7 +8,7 @@ import { renderJsonReport } from '../../ui/json.ts';
 import { ConfigError } from '../../core/errors.ts';
 import type { PipelineResult } from '../../core/pipeline.ts';
 import type { CliDeps, CliIo } from '../types.ts';
-import { assertPathInside, writeReport } from '../report.ts';
+import { assertPathInside, writeArchivedReport, writeReport } from '../report.ts';
 import {
   QUESTIONS_PROMPT,
   buildFindingsWithQAInstruction,
@@ -125,7 +125,9 @@ export async function cmdReview(
       const reportPath = typeof flags.report === 'string'
         ? resolveReportPath(root, flags.report, flags)
         : `${root}/.quorum/last-review.md`;
-      await writeReport(reportPath, renderMarkdownReport(result));
+      const md = renderMarkdownReport(result);
+      await writeReport(reportPath, md);
+      await writeArchivedReport(root, 'review', filteredPipeline.id, md);
       io.stdout.write(`\nreport: ${reportPath}\n`);
       if (result.totalCostUsd) {
         const over = result.budgetExceeded ? ' (budget exceeded)' : '';

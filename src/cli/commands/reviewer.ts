@@ -1,6 +1,5 @@
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { resolve, join } from 'node:path';
-import { Faker, base as fakerBase, fr } from '@faker-js/faker';
 import type { CliDeps, CliIo } from '../types.ts';
 
 const PKG_ROOT = resolve(import.meta.dir, '..', '..', '..');
@@ -20,6 +19,26 @@ const SUPPORTED_PROVIDERS = [
 const LEGACY_PROVIDER_ALIASES: Record<string, typeof SUPPORTED_PROVIDERS[number]> = {
   'opencode-go': 'opencode',
 };
+const REVIEWER_NAME_POOL = [
+  'ada',
+  'alan',
+  'barbara',
+  'claude',
+  'dennis',
+  'edsger',
+  'frances',
+  'grace',
+  'hedy',
+  'john',
+  'katherine',
+  'leslie',
+  'linus',
+  'margaret',
+  'niklaus',
+  'radia',
+  'tim',
+  'yukihiro',
+] as const;
 
 const REVIEWER_ADD_USAGE = 'Usage: quorum reviewer add --provider=<type> --persona=<name> --model=<model> [--variant=<variant>] [--id=<reviewer-id>] [--ext=<ext1,ext2,...>] [--fileExtensions=<ext1,ext2,...>] [--temperature=<0..2>] [--pipeline=<id>] [--config=<path>]\n';
 
@@ -189,19 +208,9 @@ function resolveReviewerId(
 }
 
 function reviewerNameCandidates(base: string, existing: Record<string, unknown>): string[] {
-  const faker = new Faker({ locale: [fr, fakerBase] });
-  faker.seed(stableSeed([base, ...Object.keys(existing).sort()].join('|')));
-
-  const candidates: string[] = [];
-  const seen = new Set<string>();
-  for (let i = 0; i < 100; i += 1) {
-    const name = slugPart(faker.person.firstName());
-    if (name && !seen.has(name)) {
-      seen.add(name);
-      candidates.push(name);
-    }
-  }
-  return candidates;
+  const seed = stableSeed([base, ...Object.keys(existing).sort()].join('|'));
+  const start = seed % REVIEWER_NAME_POOL.length;
+  return REVIEWER_NAME_POOL.map((_, i) => REVIEWER_NAME_POOL[(start + i) % REVIEWER_NAME_POOL.length]!);
 }
 
 function stableSeed(input: string): number {
@@ -211,15 +220,6 @@ function stableSeed(input: string): number {
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
-}
-
-function slugPart(input: string): string {
-  return input
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 function usedReviewerNamePrefixes(existing: Record<string, unknown>): Set<string> {

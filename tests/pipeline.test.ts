@@ -250,6 +250,21 @@ describe('PipelineExecutor', () => {
     expect(result.totalCostUsd).toBe(0.13);
   });
 
+  test('does not approve plan-review when no reviewer returned a verdict', async () => {
+    const result = await runPipeline({
+      parallel: true,
+      reviewers: ['a'],
+      boundReviewers: [reviewer('a', async () => reviewResult('a'))],
+      taskKind: 'plan-review',
+    });
+
+    expect(result.verdictSummary).toEqual({
+      decision: 'revise',
+      counts: { approve: 0, revise: 0, block: 0 },
+      summaries: [],
+    });
+  });
+
   test('passes parent aborts through to semantic meta-reviewer', async () => {
     const parent = new AbortController();
     const consensus = new ConsensusRegistry();
@@ -323,6 +338,7 @@ async function runPipeline(opts: {
   timeoutMs?: number;
   maxConcurrency?: number;
   maxTotalCostUsd?: number;
+  taskKind?: 'review' | 'plan-review';
   bus?: InMemoryEventBus;
 }) {
   const pipeline: Pipeline = {
@@ -346,6 +362,7 @@ async function runPipeline(opts: {
     consensus,
     providers: new ProviderRegistry(),
     pluginCtx: defaultPluginCtx('/repo'),
+    ...(opts.taskKind ? { taskKind: opts.taskKind } : {}),
   });
 }
 

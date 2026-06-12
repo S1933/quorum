@@ -9,7 +9,7 @@ import { renderMarkdownReport } from '../../ui/markdown.ts';
 import { renderJsonReport } from '../../ui/json.ts';
 import type { Pipeline } from '../../core/pipeline.ts';
 import type { CliDeps, CliIo } from '../types.ts';
-import { writeReport } from '../report.ts';
+import { writeArchivedReport, writeReport } from '../report.ts';
 import {
   buildSafeFence,
   resolveReportPath,
@@ -88,7 +88,9 @@ export async function cmdPlanReview(
       const reportPath = typeof flags.report === 'string'
         ? resolveReportPath(root, flags.report, flags)
         : `${root}/.quorum/last-plan-review.md`;
-      await writeReport(reportPath, renderMarkdownReport(result));
+      const md = renderMarkdownReport(result);
+      await writeReport(reportPath, md);
+      await writeArchivedReport(root, 'plan-review', filteredPipeline.id, md);
       io.stdout.write(`\nreport: ${reportPath}\n`);
       if (result.totalCostUsd) {
         const over = result.budgetExceeded ? ' (budget exceeded)' : '';

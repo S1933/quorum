@@ -65,6 +65,39 @@ export function renderMarkdownReport(result: PipelineResult): string {
     out.push('');
   }
 
+  out.push('## 💰 Token Usage');
+  out.push('');
+  let totalInput = 0;
+  let totalOutput = 0;
+  let totalCost = 0;
+  let hasCost = false;
+  for (const review of result.reviews) {
+    if (!review.usage) continue;
+    totalInput += review.usage.inputTokens;
+    totalOutput += review.usage.outputTokens;
+    if (review.usage.costUsd !== undefined) {
+      totalCost += review.usage.costUsd;
+      hasCost = true;
+    }
+  }
+  if (totalInput > 0 || totalOutput > 0) {
+    out.push(`| Reviewer | Input Tokens | Output Tokens | ${hasCost ? 'Cost' : ''}`);
+    out.push(`| --- | ---: | ---: |${hasCost ? ' ---:' : ''}`);
+    for (const review of result.reviews) {
+      if (!review.usage) {
+        out.push(`| ${escapeMd(review.reviewerId)} | _no data_ | _no data_ |${hasCost ? ' _no data_' : ''}`);
+        continue;
+      }
+      const cost = review.usage.costUsd !== undefined ? `$${review.usage.costUsd.toFixed(4)}` : '—';
+      out.push(`| ${escapeMd(review.reviewerId)} | ${review.usage.inputTokens.toLocaleString()} | ${review.usage.outputTokens.toLocaleString()} |${hasCost ? ` ${cost}` : ''}`);
+    }
+    out.push(`| **Total** | **${totalInput.toLocaleString()}** | **${totalOutput.toLocaleString()}** |${hasCost ? ` **$${totalCost.toFixed(4)}**` : ''}`);
+    out.push('');
+  } else {
+    out.push('_No token usage data available._');
+    out.push('');
+  }
+
   out.push('## 🔎 Findings by priority');
   renderPriorityFindings(out, result.consensus.groups, result.consensus.unique);
 

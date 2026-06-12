@@ -9,6 +9,24 @@ export async function writeReport(path: string, content: string): Promise<void> 
   await Bun.write(path, content);
 }
 
+export function archiveReportPath(root: string, kind: string, pipelineId: string): string {
+  const ts = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${ts.getFullYear()}-${pad(ts.getMonth() + 1)}-${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}`;
+  const safeKind = kind.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const safeId = pipelineId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `${root}/.quorum/reviews/${stamp}-${safeKind}-${safeId}.md`;
+}
+
+export async function writeArchivedReport(root: string, kind: string, pipelineId: string, content: string): Promise<void> {
+  try {
+    const path = archiveReportPath(root, kind, pipelineId);
+    await writeReport(path, content);
+  } catch {
+    /* archive is best-effort */
+  }
+}
+
 export function resolveConfigPath(
   root: string,
   value: string | boolean | undefined,
