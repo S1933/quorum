@@ -111,14 +111,24 @@ export class PipelineExecutor {
         }
       }
 
-      consensusResult = await computeConsensus(
-        reviews.filter(Boolean),
-        pipeline,
-        consensus,
-        providers,
-        pluginCtx,
-        controller.signal,
-      );
+      if (controller.signal.aborted) {
+        consensusResult = {
+          groups: [],
+          agreement: {},
+          unique: reviews.filter(Boolean).flatMap((r) => r.findings),
+          contradictions: [],
+          strategyId: 'none',
+        };
+      } else {
+        consensusResult = await computeConsensus(
+          reviews.filter(Boolean),
+          pipeline,
+          consensus,
+          providers,
+          pluginCtx,
+          controller.signal,
+        );
+      }
     } finally {
       if (timeoutHandle) clearTimeout(timeoutHandle);
       if (signal) signal.removeEventListener('abort', onParentAbort);
@@ -172,7 +182,13 @@ function buildVerdictSummary(reviews: ReviewResult[]): NonNullable<PipelineResul
     summaries.push(item);
   }
 
-  const decision = counts.block > 0 ? 'block' : counts.revise > 0 ? 'revise' : 'approve';
+  const decision = summaries.length === 0
+    ? 'revise'
+    : counts.block > 0
+      ? 'block'
+      : counts.revise > 0
+        ? 'revise'
+        : 'approve';
   return { decision, counts, summaries };
 }
 

@@ -50,20 +50,60 @@ async function refExists(root: string, ref: string): Promise<boolean> {
   return code === 0;
 }
 
+interface GitOk {
+  ok: true;
+  out: string;
+}
+
+interface GitErr {
+  ok: false;
+  err: string;
+}
+
+type GitResult = GitOk | GitErr;
+
+async function runGit(root: string, args: string[]): Promise<GitResult> {
+  const proc = Bun.spawn({
+    cmd: ['git', ...args],
+    cwd: root,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  const [out, err, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  if (code !== 0) {
+    return { ok: false, err: err.trim() || `git ${args.join(' ')} failed with code ${code}` };
+  }
+  const trimmed = out.trim();
+  return { ok: true, out: trimmed ? trimmed : '' };
+}
+
+async function runGitNul(root: string, args: string[]): Promise<string[]> {
+  const result = await runGit(root, args);
+  if (!result.ok) return [];
+  if (!result.out) return [];
+  return result.out.split('\0').filter(Boolean);
+}
+
 async function gitDiff(root: string, mergeBase: string | undefined): Promise<string | undefined> {
   if (mergeBase) {
-    const branchDiff = await runGitDiff(root, ['diff', mergeBase]);
-    return branchDiff === null ? undefined : branchDiff || undefined;
+    const result = await runGit(root, ['diff', mergeBase]);
+    if (!result.ok) throw new ProviderRuntimeError('workspace', result.err);
+    return result.out || undefined;
   }
 
   const chunks: string[] = [];
-  const [stagedDiff, worktreeDiff] = await Promise.all([
-    runGitDiff(root, ['diff', '--cached']),
-    runGitDiff(root, ['diff']),
+  const [stagedResult, worktreeResult] = await Promise.all([
+    runGit(root, ['diff', '--cached']),
+    runGit(root, ['diff']),
   ]);
-  if (stagedDiff === null || worktreeDiff === null) return undefined;
-  if (stagedDiff) chunks.push(stagedDiff);
-  if (worktreeDiff) chunks.push(worktreeDiff);
+  if (!stagedResult.ok) throw new ProviderRuntimeError('workspace', stagedResult.err);
+  if (!worktreeResult.ok) throw new ProviderRuntimeError('workspace', worktreeResult.err);
+  if (stagedResult.out) chunks.push(stagedResult.out);
+  if (worktreeResult.out) chunks.push(worktreeResult.out);
 
   return chunks.length > 0 ? chunks.join('\n') : undefined;
 }
@@ -77,29 +117,6 @@ async function getMergeBase(root: string, baseRef: string): Promise<string | und
   });
   const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
   return code === 0 ? out.trim() : undefined;
-}
-
-async function runGitDiff(root: string, args: string[]): Promise<string | null> {
-  return runGit(root, args);
-}
-
-async function runGit(root: string, args: string[]): Promise<string | null> {
-  const proc = Bun.spawn({
-    cmd: ['git', ...args],
-    cwd: root,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-  const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
-  if (code !== 0) return null;
-  const trimmed = out.trim();
-  return trimmed ? trimmed : '';
-}
-
-async function runGitNul(root: string, args: string[]): Promise<string[]> {
-  const out = await runGit(root, args);
-  if (!out) return [];
-  return out.split('\0').filter(Boolean);
 }
 
 async function gitDiffFileList(root: string, mergeBase: string | undefined): Promise<string[]> {

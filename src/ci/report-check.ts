@@ -44,19 +44,38 @@ function escapeFilePath(p: string): string {
   return p.replace(/`/g, '\\`');
 }
 
+function escapeWorkflowCommandData(value: string): string {
+  return value
+    .replace(/%/g, '%25')
+    .replace(/\r/g, '%0D')
+    .replace(/\n/g, '%0A');
+}
+
+function escapeWorkflowCommandProperty(value: string): string {
+  return escapeWorkflowCommandData(value)
+    .replace(/:/g, '%3A')
+    .replace(/,/g, '%2C');
+}
+
 function emitAnnotations(findings: ReportFinding[], failOnRank: number): boolean {
   let blocked = false;
 
   for (const { finding: f } of findings) {
     const rank = SEVERITY_RANK[f.severity];
     const title = `${severityIcon(f.severity)} ${f.title}`;
-    const body = `${categoryIcon(f.category)} ${f.category} \u00B7 ${f.body.replace(/\n/g, ' ')}`;
+    const body = `${categoryIcon(f.category)} ${f.category} \u00B7 ${f.body}`;
+    const annotation = [
+      `file=${escapeWorkflowCommandProperty(f.file)}`,
+      `line=${f.lineRange.start}`,
+      `title=${escapeWorkflowCommandProperty(title)}`,
+    ].join(',');
+    const message = escapeWorkflowCommandData(body);
 
     if (rank >= failOnRank) {
-      console.log(`::error file=${f.file},line=${f.lineRange.start},title=${title}::${body}`);
+      console.log(`::error ${annotation}::${message}`);
       blocked = true;
     } else {
-      console.log(`::warning file=${f.file},line=${f.lineRange.start},title=${title}::${body}`);
+      console.log(`::warning ${annotation}::${message}`);
     }
   }
 
@@ -146,7 +165,17 @@ function buildComment(
       lines.push('');
       lines.push(`${categoryIcon(f.category)} ${f.category} \u00B7 ${agreementText}`);
       lines.push('');
-      lines.push(f.body);
+      const body = f.body;
+      let maxTicks = 0;
+      let curTicks = 0;
+      for (const ch of body) {
+        if (ch === '`') { curTicks++; if (curTicks > maxTicks) maxTicks = curTicks; }
+        else { curTicks = 0; }
+      }
+      const fence = '`'.repeat(Math.max(3, maxTicks + 1));
+      lines.push(fence);
+      lines.push(body);
+      lines.push(fence);
       lines.push('');
       lines.push('</details>');
       lines.push('');
