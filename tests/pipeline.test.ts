@@ -5,6 +5,7 @@ import type { Pipeline } from '../src/core/pipeline.ts';
 import type { Provider } from '../src/core/provider.ts';
 import type { ReviewResult, UsageInfo } from '../src/core/task.ts';
 import { overlapV1 } from '../src/consensus/overlap-v1.ts';
+import { semanticV2 } from '../src/consensus/semantic-v2.ts';
 import { ConsensusRegistry } from '../src/consensus/registry.ts';
 import { PipelineExecutor } from '../src/pipelines/executor.ts';
 import type { BoundReviewer } from '../src/reviewers/reviewer.ts';
@@ -247,6 +248,71 @@ describe('PipelineExecutor', () => {
 
     expect(result.budgetExceeded).toBeUndefined();
     expect(result.totalCostUsd).toBe(0.13);
+  });
+
+  test('passes parent aborts through to semantic meta-reviewer', async () => {
+    const parent = new AbortController();
+    const consensus = new ConsensusRegistry();
+    consensus.register(semanticV2);
+    const providers = new ProviderRegistry();
+    providers.register({
+      type: 'fake-meta',
+      schema: {} as never,
+      async create() {
+        throw new Error('not used');
+      },
+      createMetaReviewer() {
+        return async (_prompt, ctx) => {
+          parent.abort();
+          await waitFor(() => ctx.signal.aborted);
+          return JSON.stringify({ resolution: 'both_partial', explanation: 'aborted signal observed' });
+        };
+      },
+    });
+
+    const low: Finding = {
+      file: 'src/app.ts',
+      lineRange: { start: 10, end: 10 },
+      severity: 'low',
+      category: 'correctness',
+      title: 'Shared issue',
+      body: 'low concern',
+      reviewer: 'a',
+    };
+    const critical: Finding = {
+      ...low,
+      severity: 'critical',
+      body: 'critical concern',
+      reviewer: 'b',
+    };
+
+    const executor = new PipelineExecutor();
+    const result = await executor.run({
+      pipeline: {
+        id: 'test',
+        parallel: true,
+        reviewers: ['a', 'b'],
+        consensus: {
+          strategy: 'semantic-v2',
+          enableContradictions: true,
+          metaReviewerProvider: { type: 'fake-meta' },
+        },
+      },
+      reviewers: [
+        reviewer('a', async () => reviewResult('a', [low])),
+        reviewer('b', async () => reviewResult('b', [critical])),
+      ],
+      workspace: { root: '/repo' },
+      instruction: 'review this',
+      taskId: 'task',
+      bus: new InMemoryEventBus(),
+      consensus,
+      providers,
+      pluginCtx: defaultPluginCtx('/repo'),
+      signal: parent.signal,
+    });
+
+    expect(result.consensus.contradictions[0]?.note).toContain('aborted signal observed');
   });
 });
 

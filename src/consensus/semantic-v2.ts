@@ -29,6 +29,7 @@ export const semanticV2: ConsensusStrategy<SemanticV2ConsensusConfig> = {
           contradictions,
           passing.length > 0 ? passing : groups,
           ctx.metaReview,
+          { signal: ctx.signal ?? new AbortController().signal },
         );
       }
     }

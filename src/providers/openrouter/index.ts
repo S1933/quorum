@@ -158,7 +158,7 @@ export const openRouterFactory: ProviderFactory = {
   createMetaReviewer(config, _ctx): MetaReviewFn | undefined {
     const cfg = config as OpenRouterConfig;
     const client = new OpenRouterClient(cfg, 'meta-review');
-    return async (prompt: string): Promise<string> => {
+    return async (prompt, ctx): Promise<string> => {
       const chunks: string[] = [];
       const req: Parameters<OpenRouterClient['chat']>[0] = {
         model: cfg.model,
@@ -166,7 +166,7 @@ export const openRouterFactory: ProviderFactory = {
       };
       if (cfg.max_tokens !== undefined) req.max_tokens = cfg.max_tokens;
       if (cfg.variant) req.reasoning = { effort: cfg.variant };
-      for await (const event of client.chatStream(req, new AbortController().signal)) {
+      for await (const event of client.chatStream(req, ctx.signal)) {
         if (event.type === 'token') chunks.push(event.text);
       }
       return chunks.join('').trim() || '{}';

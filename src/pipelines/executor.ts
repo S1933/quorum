@@ -59,6 +59,7 @@ export class PipelineExecutor {
 
     const reviews: ReviewResult[] = [];
     const errors: ReviewerError[] = [];
+    let consensusResult: ConsensusResult;
 
     try {
       const runOne = async (rev: BoundReviewer, index: number): Promise<void> => {
@@ -109,12 +110,19 @@ export class PipelineExecutor {
           await runOne(reviewers[i]!, i);
         }
       }
+
+      consensusResult = await computeConsensus(
+        reviews.filter(Boolean),
+        pipeline,
+        consensus,
+        providers,
+        pluginCtx,
+        controller.signal,
+      );
     } finally {
       if (timeoutHandle) clearTimeout(timeoutHandle);
       if (signal) signal.removeEventListener('abort', onParentAbort);
     }
-
-    const consensusResult = await computeConsensus(reviews.filter(Boolean), pipeline, consensus, providers, pluginCtx);
 
     const result: PipelineResult = {
       pipelineId: pipeline.id,
@@ -189,6 +197,7 @@ async function computeConsensus(
   registry: ConsensusRegistry,
   providers: ProviderRegistry,
   pluginCtx: PluginCtx,
+  signal: AbortSignal,
 ): Promise<ConsensusResult> {
   if (!pipeline.consensus) {
     return {
@@ -205,7 +214,7 @@ async function computeConsensus(
     ? resolveMetaReviewer(pipeline.consensus.metaReviewerProvider, providers, pluginCtx)
     : undefined;
 
-  const ctx: ConsensusContext | undefined = metaReview ? { metaReview } : undefined;
+  const ctx: ConsensusContext = metaReview ? { metaReview, signal } : { signal };
 
   const result = strategy.aggregate(reviews, pipeline.consensus, ctx);
   return result instanceof Promise ? await result : result;

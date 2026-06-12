@@ -2,10 +2,15 @@ import type { ReviewResult } from '../core/task.ts';
 import type { ConsensusResult, ConsensusConfig } from '../core/pipeline.ts';
 import { ConfigError } from '../core/errors.ts';
 
-export type MetaReviewFn = (prompt: string) => Promise<string>;
+export interface MetaReviewContext {
+  signal: AbortSignal;
+}
+
+export type MetaReviewFn = (prompt: string, ctx: MetaReviewContext) => Promise<string>;
 
 export interface ConsensusContext {
   metaReview?: MetaReviewFn;
+  signal?: AbortSignal;
 }
 
 export interface ConsensusStrategy<C extends ConsensusConfig = ConsensusConfig> {

@@ -1,7 +1,6 @@
 import type { FindingGroup } from '../core/finding.ts';
 import type { ConsensusResult } from '../core/pipeline.ts';
-
-export type MetaReviewFn = (prompt: string) => Promise<string>;
+import type { MetaReviewContext, MetaReviewFn } from './registry.ts';
 
 type Contradiction = ConsensusResult['contradictions'][number];
 
@@ -36,6 +35,7 @@ export async function resolveContradictions(
   contradictions: Contradiction[],
   groups: FindingGroup[],
   metaReview: MetaReviewFn,
+  ctx: MetaReviewContext,
 ): Promise<Contradiction[]> {
   const resolved: Contradiction[] = [];
 
@@ -65,7 +65,7 @@ export async function resolveContradictions(
       .replace('{bodyB}', b.body);
 
     try {
-      const raw = await metaReview(prompt);
+      const raw = await metaReview(prompt, ctx);
       const parsed = parseMetaReviewResponse(raw);
       resolved.push({
         groupId: c.groupId,

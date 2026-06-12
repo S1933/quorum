@@ -60,6 +60,35 @@ describe('openrouter provider', () => {
     expect(result.usage).toEqual({ inputTokens: 5, outputTokens: 2 });
     expect(tokenText(events)).toBe('{"findings":[]}');
   });
+
+  test('meta-reviewer uses the provided abort signal', async () => {
+    const controller = new AbortController();
+    let receivedSignal: AbortSignal | undefined;
+    globalThis.fetch = (async (_input, init) => {
+      receivedSignal = init?.signal as AbortSignal | undefined;
+      return new Response(
+        new ReadableStream({
+          start(stream) {
+            const enc = new TextEncoder();
+            stream.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"{\\"resolution\\":\\"both_partial\\",\\"explanation\\":\\"ok\\"}"}}]}\n\n'));
+            stream.enqueue(enc.encode('data: [DONE]\n\n'));
+            stream.close();
+          },
+        }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    const metaReview = openRouterFactory.createMetaReviewer?.({
+      type: 'openrouter',
+      api_key: 'test-key',
+      model: 'anthropic/test',
+      base_url: 'https://openrouter.test/api/v1',
+    }, { workspaceRoot: '/tmp/quorum', env: {} });
+
+    await expect(metaReview?.('resolve this', { signal: controller.signal })).resolves.toContain('both_partial');
+    expect(receivedSignal).toBe(controller.signal);
+  });
 });
 
 function task(): ReviewTask {

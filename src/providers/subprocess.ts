@@ -296,7 +296,7 @@ export function createSubprocessMetaReviewer(
   timeoutMs: number,
   env?: Record<string, string | undefined>,
 ): MetaReviewFn {
-  return async (prompt: string): Promise<string> => {
+  return async (prompt, ctx): Promise<string> => {
     const opts: SubprocessRunOptions = {
       providerId: 'meta-review',
       providerLabel: binary,
@@ -306,7 +306,7 @@ export function createSubprocessMetaReviewer(
       cwd,
       stdin: prompt,
       timeoutMs,
-      signal: new AbortController().signal,
+      signal: ctx.signal,
       bus: new InMemoryEventBus(),
     };
     if (env) opts.env = env;
