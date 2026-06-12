@@ -13,12 +13,19 @@ const MAX_UNTRACKED_BYTES = 24 * 1024;
 export async function probeWorkspace(opts: WorkspaceProbeOptions): Promise<WorkspaceInfo> {
   const { root } = opts;
   const baseRef = opts.baseRef ?? (await defaultBaseRef(root));
-  const [diff, untrackedDiff] = await Promise.all([
-    gitDiff(root, baseRef),
-    gitUntrackedDiff(root),
+
+  let mergeBase: string | undefined;
+  if (baseRef) {
+    mergeBase = await getMergeBase(root, baseRef);
+  }
+
+  const [diff, untracked, changedFiles] = await Promise.all([
+    gitDiff(root, mergeBase),
+    gitUntrackedInfo(root),
+    gitDiffFileList(root, mergeBase),
   ]);
-  const combinedDiff = [diff, untrackedDiff].filter(Boolean).join('\n\n') || undefined;
-  const files = parseDiffFiles(combinedDiff);
+  const combinedDiff = [diff, untracked.diff].filter(Boolean).join('\n\n') || undefined;
+  const files = [...new Set([...changedFiles, ...untracked.files])];
   const ws: WorkspaceInfo = { root, files };
   if (baseRef) ws.baseRef = baseRef;
   if (combinedDiff) ws.diff = combinedDiff;
@@ -43,10 +50,8 @@ async function refExists(root: string, ref: string): Promise<boolean> {
   return code === 0;
 }
 
-async function gitDiff(root: string, baseRef: string | undefined): Promise<string | undefined> {
-  if (baseRef) {
-    const mergeBase = await getMergeBase(root, baseRef);
-    if (!mergeBase) return undefined;
+async function gitDiff(root: string, mergeBase: string | undefined): Promise<string | undefined> {
+  if (mergeBase) {
     const branchDiff = await runGitDiff(root, ['diff', mergeBase]);
     return branchDiff === null ? undefined : branchDiff || undefined;
   }
@@ -91,30 +96,40 @@ async function runGit(root: string, args: string[]): Promise<string | null> {
   return trimmed ? trimmed : '';
 }
 
-function parseDiffFiles(diff: string | undefined): string[] {
-  if (!diff) return [];
-  const files = new Set<string>();
-  for (const line of diff.split('\n')) {
-    const git = /^diff --git a\/(.+) b\/(.+)$/.exec(line);
-    if (git) {
-      files.add(git[2]!);
-      continue;
-    }
-    const added = /^\+\+\+ b\/(.+)$/.exec(line);
-    if (added) files.add(added[1]!);
-  }
-  return [...files];
+async function runGitNul(root: string, args: string[]): Promise<string[]> {
+  const out = await runGit(root, args);
+  if (!out) return [];
+  return out.split('\0').filter(Boolean);
 }
 
-async function gitUntrackedDiff(root: string): Promise<string | undefined> {
-  const out = await runGit(root, ['ls-files', '--others', '--exclude-standard']);
-  if (out === null || !out.trim()) return undefined;
+async function gitDiffFileList(root: string, mergeBase: string | undefined): Promise<string[]> {
+  if (mergeBase) {
+    return runGitNul(root, ['diff', '--name-only', '-z', mergeBase]);
+  }
+
+  const results = await Promise.all([
+    runGitNul(root, ['diff', '--name-only', '-z', '--cached']),
+    runGitNul(root, ['diff', '--name-only', '-z']),
+  ]);
+  return [...new Set(results.flat())];
+}
+
+interface UntrackedInfo {
+  diff?: string;
+  files: string[];
+}
+
+async function gitUntrackedInfo(root: string): Promise<UntrackedInfo> {
+  const files = await runGitNul(root, ['ls-files', '--others', '--exclude-standard', '-z']);
+  if (files.length === 0) return { files: [] };
 
   const chunks: string[] = [];
-  for (const file of out.split('\n').map((line) => line.trim()).filter(Boolean)) {
+  for (const file of files) {
     chunks.push(await formatUntrackedFile(root, file));
   }
-  return chunks.length > 0 ? chunks.join('\n\n') : undefined;
+  const out: UntrackedInfo = { files };
+  if (chunks.length > 0) out.diff = chunks.join('\n\n');
+  return out;
 }
 
 async function formatUntrackedFile(root: string, file: string): Promise<string> {
