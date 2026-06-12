@@ -25,6 +25,6 @@
     "jsx": "preserve",
     "baseUrl": "."
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
