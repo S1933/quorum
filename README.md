@@ -17,6 +17,9 @@ Works as a Bun CLI.
 - Provider-agnostic execution across APIs, local models, and agent CLIs.
 - YAML-defined personas, reviewer providers, file filters, and parallel or sequential pipelines.
 - Terminal progress plus Markdown/JSON reports, available from the CLI.
+- Archived timestamped reports in `.quorum/reviews/` for every review and plan-review run.
+- Token usage & cost breakdown per reviewer in markdown reports (input/output tokens, total cost).
+- Interactive terminal dashboard (`quorum dashboard`) to browse pipelines and archived review history.
 
 ## Supported Providers
 
@@ -176,6 +179,8 @@ quorum review --include "src/**/*.ts"               # filter by glob
 quorum review --no-preview --no-color               # quiet mode
 ```
 
+Every review and plan-review run is also automatically archived to `.quorum/reviews/` with a timestamped filename. Markdown reports now include a **Token Usage** table showing input/output tokens and cost per reviewer.
+
 #### Review an implementation plan
 
 ```
@@ -190,11 +195,24 @@ quorum plan-review docs/plan.md --json
 quorum plan-review docs/plan.md --report .quorum/plan-review.md
 ```
 
-#### List personas, reviewers, and pipelines
+#### Interactive dashboard
 
 ```
-quorum reviewers [--config=<path>]
+quorum dashboard [--config=<path>]
 ```
+
+Opens a terminal TUI to browse configured pipelines and review history.
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Navigate list |
+| `←` / `→` or `Tab` | Switch between Pipelines & Reviews tabs |
+| `Enter` | Expand pipeline reviewers / open full review |
+| `Esc` | Go back / exit |
+| `q` | Quit |
+
+- **Pipelines tab** — lists all pipelines from `quorum.yaml` with mode, reviewer count, and consensus strategy. Press `Enter` to expand inline reviewer details (persona, provider, model).
+- **Reviews tab** — shows archived reports from `.quorum/reviews/` with timestamp, pipeline, finding count, severity breakdown, and duration. Press `Enter` to read the full report.
 
 #### Install a git pre-commit hook
 
