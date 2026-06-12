@@ -95,7 +95,21 @@ personas:
       name the hot path, explain the expected cost or failure mode, and suggest a
       practical measurement or fix. Cite file and line references whenever possible.
 
-reviewers: {}
+# ── Quick-start reviewer ──────────────────────────────────
+# Uncomment below, set OPENROUTER_API_KEY in your environment,
+# and run 'quorum review' to get started.
+#
+#   cp .env.example .env   # then edit .env with your key
+#   quorum review
+#
+reviewers:
+#   quick-start:
+#     persona: security
+#     provider:
+#       type: openrouter
+#       model: anthropic/claude-sonnet-4
+#       api_key: env:OPENROUTER_API_KEY
+
 #   # CI reviewers (API-based providers only — subprocess CLIs are not available in CI):
 #   ci-security:
 #     persona: security
@@ -113,6 +127,9 @@ reviewers: {}
 pipelines:
   default:
     parallel: true
+    # To quick-start, uncomment the line below (and uncomment the quick-start reviewer above):
+    # reviewers:
+    #   - quick-start
     reviewers: []
     # Consensus strategies:
     #   overlap-v1  - group by file + category + line overlap; promote on an

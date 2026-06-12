@@ -54,6 +54,12 @@ export async function cmdReview(
   const runtime = await deps.createRuntime({ config, pluginCtx });
 
   const pipeline = runtime.resolvePipeline(pipelineId);
+  if (pipeline.reviewers.length === 0) {
+    io.stderr.write('No reviewers configured in pipeline "' + pipelineId + '". Run \'quorum init\' to add your first reviewer.\n');
+    await runtime.dispose();
+    return 0;
+  }
+
   const reviewerIds = filterReviewersByChangedFiles(pipeline.reviewers, config.reviewers, workspace.files ?? []);
   if (reviewerIds.length === 0) {
     io.stderr.write('No reviewers matched the changed file extensions — nothing to review.\n');

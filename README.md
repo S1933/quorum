@@ -47,15 +47,57 @@ cd quorum
 bun install && bun link
 ```
 
-## Use Quorum CLI
+Optionally copy the environment template:
 
-### Initialize your project
+```bash
+cp .env.example .env   # then edit .env with your API key
+```
 
-Run anywhere in your repo. If no `quorum.yaml` exists, the first command copies `quorum.yaml.example`.
+## Quick start
 
-### Commands
+```bash
+quorum init
+```
 
-#### Add a reviewer
+Follow the interactive prompts: select a provider (CLI detection shows what's installed), pick a persona, accept the default model, and you're done.
+
+```
+$ quorum init
+
+Select an AI provider:
+  1. [✓] OpenRouter (API)  — needs OPENROUTER_API_KEY env var
+  2. [✓] Ollama (local)    — needs Ollama instance on localhost:11434
+  3. [✗] Claude Code CLI   — needs `claude` CLI installed
+  ...
+
+Select a review persona:
+  1. security        — Adversarial security review
+  2. backend-senior  — Senior backend engineering review
+  ...
+
+Model (press Enter for default "anthropic/claude-sonnet-4"):
+
+Select a pipeline:
+  1. default (default)
+
+✓ Reviewer "linus-security-openrouter" added to pipeline "default".
+```
+
+If OpenRouter is selected without `OPENROUTER_API_KEY`, you'll be prompted to paste your key into a `.env` file.
+
+Then run a review:
+
+```bash
+quorum review
+```
+
+## CLI Commands
+
+### `quorum init`
+
+Interactive setup wizard. Walks through provider, persona, model, and pipeline selection. Detects installed subprocess CLIs (`claude`, `codex`, `gemini`, etc.) and shows available status before selecting. Can be run multiple times to add more reviewers.
+
+### `quorum reviewer add`
 
 ```
 quorum reviewer add \

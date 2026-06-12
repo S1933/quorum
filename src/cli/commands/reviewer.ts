@@ -1,11 +1,12 @@
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { resolve, join } from 'node:path';
 import type { CliDeps, CliIo } from '../types.ts';
+import type { QuorumConfig } from '../../config/schema.ts';
 
 const PKG_ROOT = resolve(import.meta.dir, '..', '..', '..');
-const EXAMPLE_PATH = join(PKG_ROOT, 'quorum.yaml.example');
+export const EXAMPLE_PATH = join(PKG_ROOT, 'quorum.yaml.example');
 
-const SUPPORTED_PROVIDERS = [
+export const SUPPORTED_PROVIDERS = [
   'openrouter',
   'claude-code',
   'codex-cli',
@@ -16,9 +17,22 @@ const SUPPORTED_PROVIDERS = [
   'opencode',
   'ollama',
 ] as const;
+
 const LEGACY_PROVIDER_ALIASES: Record<string, typeof SUPPORTED_PROVIDERS[number]> = {
   'opencode-go': 'opencode',
 };
+
+export interface AddReviewerParams {
+  provider: string;
+  persona: string;
+  model: string;
+  reviewerId?: string | undefined;
+  pipelineId: string;
+  extensions?: string[] | undefined;
+  temperature?: number | undefined;
+  variant?: string | undefined;
+}
+
 const REVIEWER_NAME_POOL = [
   'ada',
   'alan',
@@ -75,8 +89,6 @@ async function cmdReviewerAdd(
     io.stdout.write(`inited quorum config from example: ${configPath}\n`);
   }
 
-  const config = await deps.loadConfigFromPath(configPath);
-
   const providerFlag = typeof flags.provider === 'string' ? flags.provider : null;
   const provider = providerFlag ? LEGACY_PROVIDER_ALIASES[providerFlag] ?? providerFlag : null;
   const persona = typeof flags.persona === 'string' ? flags.persona : null;
@@ -107,32 +119,67 @@ async function cmdReviewerAdd(
     return 1;
   }
 
-  if (!config.personas[persona]) {
-    io.stderr.write(`Unknown persona "${persona}". Available: ${Object.keys(config.personas).join(', ') || '(none)'}\n`);
-    return 1;
-  }
-
-  const providerEntry: Record<string, unknown> = { type: provider, model };
-  if (variant) providerEntry.variant = variant;
-  const newEntry: Record<string, unknown> = { persona, provider: providerEntry };
-  if (extensions) newEntry.fileExtensions = extensions;
-  if (temperature !== null) newEntry.overrides = { temperature };
-  const reviewerId = typeof flags.id === 'string'
-    ? flags.id
-    : resolveReviewerId(persona, provider, newEntry, config.reviewers);
-
-  if (config.reviewers[reviewerId]) {
-    io.stdout.write(`Reviewer "${reviewerId}" already exists — skipping.\n`);
-    return 0;
-  }
+  const config = await deps.loadConfigFromPath(configPath);
 
   const pipelineId = typeof flags.pipeline === 'string'
     ? flags.pipeline
     : config.defaults?.pipeline ?? 'default';
 
-  if (!config.pipelines[pipelineId]) {
-    io.stderr.write(`Unknown pipeline "${pipelineId}". Available: ${Object.keys(config.pipelines).join(', ') || '(none)'}\n`);
+  const params: AddReviewerParams = {
+    provider,
+    persona,
+    model,
+    ...(typeof flags.id === 'string' ? { reviewerId: flags.id } : {}),
+    pipelineId,
+    ...(extensions ? { extensions } : {}),
+    ...(temperature !== null ? { temperature } : {}),
+    ...(variant ? { variant } : {}),
+  };
+
+  try {
+    const result = await addReviewerToConfig(params, config, configPath, deps);
+    if (result.alreadyExisted) {
+      io.stdout.write(`Reviewer "${result.reviewerId}" already exists — skipping.\n`);
+    } else {
+      io.stdout.write(`added reviewer "${result.reviewerId}"  persona=${persona}  provider=${provider}${model ? ` (${model})` : ''}${extensions ? ` [${extensions.join(', ')}]` : ''}\n`);
+    }
+    return 0;
+  } catch (err) {
+    io.stderr.write(`error: ${(err as Error).message}\n`);
     return 1;
+  }
+}
+
+export async function addReviewerToConfig(
+  params: AddReviewerParams,
+  config: QuorumConfig,
+  configPath: string,
+  deps: Pick<CliDeps, 'readConfigFile' | 'writeConfigFile'>,
+): Promise<{ reviewerId: string; alreadyExisted: boolean }> {
+  const { provider, persona, model, variant, extensions, temperature } = params;
+
+  if (!(SUPPORTED_PROVIDERS as readonly string[]).includes(provider)) {
+    throw new Error(`Unknown provider type "${provider}". Supported: ${SUPPORTED_PROVIDERS.join(', ')}`);
+  }
+
+  if (!config.personas[persona]) {
+    throw new Error(`Unknown persona "${persona}". Available: ${Object.keys(config.personas).join(', ') || '(none)'}`);
+  }
+
+  const pipelineId = params.pipelineId || config.defaults?.pipeline || 'default';
+  if (!config.pipelines[pipelineId]) {
+    throw new Error(`Unknown pipeline "${pipelineId}". Available: ${Object.keys(config.pipelines).join(', ') || '(none)'}`);
+  }
+
+  const providerEntry: Record<string, unknown> = { type: provider, model };
+  if (variant) providerEntry.variant = variant;
+  const newEntry: Record<string, unknown> = { persona, provider: providerEntry };
+  if (extensions?.length) newEntry.fileExtensions = extensions;
+  if (temperature !== undefined) newEntry.overrides = { temperature };
+  const reviewerId = params.reviewerId ?? resolveReviewerId(persona, provider, newEntry, config.reviewers);
+
+  if (config.reviewers[reviewerId]) {
+    return { reviewerId, alreadyExisted: true };
   }
 
   const raw = await deps.readConfigFile!(configPath);
@@ -155,9 +202,8 @@ async function cmdReviewerAdd(
   }
 
   await deps.writeConfigFile!(configPath, stringifyYaml(d));
-  io.stdout.write(`added reviewer "${reviewerId}"  persona=${persona}  provider=${provider}${model ? ` (${model})` : ''}${extensions ? ` [${extensions.join(', ')}]` : ''}\n`);
 
-  return 0;
+  return { reviewerId, alreadyExisted: false };
 }
 
 function parseExtensions(flags: Record<string, string | boolean>): string[] | null {
