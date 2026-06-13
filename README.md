@@ -44,6 +44,15 @@ bun install && bun link
 
 ### 2. Add a reviewer
 
+Ask your coding agent:
+
+```text
+Create my first Quorum reviewer using the security persona,
+the OpenRouter provider, and model anthropic/claude-sonnet-4.
+```
+
+Equivalent command:
+
 ```bash
 quorum reviewer add \
   --provider=openrouter \
@@ -55,9 +64,19 @@ This creates `quorum.yaml` and adds the reviewer to the default pipeline.
 
 ### 3. Run a review
 
+Ask your coding agent:
+
+```text
+Run Quorum review on the current git diff.
+```
+
+Equivalent command:
+
 ```bash
 quorum review
 ```
+
+> Prompts mentioning "Quorum" trigger the bundled skill (`skills/review/SKILL.md`) which handles CLI execution and returns exact output. See [`docs/reference/cli.md`](docs/reference/cli.md) for all prompt examples.
 
 ## Documentation
 
