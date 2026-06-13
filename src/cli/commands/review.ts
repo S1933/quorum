@@ -140,7 +140,7 @@ export async function cmdReview(
       pluginCtx: runtime.pluginCtx,
     };
 
-    const cached = await getCachedResult(instruction, cacheOpts);
+    const cached = await getCachedResult(instruction, filteredPipeline.id, cappedReviewerIds, cacheOpts);
     let result: PipelineResult;
     if (cached) {
       result = cached;
@@ -148,7 +148,7 @@ export async function cmdReview(
       result = interactive
         ? await runInteractive(executor, runInput, io)
         : await executor.run(runInput);
-      await setCachedResult(instruction, result, cacheOpts);
+      await setCachedResult(instruction, filteredPipeline.id, cappedReviewerIds, result, cacheOpts);
     }
 
     return writeOutputReport({

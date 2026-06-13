@@ -277,7 +277,75 @@ export interface PipelineResult {
 
 ---
 
-## 8. Consensus engine
+## 8. Review execution flow
+
+The following diagram traces a complete `quorum review` run — from CLI invocation through config loading, reviewer execution (parallel), event streaming to the terminal, consensus aggregation, and final report output.
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant CLI as CLI (cli/index.ts)
+    participant Config as Config Loader
+    participant RT as Runtime (runtime.ts)
+    participant PE as PipelineExecutor
+    participant EB as EventBus
+    participant BR as BoundReviewer
+    participant P as Provider (HTTP/subprocess)
+    participant TR as TerminalRenderer
+    participant CE as Consensus Engine
+
+    U->>CLI: quorum review
+    CLI->>Config: loadConfigFromPath(quorum.yaml)
+    Config-->>CLI: QuorumConfig (validated)
+    CLI->>RT: createRuntime(config, pluginCtx)
+    RT-->>CLI: Runtime (providers, consensus, bus)
+    CLI->>RT: resolvePipeline(pipelineId)
+    RT-->>CLI: Pipeline { reviewers, parallel, consensus }
+    CLI->>RT: resolveReviewers([...ids])
+    RT-->>CLI: BoundReviewer[] (persona + provider)
+    CLI->>TR: attach(bus)
+
+    CLI->>PE: run({ pipeline, reviewers, workspace, instruction })
+    PE->>EB: pipeline.started
+
+    par parallel reviewers
+        PE->>BR: run(task, ctx) [reviewer A]
+        BR->>P: review(task)
+        loop streaming
+            P-->>EB: reviewer.event { type: 'token', text }
+            EB-->>TR: render token preview
+        end
+        P-->>BR: ReviewResult { findings[] }
+        BR-->>PE: ReviewResult
+        PE->>EB: reviewer.finished
+    and
+        PE->>BR: run(task, ctx) [reviewer B]
+        BR->>P: review(task)
+        P-->>BR: ReviewResult
+        BR-->>PE: ReviewResult
+        PE->>EB: reviewer.finished
+    end
+
+    PE->>CE: aggregate(reviews, consensusConfig)
+    CE-->>PE: ConsensusResult { groups, unique, contradictions }
+
+    PE->>EB: pipeline.finished
+    PE-->>CLI: PipelineResult
+
+    CLI->>CLI: renderMarkdownReport / renderJsonReport
+    CLI-->>U: report: .quorum/last-review.md
+```
+
+**Key observations:**
+- Config loading and runtime creation happen once, before any reviewer runs.
+- Pipeline executor handles the parallel/sequential dispatch; individual reviewers are isolated from each other.
+- EventBus decouples execution from rendering — the terminal renderer subscribes to events without blocking the pipeline.
+- Consensus aggregates after all reviewers finish (parallel mode waits for the slowest).
+- Partial failure is tolerated: if one reviewer fails, the pipeline continues and the error appears in the report.
+
+---
+
+## 9. Consensus engine
 
 Consensus is pluggable through `ConsensusRegistry`; each strategy consumes `ReviewResult[]` and returns a stable `ConsensusResult` for renderers.
 
@@ -332,7 +400,7 @@ Title/body are *not* compared semantically. Lexical near-duplicates may still be
 
 ---
 
-## 9. Event system
+## 10. Event system
 
 Single in-process pub/sub. `EventBus` is the only cross-cutting collaborator besides `core/` types.
 
@@ -361,7 +429,7 @@ The terminal renderer subscribes to runtime events for live progress. Interactiv
 
 ---
 
-## 10. Distribution surfaces
+## 11. Distribution surfaces
 
 The CLI is the primary runtime surface. Other integrations shell out to it or reuse `src/cli/index.ts`.
 
@@ -381,7 +449,7 @@ The CLI is the primary runtime surface. Other integrations shell out to it or re
 
 ---
 
-## 11. Folder structure
+## 12. Folder structure
 
 ```
 quorum/
@@ -468,7 +536,7 @@ quorum/
 
 ---
 
-## 12. Shipped implementation map
+## 13. Shipped implementation map
 
 | Area | Shipped state |
 |---|---|
@@ -483,7 +551,7 @@ The remaining architecture work is extension and hardening, not bootstrapping.
 
 ---
 
-## 13. Risks & pragmatic tradeoffs
+## 14. Risks & pragmatic tradeoffs
 
 | Risk | Mitigation |
 |---|---|
@@ -497,7 +565,7 @@ The remaining architecture work is extension and hardening, not bootstrapping.
 
 ---
 
-## 14. Out of scope
+## 15. Out of scope
 
 Explicit deferrals — capture here so they don't sneak in.
 
@@ -514,7 +582,7 @@ Implemented since the initial draft: Codex CLI, Cursor Agent, Gemini CLI, Kilo C
 
 ---
 
-## 15. Resolved design questions
+## 16. Resolved design questions
 
 The following questions from the original draft are now resolved by implementation:
 

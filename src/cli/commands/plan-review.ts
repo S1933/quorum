@@ -81,13 +81,13 @@ export async function cmdPlanReview(
       providers: runtime.providers,
       pluginCtx: runtime.pluginCtx,
     };
-    const cached = await getCachedResult(instruction, cacheOpts);
+    const cached = await getCachedResult(instruction, filteredPipeline.id, reviewerIds, cacheOpts);
     let result: PipelineResult = cached
       ? cached
       : interactive
         ? await runInteractive(executor, input, io)
         : await executor.run(input);
-    if (!cached) await setCachedResult(instruction, result, cacheOpts);
+    if (!cached) await setCachedResult(instruction, filteredPipeline.id, reviewerIds, result, cacheOpts);
 
     return writeOutputReport({
       result,

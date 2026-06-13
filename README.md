@@ -86,6 +86,7 @@ quorum review
 | [CLI Reference](docs/reference/cli.md) | All commands, flags, examples |
 | [Consensus](docs/reference/consensus.md) | Strategies: overlap, majority, severity-aware, semantic |
 | [CI Integration](docs/reference/ci.md) | GitHub Action setup, inputs, fork PR handling |
+| [JSON Report](docs/reference/json-report.md) | Report schema, types, examples, jq queries |
 | [Security](docs/reference/security.md) | Subprocess safety, report paths, binary policies |
 | [ADR](docs/adr/README.md) | Architecture Decision Records |
 

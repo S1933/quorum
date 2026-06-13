@@ -13,42 +13,54 @@ const sampleResult: PipelineResult = {
   errors: [],
 };
 
+const pipelineId = 'test';
+const reviewerIds: string[] = [];
+
 describe('cache', () => {
   test('returns undefined on cache miss', async () => {
-    const result = await getCachedResult('unique-instruction-1', opts);
+    const result = await getCachedResult('unique-instruction-1', pipelineId, reviewerIds, opts);
     expect(result).toBeUndefined();
   });
 
   test('stores and retrieves a cached result', async () => {
     const instruction = 'test-instruction-for-cache';
-    await setCachedResult(instruction, sampleResult, opts);
-    const result = await getCachedResult(instruction, opts);
+    await setCachedResult(instruction, pipelineId, reviewerIds, sampleResult, opts);
+    const result = await getCachedResult(instruction, pipelineId, reviewerIds, opts);
     expect(result).toBeDefined();
     expect(result?.pipelineId).toBe('default');
     expect(result?.durationMs).toBe(100);
   });
 
   test('returns undefined when caching is disabled', async () => {
-    await setCachedResult('disabled-test', sampleResult, opts);
-    const result = await getCachedResult('disabled-test', disabledOpts);
+    await setCachedResult('disabled-test', pipelineId, reviewerIds, sampleResult, opts);
+    const result = await getCachedResult('disabled-test', pipelineId, reviewerIds, disabledOpts);
     expect(result).toBeUndefined();
   });
 
-  test('returns different results for different instructions', async () => {
-    const a = 'instruction-a';
-    const b = 'instruction-b';
+  test('differentiates by reviewer ids', async () => {
+    const instruction = 'same-instruction';
     const resA: PipelineResult = { ...sampleResult, pipelineId: 'pipeline-a' };
     const resB: PipelineResult = { ...sampleResult, pipelineId: 'pipeline-b' };
-    await setCachedResult(a, resA, opts);
-    await setCachedResult(b, resB, opts);
-    expect((await getCachedResult(a, opts))?.pipelineId).toBe('pipeline-a');
-    expect((await getCachedResult(b, opts))?.pipelineId).toBe('pipeline-b');
+    await setCachedResult(instruction, pipelineId, ['r1'], resA, opts);
+    await setCachedResult(instruction, pipelineId, ['r2'], resB, opts);
+    expect((await getCachedResult(instruction, pipelineId, ['r1'], opts))?.pipelineId).toBe('pipeline-a');
+    expect((await getCachedResult(instruction, pipelineId, ['r2'], opts))?.pipelineId).toBe('pipeline-b');
+  });
+
+  test('differentiates by pipeline id', async () => {
+    const instruction = 'same-instruction';
+    const resA: PipelineResult = { ...sampleResult, pipelineId: 'pipeline-a' };
+    const resB: PipelineResult = { ...sampleResult, pipelineId: 'pipeline-b' };
+    await setCachedResult(instruction, 'pipe-a', ['r1'], resA, opts);
+    await setCachedResult(instruction, 'pipe-b', ['r1'], resB, opts);
+    expect((await getCachedResult(instruction, 'pipe-a', ['r1'], opts))?.pipelineId).toBe('pipeline-a');
+    expect((await getCachedResult(instruction, 'pipe-b', ['r1'], opts))?.pipelineId).toBe('pipeline-b');
   });
 
   test('handles cache write errors gracefully', async () => {
     const badOpts = { root: '/nonexistent/deep/path', enabled: true };
     await expect(
-      setCachedResult('test', sampleResult, badOpts),
+      setCachedResult('test', pipelineId, reviewerIds, sampleResult, badOpts),
     ).resolves.toBeUndefined();
   });
 });

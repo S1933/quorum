@@ -14,17 +14,23 @@ function cachePath(root: string, key: string): string {
   return resolve(root, CACHE_DIR, `${key}.json`);
 }
 
-function hashInstruction(instruction: string): string {
-  return crypto.createHash('sha256').update(instruction, 'utf8').digest('hex').slice(0, 16);
+function hashParts(...parts: string[]): string {
+  return crypto
+    .createHash('sha256')
+    .update(parts.join('\0'), 'utf8')
+    .digest('hex')
+    .slice(0, 16);
 }
 
 export async function getCachedResult(
   instruction: string,
+  pipelineId: string,
+  reviewerIds: string[],
   opts: CacheOptions,
 ): Promise<PipelineResult | undefined> {
   if (!opts.enabled) return undefined;
   try {
-    const key = hashInstruction(instruction);
+    const key = hashParts(instruction, pipelineId, ...reviewerIds);
     const file = Bun.file(cachePath(opts.root, key));
     const exists = await file.exists();
     if (!exists) return undefined;
@@ -37,12 +43,14 @@ export async function getCachedResult(
 
 export async function setCachedResult(
   instruction: string,
+  pipelineId: string,
+  reviewerIds: string[],
   result: PipelineResult,
   opts: CacheOptions,
 ): Promise<void> {
   if (!opts.enabled) return;
   try {
-    const key = hashInstruction(instruction);
+    const key = hashParts(instruction, pipelineId, ...reviewerIds);
     const path = cachePath(opts.root, key);
     const safe = {
       ...result,

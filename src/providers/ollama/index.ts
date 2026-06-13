@@ -165,6 +165,6 @@ export const ollamaFactory: ProviderFactory = {
   type: PROVIDER_TYPE,
   schema: OllamaConfigSchema,
   async create(instanceId, config, _ctx) {
-    return new OllamaProvider(instanceId, OllamaConfigSchema.parse(config));
+    return new OllamaProvider(instanceId, config);
   },
 };
