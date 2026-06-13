@@ -102,27 +102,28 @@ personas:
 #   cp .env.example .env   # then edit .env with your key
 #   quorum review
 #
-reviewers:
-#   quick-start:
-#     persona: security
-#     provider:
-#       type: openrouter
-#       model: anthropic/claude-sonnet-4
-#       api_key: env:OPENROUTER_API_KEY
-
-#   # CI reviewers (API-based providers only — subprocess CLIs are not available in CI):
-#   ci-security:
-#     persona: security
-#     provider:
-#       type: openrouter
-#       model: anthropic/claude-sonnet-4
-#       api_key: env:OPENROUTER_API_KEY
-#   ci-backend:
-#     persona: backend-senior
-#     provider:
-#       type: openrouter
-#       model: anthropic/claude-sonnet-4
-#       api_key: env:OPENROUTER_API_KEY
+reviewers: {}
+# Example reviewers:
+# quick-start:
+#   persona: security
+#   provider:
+#     type: openrouter
+#     model: anthropic/claude-sonnet-4
+#     api_key: env:OPENROUTER_API_KEY
+#
+# CI reviewers (API-based providers only — subprocess CLIs are not available in CI):
+# ci-security:
+#   persona: security
+#   provider:
+#     type: openrouter
+#     model: anthropic/claude-sonnet-4
+#     api_key: env:OPENROUTER_API_KEY
+# ci-backend:
+#   persona: backend-senior
+#   provider:
+#     type: openrouter
+#     model: anthropic/claude-sonnet-4
+#     api_key: env:OPENROUTER_API_KEY
 
 pipelines:
   default:

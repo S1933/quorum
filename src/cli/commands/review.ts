@@ -55,7 +55,7 @@ export async function cmdReview(
 
   const pipeline = runtime.resolvePipeline(pipelineId);
   if (pipeline.reviewers.length === 0) {
-    io.stderr.write('No reviewers configured in pipeline "' + pipelineId + '". Run \'quorum init\' to add your first reviewer.\n');
+    io.stderr.write('No reviewers configured in pipeline "' + pipelineId + '". Run \'quorum reviewer add\' to add your first reviewer.\n');
     await runtime.dispose();
     return 0;
   }

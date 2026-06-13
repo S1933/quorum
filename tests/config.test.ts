@@ -40,6 +40,13 @@ describe('loadConfigFromString', () => {
     expect(Object.keys(cfg.pipelines)).toEqual(['default']);
   });
 
+  test('parses quorum.yaml.example', async () => {
+    const cfg = await loadConfigFromString(await Bun.file('quorum.yaml.example').text());
+    expect(cfg.defaults?.pipeline).toBe('default');
+    expect(cfg.reviewers).toEqual({});
+    expect(cfg.pipelines.default?.reviewers).toEqual([]);
+  });
+
   test('accepts reviewer file extension filters', async () => {
     const cfg = await loadConfigFromString(MINIMAL_YAML.replace(
       '      model: test-model',

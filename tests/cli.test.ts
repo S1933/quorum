@@ -38,6 +38,25 @@ interface FakeRuntimeOpts {
 }
 
 describe('cli', () => {
+  test('help does not list removed init command', async () => {
+    const io = captureIo();
+
+    const code = await main(['help'], deps({}), io);
+
+    expect(code).toBe(0);
+    expect(io.stdoutText()).toContain('quorum reviewer add');
+    expect(io.stdoutText()).not.toContain('quorum init');
+  });
+
+  test('init command is not supported', async () => {
+    const io = captureIo();
+
+    const code = await main(['init'], deps({}), io);
+
+    expect(code).toBe(2);
+    expect(io.stderrText()).toContain('Unknown command: init');
+  });
+
   test('review runs configured pipeline through an injected runtime and writes report', async () => {
     const io = captureIo();
     const tmp = await mkdtemp(join(tmpdir(), 'quorum-cli-test-'));

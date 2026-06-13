@@ -70,6 +70,45 @@ describe('reviewer add', () => {
     expect(updated.pipelines.default.reviewers).toContain(id);
   });
 
+  test('creates quorum.yaml from example when adding the first reviewer', async () => {
+    const { root, configPath, deps } = await repoDepsWithoutConfig();
+    const io = captureIo();
+
+    expect(await Bun.file(configPath).exists()).toBe(false);
+
+    const code = await main(
+      [
+        'reviewer',
+        'add',
+        '--provider',
+        'openrouter',
+        '--persona',
+        'security',
+        '--model',
+        'anthropic/claude-sonnet-4',
+      ],
+      deps,
+      io,
+    );
+
+    expect(code).toBe(0);
+    expect(configPath).toBe(join(root, 'quorum.yaml'));
+    expect(await Bun.file(configPath).exists()).toBe(true);
+    expect(io.stdoutText()).toContain(`inited quorum config from example: ${configPath}`);
+
+    const id = addedReviewerId(io);
+    const updated = parseYaml(await Bun.file(configPath).text());
+    expect(updated.personas.security.description).toBe('Adversarial security review');
+    expect(updated.reviewers[id]).toEqual({
+      persona: 'security',
+      provider: {
+        type: 'openrouter',
+        model: 'anthropic/claude-sonnet-4',
+      },
+    });
+    expect(updated.pipelines.default.reviewers).toContain(id);
+  });
+
   test('adds reviewer with provider variant', async () => {
     const { configPath, deps } = await repoDeps();
     const io = captureIo();
@@ -356,6 +395,33 @@ async function repoDeps(reviewers = 'reviewers: {}'): Promise<{ configPath: stri
       createRuntime: async () => ({}) as ReturnType<CliDeps['createRuntime']>,
       now: () => 1,
       initConfigIfMissing: async () => false,
+      readConfigFile: async (path) => await Bun.file(path).text(),
+      writeConfigFile: async (path, content) => {
+        await Bun.write(path, content);
+      },
+    },
+  };
+}
+
+async function repoDepsWithoutConfig(): Promise<{ root: string; configPath: string; deps: CliDeps }> {
+  const root = await mkdtemp(join('/tmp', 'quorum-reviewer-add-empty-'));
+  const configPath = join(root, 'quorum.yaml');
+
+  return {
+    root,
+    configPath,
+    deps: {
+      loadConfigFromPath: async (path) => loadConfigFromString(await Bun.file(path).text()),
+      findConfigPath: () => configPath,
+      inferRepoRoot: async () => root,
+      probeWorkspace: async () => ({ root }),
+      createRuntime: async () => ({}) as ReturnType<CliDeps['createRuntime']>,
+      now: () => 1,
+      initConfigIfMissing: async (targetPath, examplePath) => {
+        if (await Bun.file(targetPath).exists()) return false;
+        await Bun.write(targetPath, await Bun.file(examplePath).text());
+        return true;
+      },
       readConfigFile: async (path) => await Bun.file(path).text(),
       writeConfigFile: async (path, content) => {
         await Bun.write(path, content);

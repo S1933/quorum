@@ -9,7 +9,6 @@ import { cmdPlanReview } from './commands/plan-review.ts';
 import { cmdReviewer } from './commands/reviewer.ts';
 import { cmdPreCommit } from './commands/pre-commit.ts';
 import { cmdDashboard } from './commands/dashboard.ts';
-import { cmdInit } from './commands/init.ts';
 import type { CliDeps, CliIo } from './types.ts';
 
 export type { CliDeps, CliIo } from './types.ts';
@@ -48,7 +47,6 @@ function printHelp(io: CliIo): void {
   io.stdout.write(`quorum — multi-model consensus reviewer
 
 Usage:
-  quorum init                               Interactive first-time setup
   quorum review [pipeline-id] [--pipeline <id>] [--base <ref>] [--config <path>] [--report <path>] [--format text|json] [--json] [--no-color] [--no-preview] [--max-diff-bytes <n>] [--include <glob>] [--exclude <glob>] [--interactive]
   quorum plan-review <plan-file> [--pipeline <id>] [--config <path>] [--report <path>] [--format text|json] [--json] [--no-color] [--no-preview] [--interactive]
   quorum reviewer add --persona <id> --provider <type> --model <model> [--pipeline <id>] [--id <id>]
@@ -82,8 +80,6 @@ export async function main(
         return await cmdReview(positional, flags, deps, io);
       case 'plan-review':
         return await cmdPlanReview(positional, flags, deps, io);
-      case 'init':
-        return await cmdInit(positional, flags, deps, io);
       case 'reviewer':
         return await cmdReviewer(positional, flags, deps, io);
       case 'pre-commit':
