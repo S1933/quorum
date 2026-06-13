@@ -7,7 +7,6 @@ import { parseArgs } from './args.ts';
 import { cmdReview } from './commands/review.ts';
 import { cmdPlanReview } from './commands/plan-review.ts';
 import { cmdReviewer } from './commands/reviewer.ts';
-import { cmdPreCommit } from './commands/pre-commit.ts';
 import { cmdDashboard } from './commands/dashboard.ts';
 import type { CliDeps, CliIo } from './types.ts';
 
@@ -50,7 +49,6 @@ Usage:
   quorum review [pipeline-id] [--pipeline <id>] [--base <ref>] [--config <path>] [--report <path>] [--format text|json] [--json] [--no-color] [--no-preview] [--max-diff-bytes <n>] [--include <glob>] [--exclude <glob>] [--interactive]
   quorum plan-review <plan-file> [--pipeline <id>] [--config <path>] [--report <path>] [--format text|json] [--json] [--no-color] [--no-preview] [--interactive]
   quorum reviewer add --persona <id> --provider <type> --model <model> [--pipeline <id>] [--id <id>]
-  quorum pre-commit true|false [--pipeline <id>]
   quorum dashboard
   quorum help
 
@@ -82,8 +80,6 @@ export async function main(
         return await cmdPlanReview(positional, flags, deps, io);
       case 'reviewer':
         return await cmdReviewer(positional, flags, deps, io);
-      case 'pre-commit':
-        return await cmdPreCommit(positional, flags, deps, io);
       case 'dashboard':
         return await cmdDashboard(positional, flags, deps, io);
       default:

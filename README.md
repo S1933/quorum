@@ -55,6 +55,15 @@ cp .env.example .env   # then edit .env with your API key
 
 ## Quick start
 
+Ask your coding agent to initialize the first reviewer:
+
+```text
+Create my first Quorum reviewer using the security persona,
+the OpenRouter provider, and model anthropic/claude-sonnet-4.
+```
+
+Equivalent command:
+
 ```bash
 quorum reviewer add \
   --provider=openrouter \
@@ -62,12 +71,88 @@ quorum reviewer add \
   --model=anthropic/claude-sonnet-4
 ```
 
-This creates `quorum.yaml` from `quorum.yaml.example` if needed, then adds the reviewer to the default pipeline.
+On a new project, this creates `quorum.yaml` from `quorum.yaml.example`, then adds the reviewer to the default pipeline.
 
-Then run a review:
+Then ask for a Quorum review:
+
+```text
+Run Quorum review on the current git diff.
+```
+
+Equivalent command:
 
 ```bash
 quorum review
+```
+
+## Prompt examples
+
+Use these prompts with Codex or another coding agent in a project that has Quorum installed. Prompts that mention "Quorum review" are handled by the bundled `skills/review/SKILL.md` wrapper, which runs the CLI and returns exact output.
+
+### Create a reviewer
+
+Prompt:
+
+```text
+Create a Quorum reviewer named architect-minimax using the architecture persona,
+the opencode provider, and model opencode-go/minimax-m3.
+```
+
+Equivalent command:
+
+```bash
+quorum reviewer add \
+  --id=architect-minimax \
+  --persona=architecture \
+  --provider=opencode \
+  --model=opencode-go/minimax-m3
+```
+
+Expected result in `quorum.yaml`:
+
+```yaml
+reviewers:
+  architect-minimax:
+    persona: architecture
+    provider:
+      type: opencode
+      model: opencode-go/minimax-m3
+
+pipelines:
+  default:
+    reviewers:
+      - architect-minimax
+```
+
+Added reviewer summary:
+
+```text
+- architect-minimax
+- persona/profile: architecture
+- provider: opencode
+- model: opencode-go/minimax-m3
+```
+
+### Run Quorum review
+
+Prompts:
+
+```text
+Run Quorum review on the current git diff.
+Run Quorum review with --pipeline ci.
+Run Quorum review against origin/main and write the report to .quorum/review.md.
+Run Quorum review as JSON with --report .quorum/review.json.
+Run Quorum review only for src/**/*.ts.
+```
+
+Equivalent commands:
+
+```bash
+quorum review
+quorum review --pipeline ci
+quorum review --base origin/main --report .quorum/review.md
+quorum review --json --report .quorum/review.json
+quorum review --include "src/**/*.ts"
 ```
 
 ## CLI Commands
@@ -230,20 +315,6 @@ Opens a terminal TUI to browse configured pipelines and review history.
 
 - **Pipelines tab** — lists all pipelines from `quorum.yaml` with mode, reviewer count, and consensus strategy. Press `Enter` to expand inline reviewer details (persona, provider, model).
 - **Reviews tab** — shows archived reports from `.quorum/reviews/` with timestamp, pipeline, finding count, severity breakdown, and duration. Press `Enter` to read the full report.
-
-#### Install a git pre-commit hook
-
-The hook blocks commits with `critical` or `high` findings. Bypass with `QUORUM_BYPASS=1`.
-
-```
-quorum pre-commit true|false [--pipeline=<id>]
-```
-
-```bash
-quorum pre-commit true
-quorum pre-commit true --pipeline ci
-quorum pre-commit false
-```
 
 ## CI Integration
 
