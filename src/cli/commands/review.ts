@@ -17,6 +17,11 @@ import {
 import { defaultPluginCtx } from '../../runtime/plugin.ts';
 import { applyDiffLimits, type DiffLimits } from '../../runtime/workspace.ts';
 import { TerminalRenderer } from '../../ui/terminal.ts';
+import {
+  type CacheOptions,
+  getCachedResult,
+  setCachedResult,
+} from '../../runtime/cache.ts';
 import { writeOutputReport } from '../report-output.ts';
 import type { CliDeps, CliIo } from '../types.ts';
 
@@ -111,6 +116,10 @@ export async function cmdReview(
     workspace.files ?? [],
   );
   const interactive = flags.interactive === true;
+  const cacheOpts: CacheOptions = {
+    root,
+    enabled: flags['no-cache'] !== true && !interactive,
+  };
 
   try {
     if (filteredPipeline.maxTotalCostUsd && format === 'text') {
@@ -119,33 +128,28 @@ export async function cmdReview(
       );
     }
 
-    const result = interactive
-      ? await runInteractive(
-          executor,
-          {
-            pipeline: filteredPipeline,
-            reviewers,
-            workspace,
-            instruction,
-            taskId: `review-${deps.now()}`,
-            bus: runtime.bus,
-            consensus: runtime.consensus,
-            providers: runtime.providers,
-            pluginCtx: runtime.pluginCtx,
-          },
-          io,
-        )
-      : await executor.run({
-          pipeline: filteredPipeline,
-          reviewers,
-          workspace,
-          instruction,
-          taskId: `review-${deps.now()}`,
-          bus: runtime.bus,
-          consensus: runtime.consensus,
-          providers: runtime.providers,
-          pluginCtx: runtime.pluginCtx,
-        });
+    const runInput = {
+      pipeline: filteredPipeline,
+      reviewers,
+      workspace,
+      instruction,
+      taskId: `review-${deps.now()}`,
+      bus: runtime.bus,
+      consensus: runtime.consensus,
+      providers: runtime.providers,
+      pluginCtx: runtime.pluginCtx,
+    };
+
+    const cached = await getCachedResult(instruction, cacheOpts);
+    let result: PipelineResult;
+    if (cached) {
+      result = cached;
+    } else {
+      result = interactive
+        ? await runInteractive(executor, runInput, io)
+        : await executor.run(runInput);
+      await setCachedResult(instruction, result, cacheOpts);
+    }
 
     return writeOutputReport({
       result,

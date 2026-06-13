@@ -2,10 +2,15 @@ import { stat } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { QuorumConfig } from '../../config/schema.ts';
 import { ConfigError } from '../../core/errors.ts';
-import type { Pipeline } from '../../core/pipeline.ts';
+import type { Pipeline, PipelineResult } from '../../core/pipeline.ts';
 import { PipelineExecutor } from '../../pipelines/executor.ts';
 import { defaultPluginCtx } from '../../runtime/plugin.ts';
 import { TerminalRenderer } from '../../ui/terminal.ts';
+import {
+  type CacheOptions,
+  getCachedResult,
+  setCachedResult,
+} from '../../runtime/cache.ts';
 import { writeOutputReport } from '../report-output.ts';
 import type { CliDeps, CliIo } from '../types.ts';
 import {
@@ -58,6 +63,10 @@ export async function cmdPlanReview(
   const workspace = { root, files: [planFile] };
   const instruction = buildPlanReviewInstruction(plan, planFile);
   const interactive = flags.interactive === true;
+  const cacheOpts: CacheOptions = {
+    root,
+    enabled: flags['no-cache'] !== true && !interactive,
+  };
 
   try {
     const input = {
@@ -72,9 +81,13 @@ export async function cmdPlanReview(
       providers: runtime.providers,
       pluginCtx: runtime.pluginCtx,
     };
-    const result = interactive
-      ? await runInteractive(executor, input, io)
-      : await executor.run(input);
+    const cached = await getCachedResult(instruction, cacheOpts);
+    let result: PipelineResult = cached
+      ? cached
+      : interactive
+        ? await runInteractive(executor, input, io)
+        : await executor.run(input);
+    if (!cached) await setCachedResult(instruction, result, cacheOpts);
 
     return writeOutputReport({
       result,
