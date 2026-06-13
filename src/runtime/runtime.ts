@@ -4,11 +4,7 @@ import type {
   QuorumConfig,
   ReviewerConfig,
 } from '../config/schema.ts';
-import { majorityV1 } from '../consensus/majority-v1.ts';
-import { overlapV1 } from '../consensus/overlap-v1.ts';
 import { ConsensusRegistry } from '../consensus/registry.ts';
-import { semanticV2 } from '../consensus/semantic-v2.ts';
-import { severityAwareV1 } from '../consensus/severity-aware-v1.ts';
 import { ConfigError } from '../core/errors.ts';
 import type { EventBus } from '../core/events.ts';
 import type { Persona } from '../core/persona.ts';
@@ -19,19 +15,9 @@ import type {
 } from '../core/pipeline.ts';
 import type { Provider } from '../core/provider.ts';
 import type { ModelConfig } from '../core/task.ts';
-import { claudeCodeFactory } from '../providers/claude-code/index.ts';
-import { codexCliFactory } from '../providers/codex-cli/index.ts';
-import { cursorAgentFactory } from '../providers/cursor-agent/index.ts';
-import { geminiCliFactory } from '../providers/gemini-cli/index.ts';
-import { kiloCodeFactory } from '../providers/kilo-code/index.ts';
-import { ollamaFactory } from '../providers/ollama/index.ts';
-import {
-  openCodeFactory,
-  openCodeGoAliasFactory,
-} from '../providers/opencode/index.ts';
-import { openRouterFactory } from '../providers/openrouter/index.ts';
 import { ProviderRegistry } from '../providers/registry.ts';
 import { type BoundReviewer, bindReviewer } from '../reviewers/reviewer.ts';
+import { registerBuiltins } from './builtins.ts';
 import { InMemoryEventBus } from './bus.ts';
 import type { PluginCtx } from './plugin.ts';
 
@@ -60,19 +46,7 @@ export async function createRuntime(
   const consensus = new ConsensusRegistry();
   const bus = opts.bus ?? new InMemoryEventBus();
 
-  providers.register(openRouterFactory);
-  providers.register(claudeCodeFactory);
-  providers.register(codexCliFactory);
-  providers.register(cursorAgentFactory);
-  providers.register(geminiCliFactory);
-  providers.register(kiloCodeFactory);
-  providers.register(openCodeFactory);
-  providers.register(openCodeGoAliasFactory);
-  providers.register(ollamaFactory);
-  consensus.register(overlapV1);
-  consensus.register(majorityV1);
-  consensus.register(severityAwareV1);
-  consensus.register(semanticV2);
+  registerBuiltins(providers, consensus);
 
   const providerCache = new Map<string, Provider>();
 

@@ -65,7 +65,7 @@ describe('extractPipelines', () => {
       },
     },
     pipelines: {
-      default: { reviewers: ['sec'] },
+      default: { parallel: false, reviewers: ['sec'] },
     },
   });
 
@@ -104,7 +104,7 @@ describe('extractPipelines', () => {
 
   test('handles missing reviewer gracefully', () => {
     const config = baseConfig();
-    config.pipelines.default.reviewers = ['sec', 'ghost'];
+    if (config.pipelines.default) config.pipelines.default.reviewers = ['sec', 'ghost'];
     const result = extractPipelines(config);
     expect(result[0]?.reviewerCount).toBe(2);
     expect(result[0]?.reviewers[1]?.id).toBe('ghost');
@@ -117,7 +117,7 @@ describe('extractPipelines', () => {
       version: 1,
       personas: { sec: { description: 'd', system: 's' } },
       reviewers: { r: { persona: 'sec', provider: { type: 'openrouter', api_key: 'k' } } },
-      pipelines: { default: { reviewers: ['r'] } },
+      pipelines: { default: { parallel: false, reviewers: ['r'] } },
     };
     const result = extractPipelines(config);
     expect(result[0]?.reviewers[0]?.model).toBeUndefined();
