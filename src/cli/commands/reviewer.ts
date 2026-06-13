@@ -10,7 +10,6 @@ export const SUPPORTED_PROVIDERS = [
   'openrouter',
   'claude-code',
   'codex-cli',
-  'continue-dev',
   'cursor-agent',
   'gemini-cli',
   'kilo-code',

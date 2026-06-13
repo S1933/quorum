@@ -56,7 +56,7 @@ Three-tier hierarchy: **Provider → Reviewer → Pipeline.** Personas hang off 
 │  Reviewers (Persona+Provider binding)   Consensus engine     │
 ├──────────────────────────────────────────────────────────────┤
 │  Provider adapters: openrouter · ollama · claude-code · codex-cli │
-│  · gemini-cli · continue-dev · kilo-code · opencode · cursor     │
+│  · gemini-cli · kilo-code · opencode · cursor-agent              │
 ├──────────────────────────────────────────────────────────────┤
 │  Core: types, schemas, pure logic — no I/O                   │
 └──────────────────────────────────────────────────────────────┘
@@ -141,7 +141,7 @@ export class ProviderRegistry {
 }
 ```
 
-Lifecycle: `register` → (config load) → `create` → (use) → `dispose`. Built-in providers (openrouter, ollama, claude-code, codex-cli, gemini-cli, continue-dev, kilo-code, opencode, cursor-agent) are registered at runtime boot. External provider plugins are **not yet supported** — the registry API is designed to accommodate them, but no discovery or loading mechanism exists. A future `@quorum/plugin-*` package convention is under consideration for V1.x.
+Lifecycle: `register` → (config load) → `create` → (use) → `dispose`. Built-in providers (openrouter, ollama, claude-code, codex-cli, gemini-cli, kilo-code, opencode, cursor-agent) are registered at runtime boot. External provider plugins are **not yet supported** — the registry API is designed to accommodate them, but no discovery or loading mechanism exists. A future `@quorum/plugin-*` package convention is under consideration for V1.x.
 
 ---
 
@@ -360,7 +360,6 @@ quorum/
 │   │   ├── claude-code/           # subprocess provider
 │   │   ├── codex-cli/             # subprocess provider
 │   │   ├── gemini-cli/            # subprocess provider
-│   │   ├── continue-dev/          # subprocess provider
 │   │   ├── kilo-code/             # subprocess provider
 │   │   ├── opencode/              # subprocess provider
 │   │   └── cursor-agent/          # subprocess provider
@@ -429,7 +428,7 @@ Each milestone gates on the prior one. No provider work before M1's config loade
 |---|---|
 | **Provider interface ossifies too early.** | Build M2 + M3 (HTTP + SDK) before generalizing. Two real implementations beat any amount of upfront design. |
 | **Consensus engine becomes a research project.** | Ship `overlap-v1` and resist embedding work until users ask. The badge is more valuable than the algorithm. |
-| **Subprocess providers have varied I/O.** | Validated. Seven subprocess providers (claude-code, codex-cli, gemini-cli, continue-dev, kilo-code, opencode, cursor-agent) share a common `createSubprocessProvider()`/`runSubprocess()` implementation with provider-specific args building and output normalization. |
+| **Subprocess providers have varied I/O.** | Validated. Six subprocess providers (claude-code, codex-cli, gemini-cli, kilo-code, opencode, cursor-agent) share a common `createSubprocessProvider()`/`runSubprocess()` implementation with provider-specific args building and output normalization. |
 | **Streaming is inconsistent across providers.** | Capability flag + fallback. UI must work without streaming; streaming is an upgrade, not a contract. |
 | **Claude Code skill API drift.** | The skill layer is intentionally thin and shells out to `src/cli`. If Claude Code's skill shape changes, only the skill layer is affected. |
 | **Cost runaway with parallel pipelines.** | V1 ships with per-pipeline reviewer count printed up front. V2 adds budget guards. |
@@ -453,7 +452,7 @@ Explicit deferrals — capture here so they don't sneak in.
 - GitHub Action / CI integration (planned for V1.x but not V1).
 - Aider and LiteLLM review providers (planned post-V1).
 
-**Implemented since initial draft:** Codex CLI, Cursor Agent, Gemini CLI, Continue.dev, Kilo Code, and OpenCode are now shipped as built-in subprocess providers alongside the original OpenRouter, Claude Code, and Ollama adapters.
+**Implemented since initial draft:** Codex CLI, Cursor Agent, Gemini CLI, Kilo Code, and OpenCode are now shipped as built-in subprocess providers alongside the original OpenRouter, Claude Code, and Ollama adapters.
 
 ---
 
@@ -465,4 +464,4 @@ The following questions from the original draft are now resolved by implementati
 2. **Finding parsing** — subprocess providers parse JSON output via the shared normalizer in `src/providers/subprocess.ts`. HTTP providers use structured JSON response formats.
 3. **Workspace context** — Quorum reads diffs via `git` directly (`src/runtime/workspace.ts`). The CLI is usable standalone; the skill passes only the repo root + base ref.
 
-**Implemented since initial draft:** Codex CLI, Cursor Agent, Gemini CLI, Continue.dev, Kilo Code, and OpenCode are now shipped as built-in subprocess providers alongside the original OpenRouter, Claude Code, and Ollama adapters. The `skills/` directory replaces `plugin/`. Personas are defined in `quorum.yaml` only; the `src/reviewers/builtin/` directory has been removed. CLI commands are split into `src/cli/commands/` (review, config, setup, reviewers, reviewer).
+**Implemented since initial draft:** Codex CLI, Cursor Agent, Gemini CLI, Kilo Code, and OpenCode are now shipped as built-in subprocess providers alongside the original OpenRouter, Claude Code, and Ollama adapters. The `skills/` directory replaces `plugin/`. Personas are defined in `quorum.yaml` only; the `src/reviewers/builtin/` directory has been removed. CLI commands are split into `src/cli/commands/` (review, config, setup, reviewers, reviewer).

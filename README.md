@@ -28,7 +28,6 @@ Works as a Bun CLI.
 | 🟢 → | OpenRouter | `openrouter` |
 | 🟢 → | Claude Code | `claude-code` |
 | 🟢 → | Codex CLI | `codex-cli` |
-| 🟢 → | Continue.dev | `continue-dev` |
 | 🟢 → | Cursor Agent CLI | `cursor-agent` |
 | 🟢 → | Gemini CLI | `gemini-cli` |
 | 🟢 → | Kilo Code CLI | `kilo-code` |
@@ -124,15 +123,6 @@ pipelines:
       - architect-minimax
 ```
 
-Added reviewer summary:
-
-```text
-- architect-minimax
-- persona/profile: architecture
-- provider: opencode
-- model: opencode-go/minimax-m3
-```
-
 ### Run Quorum review
 
 Prompts:
@@ -170,7 +160,7 @@ quorum reviewer add \
 
 | Flag | Description |
 |------|-------------|
-| `--provider` *required* | `openrouter`, `claude-code`, `codex-cli`, `continue-dev`, `cursor-agent`, `gemini-cli`, `kilo-code`, `opencode`, `ollama` |
+| `--provider` *required* | `openrouter`, `claude-code`, `codex-cli`, `cursor-agent`, `gemini-cli`, `kilo-code`, `opencode`, `ollama` |
 | `--persona` *required* | Persona defined in `quorum.yaml` |
 | `--model` *required* | Model for this provider (see examples above) |
 | `--variant` | Provider-specific model variant or reasoning effort (Claude Code maps to `--effort`; OpenCode maps to `--variant`; Codex CLI maps to `model_reasoning_effort`; OpenRouter maps to `reasoning.effort`) |
@@ -201,12 +191,6 @@ quorum reviewer add \
   --persona=security \
   --model=gpt-5-codex \
   --variant=high
-
-# Continue.dev
-quorum reviewer add \
-  --provider=continue-dev \
-  --persona=security \
-  --model=claude-sonnet-4
 
 # Cursor Agent CLI
 quorum reviewer add \

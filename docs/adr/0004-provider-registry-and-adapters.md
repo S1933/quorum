@@ -6,7 +6,7 @@ Accepted, 2026-06-08
 
 ## Context
 
-Quorum supports API providers and local agent CLIs behind one review-focused provider interface. Built-in providers include OpenRouter, Ollama, Claude Code, Codex CLI, Gemini CLI, Continue.dev, Kilo Code, OpenCode, and Cursor Agent CLI.
+Quorum supports API providers and local agent CLIs behind one review-focused provider interface. Built-in providers include OpenRouter, Ollama, Claude Code, Codex CLI, Gemini CLI, Kilo Code, OpenCode, and Cursor Agent CLI.
 
 The provider registry in `src/providers/registry.ts` maps provider `type` values to factories. Subprocess providers share behavior through `src/providers/base-subprocess.ts` and `src/providers/subprocess.ts`.
 
