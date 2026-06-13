@@ -112,7 +112,7 @@ export async function loadReviews(root: string): Promise<ReviewRecord[]> {
   return records;
 }
 
-async function parseReportSummary(
+export async function parseReportSummary(
   path: string,
 ): Promise<ReviewSummary | undefined> {
   try {
