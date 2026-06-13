@@ -15,7 +15,7 @@ export function archiveReportPath(root: string, kind: string, pipelineId: string
   const stamp = `${ts.getFullYear()}-${pad(ts.getMonth() + 1)}-${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}`;
   const safeKind = kind.replace(/[^a-zA-Z0-9_-]/g, '_');
   const safeId = pipelineId.replace(/[^a-zA-Z0-9_-]/g, '_');
-  return `${root}/.quorum/reviews/${stamp}-${safeKind}-${safeId}.md`;
+  return `${root}/.quorum/reviews/${safeId}/${stamp}-${safeKind}-${safeId}.md`;
 }
 
 export async function writeArchivedReport(root: string, kind: string, pipelineId: string, content: string): Promise<void> {

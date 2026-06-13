@@ -66,7 +66,7 @@ export async function loadReviews(root: string): Promise<ReviewRecord[]> {
   if (!exists) return [];
 
   const records: ReviewRecord[] = [];
-  const glob = new Bun.Glob('*.md');
+  const glob = new Bun.Glob('**/*.md');
 
   for await (const entry of glob.scan({ cwd: reviewsDir, onlyFiles: true, absolute: true })) {
     const path = typeof entry === 'string' ? entry : '';
