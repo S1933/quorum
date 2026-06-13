@@ -1,7 +1,7 @@
 import type { MetaReviewFn } from '../../consensus/registry.ts';
 import { createSubprocessProvider, STDIN_PROMPT } from '../base-subprocess.ts';
 import { createSubprocessMetaReviewer } from '../subprocess.ts';
-import { type GeminiCliConfig, GeminiCliConfigSchema } from './schema.ts';
+import { GeminiCliConfigSchema } from './schema.ts';
 
 export const geminiCliFactory = createSubprocessProvider({
   type: 'gemini-cli',
@@ -9,7 +9,7 @@ export const geminiCliFactory = createSubprocessProvider({
   schema: GeminiCliConfigSchema,
   processOutput: (raw) => raw.trim(),
   buildArgs: (cfg, ctx) => {
-    const c = cfg as GeminiCliConfig;
+    const c = GeminiCliConfigSchema.parse(cfg);
     const model = ctx.modelOverride?.model ?? c.model;
     const args = [
       '--prompt',
@@ -26,7 +26,7 @@ export const geminiCliFactory = createSubprocessProvider({
     return args;
   },
   createMetaReviewer: (config, ctx): MetaReviewFn | undefined => {
-    const c = config as GeminiCliConfig;
+    const c = GeminiCliConfigSchema.parse(config);
     return createSubprocessMetaReviewer(
       c.binary,
       () => {

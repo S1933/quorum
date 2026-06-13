@@ -153,10 +153,10 @@ export const openRouterFactory: ProviderFactory = {
   type: PROVIDER_TYPE,
   schema: OpenRouterConfigSchema,
   async create(instanceId, config, _ctx) {
-    return new OpenRouterProvider(instanceId, config as OpenRouterConfig);
+    return new OpenRouterProvider(instanceId, OpenRouterConfigSchema.parse(config));
   },
   createMetaReviewer(config, _ctx): MetaReviewFn | undefined {
-    const cfg = config as OpenRouterConfig;
+    const cfg = OpenRouterConfigSchema.parse(config);
     const client = new OpenRouterClient(cfg, 'meta-review');
     return async (prompt, ctx): Promise<string> => {
       const chunks: string[] = [];

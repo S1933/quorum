@@ -2,7 +2,7 @@ import type { MetaReviewFn } from '../../consensus/registry.ts';
 import { ProviderRuntimeError } from '../../core/errors.ts';
 import { createSubprocessProvider } from '../base-subprocess.ts';
 import { createSubprocessMetaReviewer } from '../subprocess.ts';
-import { type CodexCliConfig, CodexCliConfigSchema } from './schema.ts';
+import { CodexCliConfigSchema } from './schema.ts';
 
 export const codexCliFactory = createSubprocessProvider({
   type: 'codex-cli',
@@ -10,7 +10,7 @@ export const codexCliFactory = createSubprocessProvider({
   schema: CodexCliConfigSchema,
   processOutput: (raw) => raw.trim(),
   buildArgs: (cfg, ctx, _task, cwd) => {
-    const c = cfg as CodexCliConfig;
+    const c = CodexCliConfigSchema.parse(cfg);
     const model = ctx.modelOverride?.model ?? c.model;
     const args = [
       'exec',
@@ -34,7 +34,7 @@ export const codexCliFactory = createSubprocessProvider({
     return args;
   },
   createMetaReviewer: (config, ctx): MetaReviewFn | undefined => {
-    const c = config as CodexCliConfig;
+    const c = CodexCliConfigSchema.parse(config);
     return createSubprocessMetaReviewer(
       c.binary,
       () => ['exec', '--sandbox', c.sandbox, '--color', 'never', '-'],

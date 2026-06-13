@@ -5,7 +5,7 @@ import {
   createSubprocessMetaReviewer,
   normaliseSubprocessOutput,
 } from '../subprocess.ts';
-import { type CursorAgentConfig, CursorAgentConfigSchema } from './schema.ts';
+import { CursorAgentConfigSchema } from './schema.ts';
 
 const CURSOR_UNWRAP_KEYS = ['output', 'response', 'text', 'content', 'result'];
 
@@ -15,11 +15,11 @@ export const cursorAgentFactory = createSubprocessProvider({
   schema: CursorAgentConfigSchema,
   processOutput: (raw) => normaliseSubprocessOutput(raw, CURSOR_UNWRAP_KEYS),
   env: (cfg: SubprocessBaseConfig) => {
-    const c = cfg as CursorAgentConfig;
+    const c = CursorAgentConfigSchema.parse(cfg);
     return c.api_key ? { CURSOR_API_KEY: c.api_key } : undefined;
   },
   buildArgs: (cfg, ctx) => {
-    const c = cfg as CursorAgentConfig;
+    const c = CursorAgentConfigSchema.parse(cfg);
     const model = ctx.modelOverride?.model ?? c.model;
     const args = [
       '--print',
@@ -32,7 +32,7 @@ export const cursorAgentFactory = createSubprocessProvider({
     return args;
   },
   createMetaReviewer: (config, ctx): MetaReviewFn | undefined => {
-    const c = config as CursorAgentConfig;
+    const c = CursorAgentConfigSchema.parse(config);
     return createSubprocessMetaReviewer(
       c.binary,
       () => [

@@ -2,7 +2,7 @@ import type { MetaReviewFn } from '../../consensus/registry.ts';
 import { outputInstructionsForTask } from '../../reviewers/output.ts';
 import { createSubprocessProvider } from '../base-subprocess.ts';
 import { createSubprocessMetaReviewer } from '../subprocess.ts';
-import { type ClaudeCodeConfig, ClaudeCodeConfigSchema } from './schema.ts';
+import { ClaudeCodeConfigSchema } from './schema.ts';
 
 export const claudeCodeFactory = createSubprocessProvider({
   type: 'claude-code',
@@ -11,7 +11,7 @@ export const claudeCodeFactory = createSubprocessProvider({
   buildStdin: (_, task) => task.instruction,
   processOutput: (raw) => raw,
   buildArgs: (cfg, _ctx, task) => {
-    const c = cfg as ClaudeCodeConfig;
+    const c = ClaudeCodeConfigSchema.parse(cfg);
     const args = [
       '--print',
       '--model',
@@ -24,7 +24,7 @@ export const claudeCodeFactory = createSubprocessProvider({
     return args;
   },
   createMetaReviewer: (config, ctx): MetaReviewFn | undefined => {
-    const c = config as ClaudeCodeConfig;
+    const c = ClaudeCodeConfigSchema.parse(config);
     return createSubprocessMetaReviewer(
       c.binary,
       () => ['--print', '--model', c.model],

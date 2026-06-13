@@ -4,7 +4,7 @@ import {
   createSubprocessMetaReviewer,
   normaliseSubprocessOutput,
 } from '../subprocess.ts';
-import { type KiloCodeConfig, KiloCodeConfigSchema } from './schema.ts';
+import { KiloCodeConfigSchema } from './schema.ts';
 
 export const kiloCodeFactory = createSubprocessProvider({
   type: 'kilo-code',
@@ -12,7 +12,7 @@ export const kiloCodeFactory = createSubprocessProvider({
   schema: KiloCodeConfigSchema,
   processOutput: (raw) => normaliseSubprocessOutput(raw),
   buildArgs: (cfg, ctx) => {
-    const c = cfg as KiloCodeConfig;
+    const c = KiloCodeConfigSchema.parse(cfg);
     const model = ctx.modelOverride?.model ?? c.model;
     const args = ['run', ...c.extra_args];
     if (model) args.push('--model', model);
@@ -23,7 +23,7 @@ export const kiloCodeFactory = createSubprocessProvider({
     return args;
   },
   createMetaReviewer: (config, ctx): MetaReviewFn | undefined => {
-    const c = config as KiloCodeConfig;
+    const c = KiloCodeConfigSchema.parse(config);
     return createSubprocessMetaReviewer(
       c.binary,
       () => ['run', '--', 'Read stdin and respond with JSON.'],

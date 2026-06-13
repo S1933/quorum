@@ -32,7 +32,7 @@ const mkBuilder = () => ({
     config: unknown,
     ctx: import('../../runtime/plugin.ts').PluginCtx,
   ): MetaReviewFn | undefined => {
-    const c = config as OpenCodeConfig;
+    const c = OpenCodeConfigSchema.parse(config);
     const args =
       c.command_style === 'run'
         ? [
