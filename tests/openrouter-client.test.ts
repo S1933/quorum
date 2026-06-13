@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { OpenRouterClient } from '../src/providers/openrouter/client.ts';
 import { ProviderRuntimeError } from '../src/core/errors.ts';
+import { OpenRouterClient } from '../src/providers/openrouter/client.ts';
 
 const originalFetch = globalThis.fetch;
 
@@ -32,9 +32,19 @@ describe('OpenRouterClient', () => {
         new ReadableStream({
           start(controller) {
             const enc = new TextEncoder();
-            controller.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"{\\"findings\\":"}}]}\n\n'));
-            controller.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"[]}"}}]}\n\n'));
-            controller.enqueue(enc.encode('data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":2,"total_tokens":12}}\n\n'));
+            controller.enqueue(
+              enc.encode(
+                'data: {"choices":[{"delta":{"content":"{\\"findings\\":"}}]}\n\n',
+              ),
+            );
+            controller.enqueue(
+              enc.encode('data: {"choices":[{"delta":{"content":"[]}"}}]}\n\n'),
+            );
+            controller.enqueue(
+              enc.encode(
+                'data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":2,"total_tokens":12}}\n\n',
+              ),
+            );
             controller.enqueue(enc.encode('data: [DONE]\n\n'));
             controller.close();
           },
@@ -64,7 +74,10 @@ describe('OpenRouterClient', () => {
     expect(events).toEqual([
       { type: 'token', text: '{"findings":' },
       { type: 'token', text: '[]}' },
-      { type: 'usage', usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 } },
+      {
+        type: 'usage',
+        usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 },
+      },
     ]);
   });
 
@@ -73,9 +86,24 @@ describe('OpenRouterClient', () => {
     globalThis.fetch = (async () => {
       attempts++;
       if (attempts <= 2) {
-        return new Response('rate limited', { status: 429, headers: { 'retry-after': '0' } });
+        return new Response('rate limited', {
+          status: 429,
+          headers: { 'retry-after': '0' },
+        });
       }
-      return new Response(JSON.stringify({ id: 'ok', choices: [{ index: 0, message: { role: 'assistant', content: '{}' }, finish_reason: 'stop' }] }), { status: 200 });
+      return new Response(
+        JSON.stringify({
+          id: 'ok',
+          choices: [
+            {
+              index: 0,
+              message: { role: 'assistant', content: '{}' },
+              finish_reason: 'stop',
+            },
+          ],
+        }),
+        { status: 200 },
+      );
     }) as unknown as typeof fetch;
 
     const client = makeClient();
@@ -93,7 +121,9 @@ describe('OpenRouterClient', () => {
       attempts++;
       if (attempts === 1) return new Response('bad gateway', { status: 502 });
       if (attempts === 2) return new Response('unavailable', { status: 503 });
-      return new Response(JSON.stringify({ id: 'ok', choices: [] }), { status: 200 });
+      return new Response(JSON.stringify({ id: 'ok', choices: [] }), {
+        status: 200,
+      });
     }) as unknown as typeof fetch;
 
     const client = makeClient();
@@ -124,7 +154,9 @@ describe('OpenRouterClient', () => {
     globalThis.fetch = (async () => {
       attempts++;
       if (attempts <= 1) throw new TypeError('fetch failed');
-      return new Response(JSON.stringify({ id: 'ok', choices: [] }), { status: 200 });
+      return new Response(JSON.stringify({ id: 'ok', choices: [] }), {
+        status: 200,
+      });
     }) as unknown as typeof fetch;
 
     const client = makeClient();
@@ -161,7 +193,11 @@ describe('OpenRouterClient', () => {
       return new Response(
         new ReadableStream({
           start(controller) {
-            controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"ok"}}]}\n\n'));
+            controller.enqueue(
+              new TextEncoder().encode(
+                'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n',
+              ),
+            );
             controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
             controller.close();
           },
@@ -186,8 +222,14 @@ describe('OpenRouterClient', () => {
     let attempts = 0;
     globalThis.fetch = (async () => {
       attempts++;
-      if (attempts === 1) return new Response('slow down', { status: 429, headers: { 'retry-after': '0' } });
-      return new Response(JSON.stringify({ id: 'ok', choices: [] }), { status: 200 });
+      if (attempts === 1)
+        return new Response('slow down', {
+          status: 429,
+          headers: { 'retry-after': '0' },
+        });
+      return new Response(JSON.stringify({ id: 'ok', choices: [] }), {
+        status: 200,
+      });
     }) as unknown as typeof fetch;
 
     const client = makeClient();

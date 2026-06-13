@@ -1,6 +1,11 @@
-import type { ReviewTask, ReviewResult, ModelConfig, WorkspaceInfo } from './task.ts';
-import type { Finding } from './finding.ts';
 import type { EventBus } from './events.ts';
+import type { Finding } from './finding.ts';
+import type {
+  ModelConfig,
+  ReviewResult,
+  ReviewTask,
+  WorkspaceInfo,
+} from './task.ts';
 
 export interface ProviderCapabilities {
   review: boolean;
@@ -16,7 +21,12 @@ export type ProviderEvent =
   | { type: 'tool_call'; name: string; args: unknown }
   | { type: 'finding'; finding: Finding }
   | { type: 'log'; level: 'info' | 'warn' | 'error'; msg: string }
-  | { type: 'usage'; inputTokens: number; outputTokens: number; costUsd?: number };
+  | {
+      type: 'usage';
+      inputTokens: number;
+      outputTokens: number;
+      costUsd?: number;
+    };
 
 export interface ExecCtx {
   bus: EventBus;

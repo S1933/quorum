@@ -28,7 +28,11 @@ export class BudgetTracker {
     this.totalOutputTokens += usage.outputTokens;
     if (usage.costUsd) this.totalCostUsd += usage.costUsd;
 
-    if (!this.exceeded && this.limits.maxTotalCostUsd !== undefined && this.totalCostUsd > this.limits.maxTotalCostUsd) {
+    if (
+      !this.exceeded &&
+      this.limits.maxTotalCostUsd !== undefined &&
+      this.totalCostUsd > this.limits.maxTotalCostUsd
+    ) {
       this.exceeded = true;
       this.reason = `Cost limit exceeded: $${this.totalCostUsd.toFixed(4)} spent, limit $${this.limits.maxTotalCostUsd.toFixed(2)}`;
     }

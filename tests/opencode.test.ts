@@ -1,15 +1,17 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { chmod, mkdtemp, rm } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createRuntime } from '../src/runtime/runtime.ts';
+import { join } from 'node:path';
 import { openCodeFactory } from '../src/providers/opencode/index.ts';
-import { task, captureBus, tokenText } from './helpers/subprocess.ts';
+import { createRuntime } from '../src/runtime/runtime.ts';
+import { captureBus, task, tokenText } from './helpers/subprocess.ts';
 
 const tmpRoots: string[] = [];
 
 afterAll(async () => {
-  await Promise.all(tmpRoots.map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    tmpRoots.map((root) => rm(root, { recursive: true, force: true })),
+  );
 });
 
 describe('opencode provider', () => {
@@ -42,7 +44,10 @@ describe('opencode provider', () => {
     const root = await mkdtemp(join(tmpdir(), 'quorum-opencode-'));
     tmpRoots.push(root);
     const binary = join(root, 'opencode');
-    await Bun.write(binary, '#!/bin/sh\nprintf \'{"findings":\'\nsleep 0.01\nprintf \'[]}\'\n');
+    await Bun.write(
+      binary,
+      "#!/bin/sh\nprintf '{\"findings\":'\nsleep 0.01\nprintf '[]}'\n",
+    );
     await chmod(binary, 0o755);
     const events: unknown[] = [];
     const bus = captureBus(events);
@@ -62,7 +67,7 @@ describe('opencode provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    const result = await provider.review!(task(root, 'security-open'), {
+    const result = await provider.review?.(task(root, 'security-open'), {
       bus,
       signal: new AbortController().signal,
       workspace: { root },
@@ -79,7 +84,10 @@ describe('opencode provider', () => {
     const binary = join(root, 'opencode');
     const argsFile = join(root, 'args.txt');
     const stdinFile = join(root, 'stdin.txt');
-    await Bun.write(binary, `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\ncat > '${stdinFile}'\nprintf '{"findings":[]}'\n`);
+    await Bun.write(
+      binary,
+      `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\ncat > '${stdinFile}'\nprintf '{"findings":[]}'\n`,
+    );
     await chmod(binary, 0o755);
 
     const provider = await openCodeFactory.create(
@@ -99,9 +107,10 @@ describe('opencode provider', () => {
     );
 
     const reviewTask = task(root, 'security-open');
-    reviewTask.instruction = 'Review this diff.\n--dangerous\n$(touch /tmp/should-not-run)';
+    reviewTask.instruction =
+      'Review this diff.\n--dangerous\n$(touch /tmp/should-not-run)';
 
-    await provider.review!(reviewTask, {
+    await provider.review?.(reviewTask, {
       bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
@@ -140,11 +149,13 @@ describe('opencode provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    await expect(provider.review!(task(root, 'security-open'), {
-      bus: captureBus(),
-      signal: new AbortController().signal,
-      workspace: { root },
-    })).rejects.toThrow('opencode timed out after 10ms');
+    await expect(
+      provider.review?.(task(root, 'security-open'), {
+        bus: captureBus(),
+        signal: new AbortController().signal,
+        workspace: { root },
+      }),
+    ).rejects.toThrow('opencode timed out after 10ms');
   });
 
   test('rejects unsafe opencode extra args', async () => {
@@ -155,7 +166,10 @@ describe('opencode provider', () => {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: { type: 'opencode', extra_args: ['--trust-all'] } },
+          sec: {
+            persona: 'security',
+            provider: { type: 'opencode', extra_args: ['--trust-all'] },
+          },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -164,7 +178,9 @@ describe('opencode provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveReviewer('sec')).rejects.toThrow('extra_args.0');
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow(
+      'extra_args.0',
+    );
   });
 
   test('rejects variant with prompt-style opencode', async () => {
@@ -191,7 +207,9 @@ describe('opencode provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveReviewer('sec')).rejects.toThrow('variant is only supported when command_style is run');
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow(
+      'variant is only supported when command_style is run',
+    );
   });
 
   test('keeps opencode-go as a legacy provider alias', async () => {
@@ -202,7 +220,13 @@ describe('opencode provider', () => {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: { type: 'opencode-go', model: 'opencode-go/deepseek-v4-pro' } },
+          sec: {
+            persona: 'security',
+            provider: {
+              type: 'opencode-go',
+              model: 'opencode-go/deepseek-v4-pro',
+            },
+          },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },

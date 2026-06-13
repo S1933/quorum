@@ -1,7 +1,7 @@
 import * as readline from 'node:readline';
-import { parseQuestions } from '../reviewers/output.ts';
-import type { ReviewResult } from '../core/task.ts';
 import type { CliIo } from '../cli/types.ts';
+import type { ReviewResult } from '../core/task.ts';
+import { parseQuestions } from '../reviewers/output.ts';
 
 export interface ReviewerQuestion {
   reviewerId: string;
@@ -43,7 +43,9 @@ function jaccardSimilarity(a: string, b: string): number {
   return intersection.size / union.size;
 }
 
-export function deduplicateQuestions(questions: ReviewerQuestion[]): ReviewerQuestion[] {
+export function deduplicateQuestions(
+  questions: ReviewerQuestion[],
+): ReviewerQuestion[] {
   const deduped: ReviewerQuestion[] = [];
   for (const q of questions) {
     const isDuplicate = deduped.some(
@@ -60,7 +62,7 @@ export async function promptQuestions(
 ): Promise<Map<string, string>> {
   const answers = new Map<string, string>();
 
-  if (!io.stdin || !io.stdin.isTTY) {
+  if (!io.stdin?.isTTY) {
     throw new Error(
       'No TTY available — cannot answer questions interactively. Use a terminal or run without --interactive.',
     );

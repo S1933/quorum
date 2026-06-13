@@ -1,4 +1,9 @@
-import type { EventBus, EventHandler, QuorumEvent, QuorumEventType } from '../core/events.ts';
+import type {
+  EventBus,
+  EventHandler,
+  QuorumEvent,
+  QuorumEventType,
+} from '../core/events.ts';
 
 type Listener = (e: QuorumEvent) => void;
 

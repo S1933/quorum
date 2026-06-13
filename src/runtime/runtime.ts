@@ -1,27 +1,39 @@
-import type { Persona } from '../core/persona.ts';
-import type { Provider } from '../core/provider.ts';
-import type { ConsensusConfig, Pipeline, ReviewerRef } from '../core/pipeline.ts';
-import type { ModelConfig } from '../core/task.ts';
-import type { QuorumConfig, ReviewerConfig, PersonaConfig, PipelineConfig } from '../config/schema.ts';
-import type { PluginCtx } from './plugin.ts';
-import { ProviderRegistry } from '../providers/registry.ts';
+import type {
+  PersonaConfig,
+  PipelineConfig,
+  QuorumConfig,
+  ReviewerConfig,
+} from '../config/schema.ts';
+import { majorityV1 } from '../consensus/majority-v1.ts';
+import { overlapV1 } from '../consensus/overlap-v1.ts';
 import { ConsensusRegistry } from '../consensus/registry.ts';
-import { InMemoryEventBus } from './bus.ts';
-import { bindReviewer, type BoundReviewer } from '../reviewers/reviewer.ts';
-import { openRouterFactory } from '../providers/openrouter/index.ts';
+import { semanticV2 } from '../consensus/semantic-v2.ts';
+import { severityAwareV1 } from '../consensus/severity-aware-v1.ts';
+import { ConfigError } from '../core/errors.ts';
+import type { EventBus } from '../core/events.ts';
+import type { Persona } from '../core/persona.ts';
+import type {
+  ConsensusConfig,
+  Pipeline,
+  ReviewerRef,
+} from '../core/pipeline.ts';
+import type { Provider } from '../core/provider.ts';
+import type { ModelConfig } from '../core/task.ts';
 import { claudeCodeFactory } from '../providers/claude-code/index.ts';
 import { codexCliFactory } from '../providers/codex-cli/index.ts';
 import { cursorAgentFactory } from '../providers/cursor-agent/index.ts';
 import { geminiCliFactory } from '../providers/gemini-cli/index.ts';
 import { kiloCodeFactory } from '../providers/kilo-code/index.ts';
-import { openCodeFactory, openCodeGoAliasFactory } from '../providers/opencode/index.ts';
 import { ollamaFactory } from '../providers/ollama/index.ts';
-import { overlapV1 } from '../consensus/overlap-v1.ts';
-import { majorityV1 } from '../consensus/majority-v1.ts';
-import { severityAwareV1 } from '../consensus/severity-aware-v1.ts';
-import { semanticV2 } from '../consensus/semantic-v2.ts';
-import { ConfigError } from '../core/errors.ts';
-import type { EventBus } from '../core/events.ts';
+import {
+  openCodeFactory,
+  openCodeGoAliasFactory,
+} from '../providers/opencode/index.ts';
+import { openRouterFactory } from '../providers/openrouter/index.ts';
+import { ProviderRegistry } from '../providers/registry.ts';
+import { type BoundReviewer, bindReviewer } from '../reviewers/reviewer.ts';
+import { InMemoryEventBus } from './bus.ts';
+import type { PluginCtx } from './plugin.ts';
 
 export interface Runtime {
   bus: EventBus;
@@ -41,7 +53,9 @@ export interface CreateRuntimeOptions {
   bus?: EventBus;
 }
 
-export async function createRuntime(opts: CreateRuntimeOptions): Promise<Runtime> {
+export async function createRuntime(
+  opts: CreateRuntimeOptions,
+): Promise<Runtime> {
   const providers = new ProviderRegistry();
   const consensus = new ConsensusRegistry();
   const bus = opts.bus ?? new InMemoryEventBus();
@@ -64,8 +78,14 @@ export async function createRuntime(opts: CreateRuntimeOptions): Promise<Runtime
 
   const resolveReviewer = async (id: string): Promise<BoundReviewer> => {
     const ref = toReviewerRef(id, opts.config.reviewers[id]);
-    const persona = toPersona(ref.personaId, opts.config.personas[ref.personaId]);
-    const provider = await instantiateProvider(ref.providerId, ref.providerConfig);
+    const persona = toPersona(
+      ref.personaId,
+      opts.config.personas[ref.personaId],
+    );
+    const provider = await instantiateProvider(
+      ref.providerId,
+      ref.providerConfig,
+    );
     return bindReviewer(ref, persona, provider);
   };
 
@@ -92,7 +112,10 @@ export async function createRuntime(opts: CreateRuntimeOptions): Promise<Runtime
     },
   };
 
-  async function instantiateProvider(id: string, cfg: unknown): Promise<Provider> {
+  async function instantiateProvider(
+    id: string,
+    cfg: unknown,
+  ): Promise<Provider> {
     const existing = providerCache.get(id);
     if (existing) return existing;
     const inst = await providers.instantiate(id, cfg, opts.pluginCtx);
@@ -101,7 +124,10 @@ export async function createRuntime(opts: CreateRuntimeOptions): Promise<Runtime
   }
 }
 
-function toReviewerRef(id: string, cfg: ReviewerConfig | undefined): ReviewerRef {
+function toReviewerRef(
+  id: string,
+  cfg: ReviewerConfig | undefined,
+): ReviewerRef {
   if (!cfg) throw new ConfigError(`Unknown reviewer "${id}"`);
   const ref: ReviewerRef = {
     id,
@@ -116,7 +142,11 @@ function toReviewerRef(id: string, cfg: ReviewerConfig | undefined): ReviewerRef
 
 function toPersona(id: string, cfg: PersonaConfig | undefined): Persona {
   if (!cfg) throw new ConfigError(`Unknown persona "${id}"`);
-  const persona: Persona = { id, description: cfg.description, system: cfg.system };
+  const persona: Persona = {
+    id,
+    description: cfg.description,
+    system: cfg.system,
+  };
   if (cfg.outputSchemaHint) persona.outputSchemaHint = cfg.outputSchemaHint;
   return persona;
 }
@@ -136,7 +166,9 @@ function toPipeline(id: string, cfg: PipelineConfig): Pipeline {
   return pipeline;
 }
 
-function toModelConfig(cfg: ReviewerConfig['overrides']): ModelConfig | undefined {
+function toModelConfig(
+  cfg: ReviewerConfig['overrides'],
+): ModelConfig | undefined {
   if (!cfg) return undefined;
   const out: ModelConfig = {};
   if (cfg.model !== undefined) out.model = cfg.model;
@@ -146,9 +178,14 @@ function toModelConfig(cfg: ReviewerConfig['overrides']): ModelConfig | undefine
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-function toConsensusConfig(cfg: PipelineConfig['consensus']): ConsensusConfig | undefined {
+function toConsensusConfig(
+  cfg: PipelineConfig['consensus'],
+): ConsensusConfig | undefined {
   if (!cfg) return undefined;
-  const base = cfg.requireAgreement !== undefined ? { requireAgreement: cfg.requireAgreement } : {};
+  const base =
+    cfg.requireAgreement !== undefined
+      ? { requireAgreement: cfg.requireAgreement }
+      : {};
   switch (cfg.strategy) {
     case 'overlap-v1':
       return { strategy: cfg.strategy, ...base };
@@ -158,15 +195,23 @@ function toConsensusConfig(cfg: PipelineConfig['consensus']): ConsensusConfig | 
       return {
         strategy: cfg.strategy,
         ...base,
-        ...(cfg.severityThresholds !== undefined ? { severityThresholds: cfg.severityThresholds } : {}),
+        ...(cfg.severityThresholds !== undefined
+          ? { severityThresholds: cfg.severityThresholds }
+          : {}),
       };
     case 'semantic-v2':
       return {
         strategy: cfg.strategy,
         ...base,
-        ...(cfg.similarityThreshold !== undefined ? { similarityThreshold: cfg.similarityThreshold } : {}),
-        ...(cfg.enableContradictions !== undefined ? { enableContradictions: cfg.enableContradictions } : {}),
-        ...(cfg.metaReviewerProvider !== undefined ? { metaReviewerProvider: cfg.metaReviewerProvider } : {}),
+        ...(cfg.similarityThreshold !== undefined
+          ? { similarityThreshold: cfg.similarityThreshold }
+          : {}),
+        ...(cfg.enableContradictions !== undefined
+          ? { enableContradictions: cfg.enableContradictions }
+          : {}),
+        ...(cfg.metaReviewerProvider !== undefined
+          ? { metaReviewerProvider: cfg.metaReviewerProvider }
+          : {}),
       };
   }
 }

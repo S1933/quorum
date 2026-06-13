@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput, useApp } from 'ink';
+import { Box, Text, useApp, useInput } from 'ink';
+import { useEffect, useState } from 'react';
+import type { QuorumConfig } from '../../config/schema.ts';
 import { PipelinesTab, togglePipelineExpand } from './pipelines-tab.tsx';
 import { ReviewsTab } from './reviews-tab.tsx';
-import { extractPipelines, loadReviews } from './utils.ts';
-import type { QuorumConfig } from '../../config/schema.ts';
 import type { PipelineSummary, ReviewRecord } from './utils.ts';
+import { extractPipelines, loadReviews } from './utils.ts';
 
 interface Props {
   config: QuorumConfig;
@@ -13,7 +13,9 @@ interface Props {
 
 type Tab = 'pipelines' | 'reviews';
 type View = 'list' | 'detail';
-type DetailContent = { type: 'pipeline'; item: PipelineSummary } | { type: 'review'; item: ReviewRecord };
+type DetailContent =
+  | { type: 'pipeline'; item: PipelineSummary }
+  | { type: 'review'; item: ReviewRecord };
 
 export function Dashboard({ config, root }: Props) {
   const { exit } = useApp();
@@ -28,7 +30,7 @@ export function Dashboard({ config, root }: Props) {
   const pipelines = extractPipelines(config);
 
   useEffect(() => {
-    loadReviews(root).then(r => {
+    loadReviews(root).then((r) => {
       setReviews(r);
       setLoading(false);
     });
@@ -56,17 +58,17 @@ export function Dashboard({ config, root }: Props) {
     }
 
     if (key.upArrow) {
-      setSelectedIndex(i => Math.max(0, i - 1));
+      setSelectedIndex((i) => Math.max(0, i - 1));
       return;
     }
 
     if (key.downArrow) {
-      setSelectedIndex(i => Math.min(items.length - 1, i + 1));
+      setSelectedIndex((i) => Math.min(items.length - 1, i + 1));
       return;
     }
 
     if (tab === 'pipelines' && key.return) {
-      setExpanded(prev => togglePipelineExpand(prev, selectedIndex));
+      setExpanded((prev) => togglePipelineExpand(prev, selectedIndex));
       return;
     }
 
@@ -95,7 +97,15 @@ export function Dashboard({ config, root }: Props) {
   });
 
   if (view === 'detail' && detail?.type === 'review' && detail.item.content) {
-    return <ReviewDetailView record={detail.item} onBack={() => { setView('list'); setDetail(null); }} />;
+    return (
+      <ReviewDetailView
+        record={detail.item}
+        onBack={() => {
+          setView('list');
+          setDetail(null);
+        }}
+      />
+    );
   }
 
   return (
@@ -103,15 +113,17 @@ export function Dashboard({ config, root }: Props) {
       <Header tab={tab} />
       <Box flexDirection="column" flexGrow={1}>
         {tab === 'pipelines' ? (
-          <PipelinesTab pipelines={pipelines} selectedIndex={selectedIndex} expanded={expanded} />
+          <PipelinesTab
+            pipelines={pipelines}
+            selectedIndex={selectedIndex}
+            expanded={expanded}
+          />
+        ) : loading ? (
+          <Box paddingX={2} paddingY={1}>
+            <Text dimColor>Loading reviews...</Text>
+          </Box>
         ) : (
-          loading ? (
-            <Box paddingX={2} paddingY={1}>
-              <Text dimColor>Loading reviews...</Text>
-            </Box>
-          ) : (
-            <ReviewsTab reviews={reviews} selectedIndex={selectedIndex} />
-          )
+          <ReviewsTab reviews={reviews} selectedIndex={selectedIndex} />
         )}
       </Box>
       <Footer />
@@ -121,7 +133,13 @@ export function Dashboard({ config, root }: Props) {
 
 function Header({ tab }: { tab: Tab }) {
   return (
-    <Box borderStyle="round" borderColor="green" paddingX={2} paddingY={0} justifyContent="space-between">
+    <Box
+      borderStyle="round"
+      borderColor="green"
+      paddingX={2}
+      paddingY={0}
+      justifyContent="space-between"
+    >
       <Box gap={3}>
         <TabLabel label="Pipelines" active={tab === 'pipelines'} />
         <TabLabel label="Reviews" active={tab === 'reviews'} />
@@ -134,14 +152,21 @@ function Header({ tab }: { tab: Tab }) {
 function TabLabel({ label, active }: { label: string; active: boolean }) {
   return (
     <Text bold={active} color={active ? 'green' : 'dim'}>
-      {active ? '● ' : '○ '}{label}
+      {active ? '● ' : '○ '}
+      {label}
     </Text>
   );
 }
 
 function Footer() {
   return (
-    <Box borderStyle="round" borderColor="gray" paddingX={2} paddingY={0} gap={2}>
+    <Box
+      borderStyle="round"
+      borderColor="gray"
+      paddingX={2}
+      paddingY={0}
+      gap={2}
+    >
       <Text dimColor>↑↓ navigate</Text>
       <Text dimColor>↹ tab</Text>
       <Text dimColor>⏎ expand/detail</Text>
@@ -151,7 +176,13 @@ function Footer() {
   );
 }
 
-function ReviewDetailView({ record, onBack }: { record: ReviewRecord; onBack: () => void }) {
+function ReviewDetailView({
+  record,
+  onBack,
+}: {
+  record: ReviewRecord;
+  onBack: () => void;
+}) {
   useInput((_input, key) => {
     if (key.escape || key.return) onBack();
   });
@@ -162,8 +193,8 @@ function ReviewDetailView({ record, onBack }: { record: ReviewRecord; onBack: ()
     <Box flexDirection="column" height="100%">
       <Box borderStyle="round" borderColor="blue" paddingX={2} paddingY={0}>
         <Text bold>{record.pipelineId}</Text>
-        <Text dimColor>  {record.timestamp.toLocaleString()}</Text>
-        <Text dimColor>  {record.kind}</Text>
+        <Text dimColor> {record.timestamp.toLocaleString()}</Text>
+        <Text dimColor> {record.kind}</Text>
       </Box>
 
       <Box flexDirection="column" paddingX={2} paddingY={1} flexGrow={1}>
@@ -171,7 +202,7 @@ function ReviewDetailView({ record, onBack }: { record: ReviewRecord; onBack: ()
       </Box>
 
       <Box borderStyle="round" borderColor="gray" paddingX={2} paddingY={0}>
-        <Text dimColor>↑↓ scroll  </Text>
+        <Text dimColor>↑↓ scroll </Text>
         <Text color="cyan">Esc/⏎ back</Text>
       </Box>
     </Box>

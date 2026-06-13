@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const dirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+  );
 });
 
 describe('report-check', () => {
@@ -18,7 +20,14 @@ describe('report-check', () => {
     await Bun.write(reportPath, JSON.stringify(report()));
 
     const proc = Bun.spawn({
-      cmd: ['bun', 'run', 'src/ci/report-check.ts', reportPath, '--fail-on', 'high'],
+      cmd: [
+        'bun',
+        'run',
+        'src/ci/report-check.ts',
+        reportPath,
+        '--fail-on',
+        'high',
+      ],
       cwd: process.cwd(),
       stdout: 'pipe',
       stderr: 'pipe',
@@ -39,7 +48,9 @@ describe('report-check', () => {
     expect(stdout).toContain(
       '::error file=src/a%2Cb%3Ac%25.ts,line=7,title=🔥 bad%2C title%3A 100%25%0Anext::',
     );
-    expect(stdout).toContain('correctness · first%25 line%0D%0Asecond: value, more');
+    expect(stdout).toContain(
+      'correctness · first%25 line%0D%0Asecond: value, more',
+    );
   });
 });
 

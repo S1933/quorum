@@ -1,10 +1,10 @@
-import type { EventBus } from '../core/events.ts';
-import type { ReviewTask, ReviewResult } from '../core/task.ts';
+import { isAbsolute, relative, resolve } from 'node:path';
 import type { MetaReviewFn } from '../consensus/registry.ts';
 import { ProviderRuntimeError } from '../core/errors.ts';
+import type { EventBus } from '../core/events.ts';
+import type { ReviewResult, ReviewTask } from '../core/task.ts';
 import { parseReviewOutput } from '../reviewers/output.ts';
 import { InMemoryEventBus } from '../runtime/bus.ts';
-import { isAbsolute, relative, resolve } from 'node:path';
 
 export interface SubprocessRunOptions {
   providerId: string;
@@ -40,7 +40,9 @@ const DEFAULT_ENV_ALLOWLIST = [
   'XDG_DATA_HOME',
 ] as const;
 
-export async function runSubprocess(opts: SubprocessRunOptions): Promise<string> {
+export async function runSubprocess(
+  opts: SubprocessRunOptions,
+): Promise<string> {
   assertTrustedBinary(opts);
   const proc = Bun.spawn({
     cmd: [opts.binary, ...opts.args],
@@ -51,7 +53,10 @@ export async function runSubprocess(opts: SubprocessRunOptions): Promise<string>
     env: buildSubprocessEnv(opts.env),
   });
 
-  const writer = proc.stdin as unknown as { write: (s: string) => void; end: () => void };
+  const writer = proc.stdin as unknown as {
+    write: (s: string) => void;
+    end: () => void;
+  };
   writer.write(opts.stdin);
   writer.end();
 
@@ -69,8 +74,10 @@ export async function runSubprocess(opts: SubprocessRunOptions): Promise<string>
   }, opts.timeoutMs);
 
   try {
-    const maxStdoutBytes = opts.maxStdoutBytes ?? DEFAULT_SUBPROCESS_STDOUT_MAX_BYTES;
-    const maxStderrBytes = opts.maxStderrBytes ?? DEFAULT_SUBPROCESS_STDERR_MAX_BYTES;
+    const maxStdoutBytes =
+      opts.maxStdoutBytes ?? DEFAULT_SUBPROCESS_STDOUT_MAX_BYTES;
+    const maxStderrBytes =
+      opts.maxStderrBytes ?? DEFAULT_SUBPROCESS_STDERR_MAX_BYTES;
     const [stdout, stderr, exitCode] = await Promise.all([
       readPreviewedStdout(proc.stdout, {
         providerId: opts.providerId,
@@ -139,7 +146,9 @@ function isInside(root: string, path: string): boolean {
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
 }
 
-export function buildSubprocessEnv(extra: Record<string, string | undefined> = {}): Record<string, string> {
+export function buildSubprocessEnv(
+  extra: Record<string, string | undefined> = {},
+): Record<string, string> {
   const env: Record<string, string> = {};
   for (const key of DEFAULT_ENV_ALLOWLIST) {
     const value = process.env[key];
@@ -176,9 +185,18 @@ export function buildSubprocessReviewResult(
   };
 }
 
-const DEFAULT_UNWRAP_KEYS = ['output', 'response', 'text', 'content', 'message'];
+const DEFAULT_UNWRAP_KEYS = [
+  'output',
+  'response',
+  'text',
+  'content',
+  'message',
+];
 
-export function normaliseSubprocessOutput(raw: string, unwrapKeys: string[] = DEFAULT_UNWRAP_KEYS): string {
+export function normaliseSubprocessOutput(
+  raw: string,
+  unwrapKeys: string[] = DEFAULT_UNWRAP_KEYS,
+): string {
   const text = raw.trim();
   if (!text) return text;
 
@@ -190,7 +208,9 @@ export function normaliseSubprocessOutput(raw: string, unwrapKeys: string[] = DE
     .map((line) => parseJsonObject(line))
     .filter((value): value is Record<string, unknown> => value !== null)
     .map((value) => unwrapJsonOutput(value, unwrapKeys))
-    .filter((value): value is string => typeof value === 'string' && value.length > 0);
+    .filter(
+      (value): value is string => typeof value === 'string' && value.length > 0,
+    );
 
   return chunks.length > 0 ? chunks.join('\n') : text;
 }
@@ -198,15 +218,20 @@ export function normaliseSubprocessOutput(raw: string, unwrapKeys: string[] = DE
 function parseJsonObject(text: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(text);
-    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
+    return typeof parsed === 'object' &&
+      parsed !== null &&
+      !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
       : null;
   } catch {
     return null;
   }
 }
 
-function unwrapJsonOutput(value: Record<string, unknown>, keys: string[]): string | null {
+function unwrapJsonOutput(
+  value: Record<string, unknown>,
+  keys: string[],
+): string | null {
   if (Array.isArray(value.findings)) return JSON.stringify(value);
 
   for (const key of keys) {
@@ -262,7 +287,12 @@ export async function readPreviewedStdout(
 
 export async function readLimitedText(
   stream: ReadableStream<Uint8Array>,
-  opts: { providerId?: string; maxBytes?: number; onLimit?: () => void; limitLabel?: string },
+  opts: {
+    providerId?: string;
+    maxBytes?: number;
+    onLimit?: () => void;
+    limitLabel?: string;
+  },
 ): Promise<string> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();

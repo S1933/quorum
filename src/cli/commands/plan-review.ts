@@ -2,14 +2,14 @@ import { stat } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import type { QuorumConfig } from '../../config/schema.ts';
 import { ConfigError } from '../../core/errors.ts';
-import { defaultPluginCtx } from '../../runtime/plugin.ts';
-import { PipelineExecutor } from '../../pipelines/executor.ts';
-import { TerminalRenderer } from '../../ui/terminal.ts';
-import { renderMarkdownReport } from '../../ui/markdown.ts';
-import { renderJsonReport } from '../../ui/json.ts';
 import type { Pipeline } from '../../core/pipeline.ts';
-import type { CliDeps, CliIo } from '../types.ts';
+import { PipelineExecutor } from '../../pipelines/executor.ts';
+import { defaultPluginCtx } from '../../runtime/plugin.ts';
+import { renderJsonReport } from '../../ui/json.ts';
+import { renderMarkdownReport } from '../../ui/markdown.ts';
+import { TerminalRenderer } from '../../ui/terminal.ts';
 import { writeArchivedReport, writeReport } from '../report.ts';
+import type { CliDeps, CliIo } from '../types.ts';
 import {
   buildSafeFence,
   resolveReportPath,
@@ -27,7 +27,8 @@ export async function cmdPlanReview(
     throw new ConfigError('Usage: quorum plan-review <plan-file>');
   }
 
-  const configPath = typeof flags.config === 'string' ? flags.config : deps.findConfigPath();
+  const configPath =
+    typeof flags.config === 'string' ? flags.config : deps.findConfigPath();
   const config = await deps.loadConfigFromPath(configPath);
   const format = reviewOutputFormat(flags);
   const pipelineId = resolvePipelineId(positional[0]!, flags, config);
@@ -41,9 +42,10 @@ export async function cmdPlanReview(
   const runtime = await deps.createRuntime({ config, pluginCtx });
   const pipeline = runtime.resolvePipeline(pipelineId);
   const reviewerIds = capReviewerIds(pipeline);
-  const filteredPipeline = reviewerIds.length === pipeline.reviewers.length
-    ? pipeline
-    : { ...pipeline, reviewers: reviewerIds };
+  const filteredPipeline =
+    reviewerIds.length === pipeline.reviewers.length
+      ? pipeline
+      : { ...pipeline, reviewers: reviewerIds };
   const reviewers = await runtime.resolveReviewers(reviewerIds);
 
   const detach =
@@ -85,16 +87,19 @@ export async function cmdPlanReview(
       }
       io.stdout.write(json);
     } else {
-      const reportPath = typeof flags.report === 'string'
-        ? resolveReportPath(root, flags.report, flags)
-        : `${root}/.quorum/last-plan-review.md`;
+      const reportPath =
+        typeof flags.report === 'string'
+          ? resolveReportPath(root, flags.report, flags)
+          : `${root}/.quorum/last-plan-review.md`;
       const md = renderMarkdownReport(result);
       await writeReport(reportPath, md);
       await writeArchivedReport(root, 'plan-review', filteredPipeline.id, md);
       io.stdout.write(`\nreport: ${reportPath}\n`);
       if (result.totalCostUsd) {
         const over = result.budgetExceeded ? ' (budget exceeded)' : '';
-        io.stdout.write(`💰  total cost: $${result.totalCostUsd.toFixed(4)}${over}\n`);
+        io.stdout.write(
+          `💰  total cost: $${result.totalCostUsd.toFixed(4)}${over}\n`,
+        );
       }
     }
     return result.errors.length > 0 && result.reviews.length === 0 ? 1 : 0;
@@ -104,7 +109,10 @@ export async function cmdPlanReview(
   }
 }
 
-export function buildPlanReviewInstruction(plan: string, planFile: string): string {
+export function buildPlanReviewInstruction(
+  plan: string,
+  planFile: string,
+): string {
   const fence = buildSafeFence(plan);
   return [
     `Review the implementation plan in ${planFile} and report findings as structured JSON per the system prompt.`,
@@ -124,9 +132,13 @@ function resolvePipelineId(
   flags: Record<string, string | boolean>,
   config: QuorumConfig,
 ): string {
-  const pipelineId = (typeof flags.pipeline === 'string' && flags.pipeline) || config.defaults?.pipeline;
+  const pipelineId =
+    (typeof flags.pipeline === 'string' && flags.pipeline) ||
+    config.defaults?.pipeline;
   if (!pipelineId) {
-    throw new ConfigError(`No pipeline specified for plan "${planArg}" and no defaults.pipeline configured`);
+    throw new ConfigError(
+      `No pipeline specified for plan "${planArg}" and no defaults.pipeline configured`,
+    );
   }
   return pipelineId;
 }
@@ -138,14 +150,16 @@ async function readPlan(planPath: string): Promise<string> {
   } catch {
     throw new ConfigError(`Plan file not found: ${planPath}`);
   }
-  if (!info.isFile()) throw new ConfigError(`Plan path is not a file: ${planPath}`);
+  if (!info.isFile())
+    throw new ConfigError(`Plan path is not a file: ${planPath}`);
   const content = await Bun.file(planPath).text();
   if (!content.trim()) throw new ConfigError(`Plan file is empty: ${planPath}`);
   return content;
 }
 
 function capReviewerIds(pipeline: Pipeline): string[] {
-  return pipeline.maxReviewers && pipeline.maxReviewers < pipeline.reviewers.length
+  return pipeline.maxReviewers &&
+    pipeline.maxReviewers < pipeline.reviewers.length
     ? pipeline.reviewers.slice(0, pipeline.maxReviewers)
     : pipeline.reviewers;
 }

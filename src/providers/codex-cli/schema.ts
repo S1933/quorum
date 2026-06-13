@@ -15,15 +15,20 @@ export const CodexCliConfigSchema = z
     variant: z.string().min(1).optional(),
     binary: z.string().min(1).default('codex'),
     allow_project_binary: z.boolean().default(false),
-    sandbox: z.enum(['read-only', 'workspace-write', 'danger-full-access']).default('read-only'),
-    approval_policy: z.enum(['untrusted', 'on-request', 'never']).default('on-request'),
+    sandbox: z
+      .enum(['read-only', 'workspace-write', 'danger-full-access'])
+      .default('read-only'),
+    approval_policy: z
+      .enum(['untrusted', 'on-request', 'never'])
+      .default('on-request'),
     extra_args: z.array(SafeExtraArgSchema).default([]),
     cwd: z.string().optional(),
     timeout_ms: z.number().int().positive().default(120_000),
   })
   .strict()
   .refine(
-    (cfg) => cfg.sandbox !== 'danger-full-access' || cfg.approval_policy !== 'never',
+    (cfg) =>
+      cfg.sandbox !== 'danger-full-access' || cfg.approval_policy !== 'never',
     {
       message: 'danger-full-access requires approval_policy other than never',
       path: ['approval_policy'],

@@ -1,7 +1,7 @@
-import type { Finding, Severity, Category } from '../core/finding.ts';
-import type { PlanReviewVerdict, ReviewTask } from '../core/task.ts';
-import { CATEGORIES, SEVERITIES } from '../core/finding.ts';
 import { ReviewerOutputError } from '../core/errors.ts';
+import type { Category, Finding, Severity } from '../core/finding.ts';
+import { CATEGORIES, SEVERITIES } from '../core/finding.ts';
+import type { PlanReviewVerdict, ReviewTask } from '../core/task.ts';
 
 export const REVIEW_OUTPUT_INSTRUCTIONS = `Respond with a single JSON object — no prose, no preamble, no markdown fence, no thinking written outside the object — matching this shape:
 {
@@ -98,33 +98,50 @@ export interface ParsedReviewOutput {
   verdict?: PlanReviewVerdict;
 }
 
-export function outputInstructionsForTask(task: Pick<ReviewTask, 'kind'>): string {
-  return task.kind === 'plan-review' ? PLAN_REVIEW_OUTPUT_INSTRUCTIONS : REVIEW_OUTPUT_INSTRUCTIONS;
+export function outputInstructionsForTask(
+  task: Pick<ReviewTask, 'kind'>,
+): string {
+  return task.kind === 'plan-review'
+    ? PLAN_REVIEW_OUTPUT_INSTRUCTIONS
+    : REVIEW_OUTPUT_INSTRUCTIONS;
 }
 
 export function parseFindings(raw: string, reviewerId: string): Finding[] {
   return parseReviewOutput(raw, reviewerId).findings;
 }
 
-export function parseReviewOutput(raw: string, reviewerId: string): ParsedReviewOutput {
+export function parseReviewOutput(
+  raw: string,
+  reviewerId: string,
+): ParsedReviewOutput {
   const text = stripFence(raw).trim();
-  if (!text) throw new ReviewerOutputError(reviewerId, 'Reviewer returned empty output');
+  if (!text)
+    throw new ReviewerOutputError(reviewerId, 'Reviewer returned empty output');
 
   const parsed = parseOutputJson(text, reviewerId);
 
   if (typeof parsed !== 'object' || parsed === null) {
-    throw new ReviewerOutputError(reviewerId, 'Reviewer output JSON must be an object');
+    throw new ReviewerOutputError(
+      reviewerId,
+      'Reviewer output JSON must be an object',
+    );
   }
   const findingsRaw = (parsed as { findings?: unknown }).findings;
   if (!Array.isArray(findingsRaw)) {
-    throw new ReviewerOutputError(reviewerId, 'Reviewer output must contain a findings array');
+    throw new ReviewerOutputError(
+      reviewerId,
+      'Reviewer output must contain a findings array',
+    );
   }
 
   const out: Finding[] = [];
   for (const [idx, item] of findingsRaw.entries()) {
     const normalised = normaliseFinding(item as RawFinding, reviewerId);
     if (!normalised) {
-      throw new ReviewerOutputError(reviewerId, `Invalid finding at index ${idx}`);
+      throw new ReviewerOutputError(
+        reviewerId,
+        `Invalid finding at index ${idx}`,
+      );
     }
     out.push(normalised);
   }
@@ -138,7 +155,11 @@ function parseOutputJson(text: string, reviewerId: string): unknown {
   } catch (err) {
     const recovered = extractJsonObject(text);
     if (!recovered) {
-      throw new ReviewerOutputError(reviewerId, 'Reviewer output did not contain JSON', err);
+      throw new ReviewerOutputError(
+        reviewerId,
+        'Reviewer output did not contain JSON',
+        err,
+      );
     }
     try {
       return JSON.parse(recovered);
@@ -154,13 +175,22 @@ function parseOutputJson(text: string, reviewerId: string): unknown {
 
 function normaliseVerdict(raw: unknown): PlanReviewVerdict | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
-  const obj = raw as { decision?: unknown; summary?: unknown; confidence?: unknown };
-  const decisionRaw = typeof obj.decision === 'string' ? obj.decision.toLowerCase().trim() : '';
+  const obj = raw as {
+    decision?: unknown;
+    summary?: unknown;
+    confidence?: unknown;
+  };
+  const decisionRaw =
+    typeof obj.decision === 'string' ? obj.decision.toLowerCase().trim() : '';
   const decision = isDecision(decisionRaw) ? decisionRaw : 'revise';
-  const summary = typeof obj.summary === 'string' && obj.summary.trim()
-    ? obj.summary.trim()
-    : 'No verdict summary provided.';
-  const confidenceRaw = typeof obj.confidence === 'string' ? obj.confidence.toLowerCase().trim() : '';
+  const summary =
+    typeof obj.summary === 'string' && obj.summary.trim()
+      ? obj.summary.trim()
+      : 'No verdict summary provided.';
+  const confidenceRaw =
+    typeof obj.confidence === 'string'
+      ? obj.confidence.toLowerCase().trim()
+      : '';
   const confidence = isConfidence(confidenceRaw) ? confidenceRaw : undefined;
   return confidence ? { decision, summary, confidence } : { decision, summary };
 }
@@ -169,11 +199,16 @@ function isDecision(value: string): value is PlanReviewVerdict['decision'] {
   return value === 'approve' || value === 'revise' || value === 'block';
 }
 
-function isConfidence(value: string): value is NonNullable<PlanReviewVerdict['confidence']> {
+function isConfidence(
+  value: string,
+): value is NonNullable<PlanReviewVerdict['confidence']> {
   return value === 'low' || value === 'medium' || value === 'high';
 }
 
-function normaliseFinding(item: RawFinding, reviewerId: string): Finding | null {
+function normaliseFinding(
+  item: RawFinding,
+  reviewerId: string,
+): Finding | null {
   if (!item || typeof item !== 'object') return null;
   const file = typeof item.file === 'string' ? item.file : null;
   if (!file) return null;
@@ -201,13 +236,17 @@ function normaliseFinding(item: RawFinding, reviewerId: string): Finding | null 
 
 function normaliseBody(body: unknown, recommendation: unknown): string {
   const parts = [body, recommendation]
-    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .filter(
+      (value): value is string =>
+        typeof value === 'string' && value.trim().length > 0,
+    )
     .map((value) => value.trim());
   return [...new Set(parts)].join('\n\n');
 }
 
 function toInt(v: unknown): number | null {
-  if (typeof v === 'number' && Number.isFinite(v)) return Math.max(1, Math.floor(v));
+  if (typeof v === 'number' && Number.isFinite(v))
+    return Math.max(1, Math.floor(v));
   if (typeof v === 'string') {
     const n = parseInt(v, 10);
     if (Number.isFinite(n)) return Math.max(1, n);
@@ -218,13 +257,17 @@ function toInt(v: unknown): number | null {
 function normaliseSeverity(v: unknown): Severity {
   if (typeof v !== 'string') return 'medium';
   const lc = v.toLowerCase().trim();
-  return (SEVERITIES as readonly string[]).includes(lc) ? (lc as Severity) : 'medium';
+  return (SEVERITIES as readonly string[]).includes(lc)
+    ? (lc as Severity)
+    : 'medium';
 }
 
 function normaliseCategory(v: unknown): Category {
   if (typeof v !== 'string') return 'correctness';
   const lc = v.toLowerCase().trim();
-  return (CATEGORIES as readonly string[]).includes(lc) ? (lc as Category) : 'correctness';
+  return (CATEGORIES as readonly string[]).includes(lc)
+    ? (lc as Category)
+    : 'correctness';
 }
 
 function stripFence(s: string): string {
@@ -247,7 +290,10 @@ function extractJsonObject(s: string): string | null {
   return null;
 }
 
-function extractBalancedBraces(s: string, from: number): { text: string; startIndex: number } | null {
+function extractBalancedBraces(
+  s: string,
+  from: number,
+): { text: string; startIndex: number } | null {
   const start = s.indexOf('{', from);
   if (start === -1) return null;
 
@@ -256,20 +302,32 @@ function extractBalancedBraces(s: string, from: number): { text: string; startIn
   let escape = false;
   for (let i = start; i < s.length; i++) {
     const ch = s[i]!;
-    if (escape) { escape = false; continue; }
-    if (ch === '\\' && inString) { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
     if (inString) continue;
     if (ch === '{') depth++;
     else if (ch === '}') {
       depth--;
-      if (depth === 0) return { text: s.slice(start, i + 1), startIndex: start };
+      if (depth === 0)
+        return { text: s.slice(start, i + 1), startIndex: start };
     }
   }
   return null;
 }
 
-export function parseQuestions(raw: string): { question: string; context?: string }[] {
+export function parseQuestions(
+  raw: string,
+): { question: string; context?: string }[] {
   const text = stripFence(raw).trim();
   if (!text) return [];
 
@@ -279,7 +337,11 @@ export function parseQuestions(raw: string): { question: string; context?: strin
   } catch {
     const recovered = extractJsonObject(text);
     if (!recovered) return [];
-    try { parsed = JSON.parse(recovered); } catch { return []; }
+    try {
+      parsed = JSON.parse(recovered);
+    } catch {
+      return [];
+    }
   }
 
   if (typeof parsed !== 'object' || parsed === null) return [];

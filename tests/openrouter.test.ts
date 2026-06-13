@@ -18,9 +18,19 @@ describe('openrouter provider', () => {
         new ReadableStream({
           start(controller) {
             const enc = new TextEncoder();
-            controller.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"{\\"findings\\":"}}]}\n\n'));
-            controller.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"[]}"}}]}\n\n'));
-            controller.enqueue(enc.encode('data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}\n\n'));
+            controller.enqueue(
+              enc.encode(
+                'data: {"choices":[{"delta":{"content":"{\\"findings\\":"}}]}\n\n',
+              ),
+            );
+            controller.enqueue(
+              enc.encode('data: {"choices":[{"delta":{"content":"[]}"}}]}\n\n'),
+            );
+            controller.enqueue(
+              enc.encode(
+                'data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}\n\n',
+              ),
+            );
             controller.enqueue(enc.encode('data: [DONE]\n\n'));
             controller.close();
           },
@@ -42,7 +52,7 @@ describe('openrouter provider', () => {
     );
     const events: unknown[] = [];
 
-    const result = await provider.review!(task(), {
+    const result = await provider.review?.(task(), {
       bus: captureBus(events),
       signal: new AbortController().signal,
       workspace: { root: '/tmp/quorum' },
@@ -70,7 +80,11 @@ describe('openrouter provider', () => {
         new ReadableStream({
           start(stream) {
             const enc = new TextEncoder();
-            stream.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"{\\"resolution\\":\\"both_partial\\",\\"explanation\\":\\"ok\\"}"}}]}\n\n'));
+            stream.enqueue(
+              enc.encode(
+                'data: {"choices":[{"delta":{"content":"{\\"resolution\\":\\"both_partial\\",\\"explanation\\":\\"ok\\"}"}}]}\n\n',
+              ),
+            );
             stream.enqueue(enc.encode('data: [DONE]\n\n'));
             stream.close();
           },
@@ -79,14 +93,19 @@ describe('openrouter provider', () => {
       );
     }) as typeof fetch;
 
-    const metaReview = openRouterFactory.createMetaReviewer?.({
-      type: 'openrouter',
-      api_key: 'test-key',
-      model: 'anthropic/test',
-      base_url: 'https://openrouter.test/api/v1',
-    }, { workspaceRoot: '/tmp/quorum', env: {} });
+    const metaReview = openRouterFactory.createMetaReviewer?.(
+      {
+        type: 'openrouter',
+        api_key: 'test-key',
+        model: 'anthropic/test',
+        base_url: 'https://openrouter.test/api/v1',
+      },
+      { workspaceRoot: '/tmp/quorum', env: {} },
+    );
 
-    await expect(metaReview?.('resolve this', { signal: controller.signal })).resolves.toContain('both_partial');
+    await expect(
+      metaReview?.('resolve this', { signal: controller.signal }),
+    ).resolves.toContain('both_partial');
     expect(receivedSignal).toBe(controller.signal);
   });
 });

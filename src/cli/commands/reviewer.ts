@@ -1,7 +1,7 @@
+import { join, resolve } from 'node:path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import { resolve, join } from 'node:path';
-import type { CliDeps, CliIo } from '../types.ts';
 import type { QuorumConfig } from '../../config/schema.ts';
+import type { CliDeps, CliIo } from '../types.ts';
 
 const PKG_ROOT = resolve(import.meta.dir, '..', '..', '..');
 export const EXAMPLE_PATH = join(PKG_ROOT, 'quorum.yaml.example');
@@ -17,7 +17,10 @@ export const SUPPORTED_PROVIDERS = [
   'ollama',
 ] as const;
 
-const LEGACY_PROVIDER_ALIASES: Record<string, typeof SUPPORTED_PROVIDERS[number]> = {
+const LEGACY_PROVIDER_ALIASES: Record<
+  string,
+  (typeof SUPPORTED_PROVIDERS)[number]
+> = {
   'opencode-go': 'opencode',
 };
 
@@ -53,7 +56,8 @@ const REVIEWER_NAME_POOL = [
   'yukihiro',
 ] as const;
 
-const REVIEWER_ADD_USAGE = 'Usage: quorum reviewer add --provider=<type> --persona=<name> --model=<model> [--variant=<variant>] [--id=<reviewer-id>] [--ext=<ext1,ext2,...>] [--fileExtensions=<ext1,ext2,...>] [--temperature=<0..2>] [--pipeline=<id>] [--config=<path>]\n';
+const REVIEWER_ADD_USAGE =
+  'Usage: quorum reviewer add --provider=<type> --persona=<name> --model=<model> [--variant=<variant>] [--id=<reviewer-id>] [--ext=<ext1,ext2,...>] [--fileExtensions=<ext1,ext2,...>] [--temperature=<0..2>] [--pipeline=<id>] [--config=<path>]\n';
 
 export async function cmdReviewer(
   positional: string[],
@@ -82,17 +86,24 @@ async function cmdReviewerAdd(
   deps: CliDeps,
   io: CliIo,
 ): Promise<number> {
-  const configPath = typeof flags.config === 'string' ? flags.config : deps.findConfigPath();
+  const configPath =
+    typeof flags.config === 'string' ? flags.config : deps.findConfigPath();
   const inited = await deps.initConfigIfMissing?.(configPath, EXAMPLE_PATH);
   if (inited) {
     io.stdout.write(`inited quorum config from example: ${configPath}\n`);
   }
 
-  const providerFlag = typeof flags.provider === 'string' ? flags.provider : null;
-  const provider = providerFlag ? LEGACY_PROVIDER_ALIASES[providerFlag] ?? providerFlag : null;
+  const providerFlag =
+    typeof flags.provider === 'string' ? flags.provider : null;
+  const provider = providerFlag
+    ? (LEGACY_PROVIDER_ALIASES[providerFlag] ?? providerFlag)
+    : null;
   const persona = typeof flags.persona === 'string' ? flags.persona : null;
   const model = typeof flags.model === 'string' ? flags.model : null;
-  const variant = typeof flags.variant === 'string' && flags.variant.trim() !== '' ? flags.variant : null;
+  const variant =
+    typeof flags.variant === 'string' && flags.variant.trim() !== ''
+      ? flags.variant
+      : null;
   const extensions = parseExtensions(flags);
   const temperature = parseTemperature(flags);
 
@@ -109,20 +120,25 @@ async function cmdReviewerAdd(
     return 1;
   }
   if (temperature === false) {
-    io.stderr.write('Invalid --temperature flag; expected a number between 0 and 2\n');
+    io.stderr.write(
+      'Invalid --temperature flag; expected a number between 0 and 2\n',
+    );
     return 1;
   }
 
   if (!(SUPPORTED_PROVIDERS as readonly string[]).includes(provider)) {
-    io.stderr.write(`Unknown provider type "${providerFlag}". Supported: ${SUPPORTED_PROVIDERS.join(', ')}\n`);
+    io.stderr.write(
+      `Unknown provider type "${providerFlag}". Supported: ${SUPPORTED_PROVIDERS.join(', ')}\n`,
+    );
     return 1;
   }
 
   const config = await deps.loadConfigFromPath(configPath);
 
-  const pipelineId = typeof flags.pipeline === 'string'
-    ? flags.pipeline
-    : config.defaults?.pipeline ?? 'default';
+  const pipelineId =
+    typeof flags.pipeline === 'string'
+      ? flags.pipeline
+      : (config.defaults?.pipeline ?? 'default');
 
   const params: AddReviewerParams = {
     provider,
@@ -138,9 +154,13 @@ async function cmdReviewerAdd(
   try {
     const result = await addReviewerToConfig(params, config, configPath, deps);
     if (result.alreadyExisted) {
-      io.stdout.write(`Reviewer "${result.reviewerId}" already exists — skipping.\n`);
+      io.stdout.write(
+        `Reviewer "${result.reviewerId}" already exists — skipping.\n`,
+      );
     } else {
-      io.stdout.write(`added reviewer "${result.reviewerId}"  persona=${persona}  provider=${provider}${model ? ` (${model})` : ''}${extensions ? ` [${extensions.join(', ')}]` : ''}\n`);
+      io.stdout.write(
+        `added reviewer "${result.reviewerId}"  persona=${persona}  provider=${provider}${model ? ` (${model})` : ''}${extensions ? ` [${extensions.join(', ')}]` : ''}\n`,
+      );
     }
     return 0;
   } catch (err) {
@@ -158,24 +178,36 @@ export async function addReviewerToConfig(
   const { provider, persona, model, variant, extensions, temperature } = params;
 
   if (!(SUPPORTED_PROVIDERS as readonly string[]).includes(provider)) {
-    throw new Error(`Unknown provider type "${provider}". Supported: ${SUPPORTED_PROVIDERS.join(', ')}`);
+    throw new Error(
+      `Unknown provider type "${provider}". Supported: ${SUPPORTED_PROVIDERS.join(', ')}`,
+    );
   }
 
   if (!config.personas[persona]) {
-    throw new Error(`Unknown persona "${persona}". Available: ${Object.keys(config.personas).join(', ') || '(none)'}`);
+    throw new Error(
+      `Unknown persona "${persona}". Available: ${Object.keys(config.personas).join(', ') || '(none)'}`,
+    );
   }
 
-  const pipelineId = params.pipelineId || config.defaults?.pipeline || 'default';
+  const pipelineId =
+    params.pipelineId || config.defaults?.pipeline || 'default';
   if (!config.pipelines[pipelineId]) {
-    throw new Error(`Unknown pipeline "${pipelineId}". Available: ${Object.keys(config.pipelines).join(', ') || '(none)'}`);
+    throw new Error(
+      `Unknown pipeline "${pipelineId}". Available: ${Object.keys(config.pipelines).join(', ') || '(none)'}`,
+    );
   }
 
   const providerEntry: Record<string, unknown> = { type: provider, model };
   if (variant) providerEntry.variant = variant;
-  const newEntry: Record<string, unknown> = { persona, provider: providerEntry };
+  const newEntry: Record<string, unknown> = {
+    persona,
+    provider: providerEntry,
+  };
   if (extensions?.length) newEntry.fileExtensions = extensions;
   if (temperature !== undefined) newEntry.overrides = { temperature };
-  const reviewerId = params.reviewerId ?? resolveReviewerId(persona, provider, newEntry, config.reviewers);
+  const reviewerId =
+    params.reviewerId ??
+    resolveReviewerId(persona, provider, newEntry, config.reviewers);
 
   if (config.reviewers[reviewerId]) {
     return { reviewerId, alreadyExisted: true };
@@ -183,7 +215,10 @@ export async function addReviewerToConfig(
 
   const raw = await deps.readConfigFile!(configPath);
   const doc = parseYaml(raw);
-  const d = (doc && typeof doc === 'object' ? doc : {}) as Record<string, unknown>;
+  const d = (doc && typeof doc === 'object' ? doc : {}) as Record<
+    string,
+    unknown
+  >;
 
   if (!d.reviewers || typeof d.reviewers !== 'object') {
     d.reviewers = {};
@@ -192,7 +227,9 @@ export async function addReviewerToConfig(
 
   if (d.pipelines && typeof d.pipelines === 'object') {
     const pipelines = d.pipelines as Record<string, unknown>;
-    const pipeline = pipelines[pipelineId] as Record<string, unknown> | undefined;
+    const pipeline = pipelines[pipelineId] as
+      | Record<string, unknown>
+      | undefined;
     if (pipeline && Array.isArray(pipeline.reviewers)) {
       if (!pipeline.reviewers.includes(reviewerId)) {
         pipeline.reviewers.push(reviewerId);
@@ -205,20 +242,30 @@ export async function addReviewerToConfig(
   return { reviewerId, alreadyExisted: false };
 }
 
-function parseExtensions(flags: Record<string, string | boolean>): string[] | null {
+function parseExtensions(
+  flags: Record<string, string | boolean>,
+): string[] | null {
   const flag = flags.fileExtensions ?? flags.fileExtension ?? flags.ext;
-  const raw = typeof flag === 'string'
-    ? flag.split(',').map((s) => s.trim()).filter(Boolean)
-    : flag;
+  const raw =
+    typeof flag === 'string'
+      ? flag
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : flag;
   if (!Array.isArray(raw) || raw.length === 0) return null;
   return raw.map((s) => String(s).trim()).filter(Boolean);
 }
 
-function parseTemperature(flags: Record<string, string | boolean>): number | null | false {
+function parseTemperature(
+  flags: Record<string, string | boolean>,
+): number | null | false {
   if (flags.temperature === undefined) return null;
-  if (typeof flags.temperature !== 'string' || flags.temperature.trim() === '') return false;
+  if (typeof flags.temperature !== 'string' || flags.temperature.trim() === '')
+    return false;
   const temperature = Number(flags.temperature);
-  if (!Number.isFinite(temperature) || temperature < 0 || temperature > 2) return false;
+  if (!Number.isFinite(temperature) || temperature < 0 || temperature > 2)
+    return false;
   return temperature;
 }
 
@@ -229,17 +276,27 @@ function resolveReviewerId(
   existing: Record<string, unknown>,
 ): string {
   for (const [id, cfg] of Object.entries(existing)) {
-    if (hasReviewerNamePrefix(id, persona, provider) && reviewerEntryMatches(cfg, target)) return id;
+    if (
+      hasReviewerNamePrefix(id, persona, provider) &&
+      reviewerEntryMatches(cfg, target)
+    )
+      return id;
   }
 
   for (const [id, cfg] of Object.entries(existing)) {
-    if (!hasReviewerNamePrefix(id, persona, provider) && reviewerEntryMatches(cfg, target)) return id;
+    if (
+      !hasReviewerNamePrefix(id, persona, provider) &&
+      reviewerEntryMatches(cfg, target)
+    )
+      return id;
   }
 
   const base = `${persona}-${provider}`;
   const usedNames = usedReviewerNamePrefixes(existing);
   const candidates = reviewerNameCandidates(base, existing);
-  const availableName = candidates.find((name) => !usedNames.has(name) && !existing[`${name}-${base}`]);
+  const availableName = candidates.find(
+    (name) => !usedNames.has(name) && !existing[`${name}-${base}`],
+  );
   if (availableName) return `${availableName}-${base}`;
 
   let n = 2;
@@ -252,10 +309,15 @@ function resolveReviewerId(
   return id;
 }
 
-function reviewerNameCandidates(base: string, existing: Record<string, unknown>): string[] {
+function reviewerNameCandidates(
+  base: string,
+  existing: Record<string, unknown>,
+): string[] {
   const seed = stableSeed([base, ...Object.keys(existing).sort()].join('|'));
   const start = seed % REVIEWER_NAME_POOL.length;
-  return REVIEWER_NAME_POOL.map((_, i) => REVIEWER_NAME_POOL[(start + i) % REVIEWER_NAME_POOL.length]!);
+  return REVIEWER_NAME_POOL.map(
+    (_, i) => REVIEWER_NAME_POOL[(start + i) % REVIEWER_NAME_POOL.length]!,
+  );
 }
 
 function stableSeed(input: string): number {
@@ -267,7 +329,9 @@ function stableSeed(input: string): number {
   return hash >>> 0;
 }
 
-function usedReviewerNamePrefixes(existing: Record<string, unknown>): Set<string> {
+function usedReviewerNamePrefixes(
+  existing: Record<string, unknown>,
+): Set<string> {
   const used = new Set<string>();
   for (const id of Object.keys(existing)) {
     const name = id.split('-')[0];
@@ -276,19 +340,26 @@ function usedReviewerNamePrefixes(existing: Record<string, unknown>): Set<string
   return used;
 }
 
-function hasReviewerNamePrefix(id: string, persona: string, provider: string): boolean {
+function hasReviewerNamePrefix(
+  id: string,
+  persona: string,
+  provider: string,
+): boolean {
   const suffix = `-${persona}-${provider}`;
   return id.endsWith(suffix) && id.length > suffix.length;
 }
 
-function reviewerEntryMatches(actual: unknown, target: Record<string, unknown>): boolean {
+function reviewerEntryMatches(
+  actual: unknown,
+  target: Record<string, unknown>,
+): boolean {
   if (!actual || typeof actual !== 'object') return false;
   const a = actual as Record<string, unknown>;
   return (
-    a.persona === target.persona
-    && deepEqual(a.provider, target.provider)
-    && deepEqual(a.fileExtensions ?? [], target.fileExtensions ?? [])
-    && deepEqual(a.overrides ?? {}, target.overrides ?? {})
+    a.persona === target.persona &&
+    deepEqual(a.provider, target.provider) &&
+    deepEqual(a.fileExtensions ?? [], target.fileExtensions ?? []) &&
+    deepEqual(a.overrides ?? {}, target.overrides ?? {})
   );
 }
 

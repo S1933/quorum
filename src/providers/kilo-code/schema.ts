@@ -1,8 +1,6 @@
 import { z } from 'zod';
 
-const SafeExtraArgSchema = z.enum([
-  '--thinking',
-]);
+const SafeExtraArgSchema = z.enum(['--thinking']);
 
 export const KiloCodeConfigSchema = z
   .object({

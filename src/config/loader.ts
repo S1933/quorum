@@ -1,7 +1,7 @@
 import { parse as parseYaml } from 'yaml';
-import { QuorumConfigSchema, type QuorumConfig } from './schema.ts';
-import { interpolateDeep } from './interpolate.ts';
 import { ConfigError } from '../core/errors.ts';
+import { interpolateDeep } from './interpolate.ts';
+import { type QuorumConfig, QuorumConfigSchema } from './schema.ts';
 
 export interface LoadOptions {
   env?: Record<string, string | undefined>;
@@ -15,7 +15,10 @@ export async function loadConfigFromString(
   try {
     raw = parseYaml(source);
   } catch (err) {
-    throw new ConfigError(`Failed to parse YAML: ${(err as Error).message}`, err);
+    throw new ConfigError(
+      `Failed to parse YAML: ${(err as Error).message}`,
+      err,
+    );
   }
 
   const interpolated = interpolateDeep(
@@ -52,18 +55,24 @@ function validateCrossRefs(cfg: QuorumConfig): void {
 
   for (const [revId, rev] of Object.entries(cfg.reviewers)) {
     if (!cfg.personas[rev.persona]) {
-      errors.push(`reviewer "${revId}" references unknown persona "${rev.persona}"`);
+      errors.push(
+        `reviewer "${revId}" references unknown persona "${rev.persona}"`,
+      );
     }
-
   }
 
   for (const [pipeId, pipe] of Object.entries(cfg.pipelines)) {
     for (const revId of pipe.reviewers) {
       if (!cfg.reviewers[revId]) {
-        errors.push(`pipeline "${pipeId}" references unknown reviewer "${revId}"`);
+        errors.push(
+          `pipeline "${pipeId}" references unknown reviewer "${revId}"`,
+        );
       }
     }
-    if (pipe.consensus?.requireAgreement && pipe.consensus.requireAgreement > pipe.reviewers.length) {
+    if (
+      pipe.consensus?.requireAgreement &&
+      pipe.consensus.requireAgreement > pipe.reviewers.length
+    ) {
       errors.push(
         `pipeline "${pipeId}".consensus.requireAgreement (${pipe.consensus.requireAgreement}) exceeds reviewer count (${pipe.reviewers.length})`,
       );
@@ -71,11 +80,15 @@ function validateCrossRefs(cfg: QuorumConfig): void {
   }
 
   if (cfg.defaults?.pipeline && !cfg.pipelines[cfg.defaults.pipeline]) {
-    errors.push(`defaults.pipeline "${cfg.defaults.pipeline}" not found in pipelines`);
+    errors.push(
+      `defaults.pipeline "${cfg.defaults.pipeline}" not found in pipelines`,
+    );
   }
 
   if (errors.length > 0) {
-    throw new ConfigError(`Config validation failed:\n${errors.map((e) => `  - ${e}`).join('\n')}`);
+    throw new ConfigError(
+      `Config validation failed:\n${errors.map((e) => `  - ${e}`).join('\n')}`,
+    );
   }
 }
 

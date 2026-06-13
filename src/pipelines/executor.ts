@@ -1,11 +1,25 @@
-import type { ReviewResult, WorkspaceInfo, ReviewTask, PlanReviewVerdict } from '../core/task.ts';
-import type { Pipeline, PipelineResult, ReviewerError, ConsensusResult } from '../core/pipeline.ts';
-import type { EventBus } from '../core/events.ts';
-import type { BoundReviewer } from '../reviewers/reviewer.ts';
-import type { ConsensusRegistry, ConsensusContext, MetaReviewFn } from '../consensus/registry.ts';
-import type { PluginCtx } from '../runtime/plugin.ts';
-import type { ProviderRegistry } from '../providers/registry.ts';
+import type {
+  ConsensusContext,
+  ConsensusRegistry,
+  MetaReviewFn,
+} from '../consensus/registry.ts';
 import { ReviewerExecError } from '../core/errors.ts';
+import type { EventBus } from '../core/events.ts';
+import type {
+  ConsensusResult,
+  Pipeline,
+  PipelineResult,
+  ReviewerError,
+} from '../core/pipeline.ts';
+import type {
+  PlanReviewVerdict,
+  ReviewResult,
+  ReviewTask,
+  WorkspaceInfo,
+} from '../core/task.ts';
+import type { ProviderRegistry } from '../providers/registry.ts';
+import type { BoundReviewer } from '../reviewers/reviewer.ts';
+import type { PluginCtx } from '../runtime/plugin.ts';
 import { BudgetTracker } from './budget.ts';
 
 export interface PipelineRunInput {
@@ -24,7 +38,18 @@ export interface PipelineRunInput {
 
 export class PipelineExecutor {
   async run(input: PipelineRunInput): Promise<PipelineResult> {
-    const { pipeline, reviewers, bus, signal, workspace, instruction, taskId, consensus, providers, pluginCtx } = input;
+    const {
+      pipeline,
+      reviewers,
+      bus,
+      signal,
+      workspace,
+      instruction,
+      taskId,
+      consensus,
+      providers,
+      pluginCtx,
+    } = input;
     const taskKind = input.taskKind ?? 'review';
     const started = Date.now();
 
@@ -44,7 +69,9 @@ export class PipelineExecutor {
     let budgetExceeded = false;
     let budgetSpent = 0;
     const budgetTracker = new BudgetTracker(
-      pipeline.maxTotalCostUsd !== undefined ? { maxTotalCostUsd: pipeline.maxTotalCostUsd } : {},
+      pipeline.maxTotalCostUsd !== undefined
+        ? { maxTotalCostUsd: pipeline.maxTotalCostUsd }
+        : {},
     );
 
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
@@ -62,11 +89,19 @@ export class PipelineExecutor {
     let consensusResult: ConsensusResult;
 
     try {
-      const runOne = async (rev: BoundReviewer, index: number): Promise<void> => {
+      const runOne = async (
+        rev: BoundReviewer,
+        index: number,
+      ): Promise<void> => {
         bus.emit({ type: 'reviewer.started', reviewerId: rev.id });
         try {
           const result = await rev.run(
-            { kind: taskKind, id: `${taskId}:${rev.id}`, instruction, workspace },
+            {
+              kind: taskKind,
+              id: `${taskId}:${rev.id}`,
+              instruction,
+              workspace,
+            },
             { bus, signal: controller.signal, workspace },
           );
           reviews[index] = result;
@@ -86,14 +121,24 @@ export class PipelineExecutor {
           bus.emit({ type: 'reviewer.finished', reviewerId: rev.id, result });
         } catch (err) {
           const message =
-            err instanceof Error ? err.message : `Unknown reviewer failure: ${String(err)}`;
+            err instanceof Error
+              ? err.message
+              : `Unknown reviewer failure: ${String(err)}`;
           const wrapped =
             err instanceof ReviewerExecError
               ? err
               : new ReviewerExecError(rev.id, message, err);
-          const reviewerError: ReviewerError = { reviewerId: rev.id, message: wrapped.message, cause: err };
+          const reviewerError: ReviewerError = {
+            reviewerId: rev.id,
+            message: wrapped.message,
+            cause: err,
+          };
           errors[index] = reviewerError;
-          bus.emit({ type: 'reviewer.failed', reviewerId: rev.id, error: reviewerError });
+          bus.emit({
+            type: 'reviewer.failed',
+            reviewerId: rev.id,
+            error: reviewerError,
+          });
         }
       };
 
@@ -140,9 +185,13 @@ export class PipelineExecutor {
       consensus: consensusResult,
       durationMs: Date.now() - started,
       errors: errors.filter(Boolean),
-      ...(taskKind === 'plan-review' ? { verdictSummary: buildVerdictSummary(reviews.filter(Boolean)) } : {}),
+      ...(taskKind === 'plan-review'
+        ? { verdictSummary: buildVerdictSummary(reviews.filter(Boolean)) }
+        : {}),
       ...(budgetExceeded ? { budgetExceeded: true } : {}),
-      ...(budgetTracker.state().totalCostUsd > 0 ? { totalCostUsd: budgetTracker.state().totalCostUsd } : {}),
+      ...(budgetTracker.state().totalCostUsd > 0
+        ? { totalCostUsd: budgetTracker.state().totalCostUsd }
+        : {}),
     };
     bus.emit({ type: 'pipeline.finished', result });
     if (timedOut) {
@@ -152,28 +201,37 @@ export class PipelineExecutor {
   }
 }
 
-function effectiveConcurrencyLimit(pipeline: Pipeline, reviewers: BoundReviewer[]): number | undefined {
+function effectiveConcurrencyLimit(
+  pipeline: Pipeline,
+  reviewers: BoundReviewer[],
+): number | undefined {
   const providerLimits = reviewers
     .map((reviewer) => reviewer.provider.capabilities().maxConcurrentReviews)
     .filter((limit): limit is number => limit !== undefined);
-  const providerLimit = providerLimits.length > 0 ? Math.min(...providerLimits) : undefined;
+  const providerLimit =
+    providerLimits.length > 0 ? Math.min(...providerLimits) : undefined;
   if (pipeline.maxConcurrency === undefined) return providerLimit;
   if (providerLimit === undefined) return pipeline.maxConcurrency;
   return Math.min(pipeline.maxConcurrency, providerLimit);
 }
 
-function buildVerdictSummary(reviews: ReviewResult[]): NonNullable<PipelineResult['verdictSummary']> {
+function buildVerdictSummary(
+  reviews: ReviewResult[],
+): NonNullable<PipelineResult['verdictSummary']> {
   const counts: Record<PlanReviewVerdict['decision'], number> = {
     approve: 0,
     revise: 0,
     block: 0,
   };
-  const summaries: NonNullable<PipelineResult['verdictSummary']>['summaries'] = [];
+  const summaries: NonNullable<PipelineResult['verdictSummary']>['summaries'] =
+    [];
 
   for (const review of reviews) {
     if (!review.verdict) continue;
     counts[review.verdict.decision]++;
-    const item: NonNullable<PipelineResult['verdictSummary']>['summaries'][number] = {
+    const item: NonNullable<
+      PipelineResult['verdictSummary']
+    >['summaries'][number] = {
       reviewerId: review.reviewerId,
       decision: review.verdict.decision,
       summary: review.verdict.summary,
@@ -182,13 +240,14 @@ function buildVerdictSummary(reviews: ReviewResult[]): NonNullable<PipelineResul
     summaries.push(item);
   }
 
-  const decision = summaries.length === 0
-    ? 'revise'
-    : counts.block > 0
-      ? 'block'
-      : counts.revise > 0
-        ? 'revise'
-        : 'approve';
+  const decision =
+    summaries.length === 0
+      ? 'revise'
+      : counts.block > 0
+        ? 'block'
+        : counts.revise > 0
+          ? 'revise'
+          : 'approve';
   return { decision, counts, summaries };
 }
 
@@ -204,7 +263,9 @@ async function runWithConcurrencyLimit(
       await runOne(reviewers[idx]!, idx);
     }
   };
-  await Promise.all(Array.from({ length: Math.min(limit, reviewers.length) }, () => worker()));
+  await Promise.all(
+    Array.from({ length: Math.min(limit, reviewers.length) }, () => worker()),
+  );
 }
 
 async function computeConsensus(
@@ -226,11 +287,19 @@ async function computeConsensus(
   }
   const strategy = registry.resolve(pipeline.consensus.strategy);
 
-  const metaReview = pipeline.consensus.strategy === 'semantic-v2' && pipeline.consensus.metaReviewerProvider
-    ? resolveMetaReviewer(pipeline.consensus.metaReviewerProvider, providers, pluginCtx)
-    : undefined;
+  const metaReview =
+    pipeline.consensus.strategy === 'semantic-v2' &&
+    pipeline.consensus.metaReviewerProvider
+      ? resolveMetaReviewer(
+          pipeline.consensus.metaReviewerProvider,
+          providers,
+          pluginCtx,
+        )
+      : undefined;
 
-  const ctx: ConsensusContext = metaReview ? { metaReview, signal } : { signal };
+  const ctx: ConsensusContext = metaReview
+    ? { metaReview, signal }
+    : { signal };
 
   const result = strategy.aggregate(reviews, pipeline.consensus, ctx);
   return result instanceof Promise ? await result : result;

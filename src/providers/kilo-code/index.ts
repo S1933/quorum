@@ -1,7 +1,10 @@
 import type { MetaReviewFn } from '../../consensus/registry.ts';
-import { normaliseSubprocessOutput, createSubprocessMetaReviewer } from '../subprocess.ts';
 import { createSubprocessProvider, STDIN_PROMPT } from '../base-subprocess.ts';
-import { KiloCodeConfigSchema, type KiloCodeConfig } from './schema.ts';
+import {
+  createSubprocessMetaReviewer,
+  normaliseSubprocessOutput,
+} from '../subprocess.ts';
+import { type KiloCodeConfig, KiloCodeConfigSchema } from './schema.ts';
 
 export const kiloCodeFactory = createSubprocessProvider({
   type: 'kilo-code',
@@ -22,8 +25,10 @@ export const kiloCodeFactory = createSubprocessProvider({
   createMetaReviewer: (config, ctx): MetaReviewFn | undefined => {
     const c = config as KiloCodeConfig;
     return createSubprocessMetaReviewer(
-      c.binary, () => ['run', '--', 'Read stdin and respond with JSON.'],
-      c.cwd ?? ctx.workspaceRoot, c.timeout_ms,
+      c.binary,
+      () => ['run', '--', 'Read stdin and respond with JSON.'],
+      c.cwd ?? ctx.workspaceRoot,
+      c.timeout_ms,
     );
   },
 });

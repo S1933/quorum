@@ -36,7 +36,11 @@ describe('BudgetTracker', () => {
     tracker.record({ inputTokens: 100, outputTokens: 50, costUsd: 0.006 });
     expect(tracker.isExceeded).toBe(false);
 
-    const state = tracker.record({ inputTokens: 100, outputTokens: 50, costUsd: 0.006 });
+    const state = tracker.record({
+      inputTokens: 100,
+      outputTokens: 50,
+      costUsd: 0.006,
+    });
     expect(state.exceeded).toBe(true);
     expect(tracker.isExceeded).toBe(true);
     expect(state.reason).toInclude('Cost limit exceeded');
@@ -44,7 +48,7 @@ describe('BudgetTracker', () => {
   });
 
   test('does not detect exceeded when cost within limit', () => {
-    const tracker = new BudgetTracker({ maxTotalCostUsd: 0.10 });
+    const tracker = new BudgetTracker({ maxTotalCostUsd: 0.1 });
     tracker.record({ inputTokens: 1000, outputTokens: 500, costUsd: 0.05 });
     expect(tracker.isExceeded).toBe(false);
   });
@@ -64,7 +68,7 @@ describe('BudgetTracker', () => {
     tracker.record({ inputTokens: 100, outputTokens: 50, costUsd: 0.002 });
     expect(tracker.isExceeded).toBe(true);
 
-    tracker.record({ inputTokens: 100, outputTokens: 50, costUsd: 0.10 });
+    tracker.record({ inputTokens: 100, outputTokens: 50, costUsd: 0.1 });
     expect(tracker.isExceeded).toBe(true);
     expect(tracker.state().totalCostUsd).toBeCloseTo(0.106, 6);
   });

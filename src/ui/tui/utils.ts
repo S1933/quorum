@@ -35,12 +35,17 @@ export interface ReviewRecord {
 export function extractPipelines(config: QuorumConfig): PipelineSummary[] {
   const pipelines: PipelineSummary[] = [];
   for (const [id, p] of Object.entries(config.pipelines)) {
-    const reviewers = p.reviewers.map(rid => {
+    const reviewers = p.reviewers.map((rid) => {
       const r = config.reviewers[rid];
       if (!r) return { id: rid, persona: '?', provider: '?' };
       const prov = r.provider as Record<string, unknown>;
       const model = typeof prov.model === 'string' ? prov.model : undefined;
-      const entry: { id: string; persona: string; provider: string; model?: string } = {
+      const entry: {
+        id: string;
+        persona: string;
+        provider: string;
+        model?: string;
+      } = {
         id: rid,
         persona: r.persona,
         provider: r.provider.type,
@@ -68,7 +73,11 @@ export async function loadReviews(root: string): Promise<ReviewRecord[]> {
   const records: ReviewRecord[] = [];
   const glob = new Bun.Glob('**/*.md');
 
-  for await (const entry of glob.scan({ cwd: reviewsDir, onlyFiles: true, absolute: true })) {
+  for await (const entry of glob.scan({
+    cwd: reviewsDir,
+    onlyFiles: true,
+    absolute: true,
+  })) {
     const path = typeof entry === 'string' ? entry : '';
     if (!path) continue;
     const basename = path.split('/').pop()?.replace(/\.md$/, '') ?? '';
@@ -88,7 +97,14 @@ export async function loadReviews(root: string): Promise<ReviewRecord[]> {
     const summary = await parseReportSummary(path);
     const content = summary ? await Bun.file(path).text() : undefined;
 
-    const record: ReviewRecord = { timestamp, kind, pipelineId, path, summary, content };
+    const record: ReviewRecord = {
+      timestamp,
+      kind,
+      pipelineId,
+      path,
+      summary,
+      content,
+    };
     records.push(record);
   }
 
@@ -96,7 +112,9 @@ export async function loadReviews(root: string): Promise<ReviewRecord[]> {
   return records;
 }
 
-async function parseReportSummary(path: string): Promise<ReviewSummary | undefined> {
+async function parseReportSummary(
+  path: string,
+): Promise<ReviewSummary | undefined> {
   try {
     const text = await Bun.file(path).text();
     const rc = text.match(/\*\*(\d+)\s*reviewer/);
@@ -109,11 +127,11 @@ async function parseReportSummary(path: string): Promise<ReviewSummary | undefin
     const severity: Record<string, number> = {};
     const sevTable = text.match(/## 📊 Summary[\s\S]*?(?=## )/);
     if (sevTable) {
-      const sevLines = sevTable[0]!.split('\n');
+      const sevLines = sevTable[0]?.split('\n');
       for (const line of sevLines) {
         const m = line.match(/^\|\s*\S+\s+(.+?)\s+\|\s*(\d+)\s*\|$/);
         if (m) {
-          const key = m[1]!.trim();
+          const key = m[1]?.trim();
           severity[key] = parseInt(m[2]!, 10);
         }
       }

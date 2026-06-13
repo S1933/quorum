@@ -1,6 +1,6 @@
 import type { FindingGroup } from '../core/finding.ts';
-import type { ReviewResult } from '../core/task.ts';
 import { severityRank } from '../core/finding.ts';
+import type { ReviewResult } from '../core/task.ts';
 import { buildGroups } from './grouping.ts';
 import { findingSimilarity } from './similarity.ts';
 
@@ -28,7 +28,9 @@ export function buildSemanticGroups(
       for (let j = i + 1; j < groups.length; j++) {
         const b = groups[j];
         if (!b) continue;
-        if (findingSimilarity(a.representative, b.representative) >= threshold) {
+        if (
+          findingSimilarity(a.representative, b.representative) >= threshold
+        ) {
           a.members.push(...b.members);
           for (const reviewer of b.reviewers) {
             if (!a.reviewers.includes(reviewer)) {

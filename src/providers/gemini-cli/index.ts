@@ -1,7 +1,7 @@
 import type { MetaReviewFn } from '../../consensus/registry.ts';
-import { createSubprocessMetaReviewer } from '../subprocess.ts';
 import { createSubprocessProvider, STDIN_PROMPT } from '../base-subprocess.ts';
-import { GeminiCliConfigSchema, type GeminiCliConfig } from './schema.ts';
+import { createSubprocessMetaReviewer } from '../subprocess.ts';
+import { type GeminiCliConfig, GeminiCliConfigSchema } from './schema.ts';
 
 export const geminiCliFactory = createSubprocessProvider({
   type: 'gemini-cli',
@@ -12,9 +12,12 @@ export const geminiCliFactory = createSubprocessProvider({
     const c = cfg as GeminiCliConfig;
     const model = ctx.modelOverride?.model ?? c.model;
     const args = [
-      '--prompt', STDIN_PROMPT,
-      '--approval-mode', c.approval_mode,
-      '--output-format', 'text',
+      '--prompt',
+      STDIN_PROMPT,
+      '--approval-mode',
+      c.approval_mode,
+      '--output-format',
+      'text',
       ...c.extra_args,
     ];
     if (c.sandbox) args.push('--sandbox');
@@ -27,12 +30,18 @@ export const geminiCliFactory = createSubprocessProvider({
     return createSubprocessMetaReviewer(
       c.binary,
       () => {
-        const args = ['--approval-mode', c.approval_mode, '--output-format', 'text'];
+        const args = [
+          '--approval-mode',
+          c.approval_mode,
+          '--output-format',
+          'text',
+        ];
         if (c.sandbox) args.push('--sandbox');
         if (c.skip_trust) args.push('--skip-trust');
         return args;
       },
-      c.cwd ?? ctx.workspaceRoot, c.timeout_ms,
+      c.cwd ?? ctx.workspaceRoot,
+      c.timeout_ms,
     );
   },
 });

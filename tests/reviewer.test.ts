@@ -1,10 +1,17 @@
 import { describe, expect, test } from 'bun:test';
+import {
+  ProviderRuntimeError,
+  ReviewerOutputError,
+} from '../src/core/errors.ts';
 import type { EventBus } from '../src/core/events.ts';
-import type { ExecCtx, Provider, ProviderCapabilities } from '../src/core/provider.ts';
-import type { ReviewTask, ReviewResult } from '../src/core/task.ts';
-import { bindReviewer } from '../src/reviewers/reviewer.ts';
-import { ReviewerOutputError, ProviderRuntimeError } from '../src/core/errors.ts';
+import type {
+  ExecCtx,
+  Provider,
+  ProviderCapabilities,
+} from '../src/core/provider.ts';
+import type { ReviewResult, ReviewTask } from '../src/core/task.ts';
 import { RETRY_REMINDER } from '../src/reviewers/output.ts';
+import { bindReviewer } from '../src/reviewers/reviewer.ts';
 
 const bus: EventBus = {
   emit() {},
@@ -62,30 +69,57 @@ describe('bindReviewer', () => {
     );
 
     await reviewer.run(
-      { id: 'task-1', instruction: 'review this diff', workspace: { root: '/repo' } },
-      { bus, signal: new AbortController().signal, workspace: { root: '/repo' } },
+      {
+        id: 'task-1',
+        instruction: 'review this diff',
+        workspace: { root: '/repo' },
+      },
+      {
+        bus,
+        signal: new AbortController().signal,
+        workspace: { root: '/repo' },
+      },
     );
 
     expect(capturedCtx?.modelOverride).toEqual({ temperature: 0.1 });
   });
 
-  function makeReviewer(review: (task: ReviewTask, ctx: ExecCtx) => Promise<ReviewResult>) {
+  function makeReviewer(
+    review: (task: ReviewTask, ctx: ExecCtx) => Promise<ReviewResult>,
+  ) {
     const provider: Provider = {
       id: 'provider-a',
       capabilities: reviewOnlyCapabilities,
       review,
     };
     return bindReviewer(
-      { id: 'arch-reviewer', personaId: 'architecture', providerId: 'provider-a', providerConfig: { type: 'openrouter' } },
-      { id: 'architecture', description: 'Architecture review', system: 'Review architecture.' },
+      {
+        id: 'arch-reviewer',
+        personaId: 'architecture',
+        providerId: 'provider-a',
+        providerConfig: { type: 'openrouter' },
+      },
+      {
+        id: 'architecture',
+        description: 'Architecture review',
+        system: 'Review architecture.',
+      },
       provider,
     );
   }
 
   const runArgs = () =>
     [
-      { id: 'task-1', instruction: 'review this diff', workspace: { root: '/repo' } },
-      { bus, signal: new AbortController().signal, workspace: { root: '/repo' } },
+      {
+        id: 'task-1',
+        instruction: 'review this diff',
+        workspace: { root: '/repo' },
+      },
+      {
+        bus,
+        signal: new AbortController().signal,
+        workspace: { root: '/repo' },
+      },
     ] as const;
 
   test('retries once with the reminder when the first reply is not parseable JSON', async () => {
@@ -93,7 +127,10 @@ describe('bindReviewer', () => {
     const reviewer = makeReviewer(async (task) => {
       instructions.push(task.instruction);
       if (instructions.length === 1) {
-        throw new ReviewerOutputError('arch-reviewer', 'Reviewer output did not contain JSON');
+        throw new ReviewerOutputError(
+          'arch-reviewer',
+          'Reviewer output did not contain JSON',
+        );
       }
       return {
         taskId: task.id,
@@ -130,12 +167,19 @@ describe('bindReviewer', () => {
     const reviewer = makeReviewer(async () => {
       calls++;
       controller.abort();
-      throw new ReviewerOutputError('arch-reviewer', 'Reviewer output did not contain JSON');
+      throw new ReviewerOutputError(
+        'arch-reviewer',
+        'Reviewer output did not contain JSON',
+      );
     });
 
     await expect(
       reviewer.run(
-        { id: 'task-1', instruction: 'review this diff', workspace: { root: '/repo' } },
+        {
+          id: 'task-1',
+          instruction: 'review this diff',
+          workspace: { root: '/repo' },
+        },
         { bus, signal: controller.signal, workspace: { root: '/repo' } },
       ),
     ).rejects.toThrow('did not contain JSON');

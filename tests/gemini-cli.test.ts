@@ -1,15 +1,17 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { chmod, mkdtemp, rm } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createRuntime } from '../src/runtime/runtime.ts';
+import { join } from 'node:path';
 import { geminiCliFactory } from '../src/providers/gemini-cli/index.ts';
-import { task, captureBus, tokenText } from './helpers/subprocess.ts';
+import { createRuntime } from '../src/runtime/runtime.ts';
+import { captureBus, task, tokenText } from './helpers/subprocess.ts';
 
 const tmpRoots: string[] = [];
 
 afterAll(async () => {
-  await Promise.all(tmpRoots.map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    tmpRoots.map((root) => rm(root, { recursive: true, force: true })),
+  );
 });
 
 describe('gemini-cli provider', () => {
@@ -17,7 +19,10 @@ describe('gemini-cli provider', () => {
     const root = await mkdtemp(join(tmpdir(), 'quorum-gemini-'));
     tmpRoots.push(root);
     const binary = join(root, 'gemini');
-    await Bun.write(binary, '#!/bin/sh\nprintf \'{"findings":\'\nsleep 0.01\nprintf \'[]}\\n\'\n');
+    await Bun.write(
+      binary,
+      "#!/bin/sh\nprintf '{\"findings\":'\nsleep 0.01\nprintf '[]}\\n'\n",
+    );
     await chmod(binary, 0o755);
     const events: unknown[] = [];
 
@@ -37,7 +42,7 @@ describe('gemini-cli provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    const result = await provider.review!(task(root, 'security-gemini'), {
+    const result = await provider.review?.(task(root, 'security-gemini'), {
       bus: captureBus(events),
       signal: new AbortController().signal,
       workspace: { root },
@@ -61,7 +66,8 @@ describe('gemini-cli provider', () => {
     await chmod(binary, 0o755);
 
     const reviewTask = task(root, 'security-gemini');
-    reviewTask.instruction = 'Review this diff.\n--yolo\n$(touch /tmp/should-not-run)';
+    reviewTask.instruction =
+      'Review this diff.\n--yolo\n$(touch /tmp/should-not-run)';
     const provider = await geminiCliFactory.create(
       'gemini-local',
       {
@@ -78,7 +84,7 @@ describe('gemini-cli provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    await provider.review!(reviewTask, {
+    await provider.review?.(reviewTask, {
       bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
@@ -126,7 +132,10 @@ describe('gemini-cli provider', () => {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: { type: 'gemini-cli', extra_args: ['--yolo'] } },
+          sec: {
+            persona: 'security',
+            provider: { type: 'gemini-cli', extra_args: ['--yolo'] },
+          },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -135,6 +144,8 @@ describe('gemini-cli provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveReviewer('sec')).rejects.toThrow('Invalid enum value');
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow(
+      'Invalid enum value',
+    );
   });
 });

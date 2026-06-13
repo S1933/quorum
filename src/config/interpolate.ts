@@ -15,10 +15,15 @@ export interface LazyEnvRef {
 }
 
 export function isLazyEnvRef(v: unknown): v is LazyEnvRef {
-  return typeof v === 'object' && v !== null && (v as LazyEnvRef).__lazyEnv === true;
+  return (
+    typeof v === 'object' && v !== null && (v as LazyEnvRef).__lazyEnv === true
+  );
 }
 
-export function interpolateString(input: string, opts: InterpolateOptions = {}): string | LazyEnvRef {
+export function interpolateString(
+  input: string,
+  opts: InterpolateOptions = {},
+): string | LazyEnvRef {
   const env = opts.env ?? (typeof process !== 'undefined' ? process.env : {});
 
   const envMatch = ENV_PREFIX.exec(input);
@@ -31,7 +36,9 @@ export function interpolateString(input: string, opts: InterpolateOptions = {}):
         resolve() {
           const v = env[varName];
           if (v === undefined || v === '') {
-            throw new ConfigError(`Required environment variable ${varName} is not set`);
+            throw new ConfigError(
+              `Required environment variable ${varName} is not set`,
+            );
           }
           return v;
         },
@@ -39,7 +46,9 @@ export function interpolateString(input: string, opts: InterpolateOptions = {}):
     }
     const v = env[varName];
     if (v === undefined || v === '') {
-      throw new ConfigError(`Required environment variable ${varName} is not set`);
+      throw new ConfigError(
+        `Required environment variable ${varName} is not set`,
+      );
     }
     return v;
   }
@@ -53,7 +62,10 @@ export function interpolateString(input: string, opts: InterpolateOptions = {}):
   });
 }
 
-export function interpolateDeep(value: unknown, opts: InterpolateOptions = {}): unknown {
+export function interpolateDeep(
+  value: unknown,
+  opts: InterpolateOptions = {},
+): unknown {
   if (typeof value === 'string') {
     return interpolateString(value, opts);
   }

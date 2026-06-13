@@ -1,6 +1,9 @@
-import type { ConsensusResult, MajorityV1ConsensusConfig } from '../core/pipeline.ts';
-import type { ConsensusStrategy } from './registry.ts';
+import type {
+  ConsensusResult,
+  MajorityV1ConsensusConfig,
+} from '../core/pipeline.ts';
 import { buildGroups } from './grouping.ts';
+import type { ConsensusStrategy } from './registry.ts';
 
 /**
  * Promotes a finding group when a strict majority of the reviewers that actually

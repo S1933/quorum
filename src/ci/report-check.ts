@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Severity } from '../core/finding.ts';
 import type { JsonReport, ReportFinding } from '../ui/report-model.ts';
@@ -9,10 +9,10 @@ import {
   collectJsonReportFindings,
   countBySeverity,
   formatDuration,
-  severityIcon,
-  severityLabel,
   SEVERITY_ORDER,
   SEVERITY_RANK,
+  severityIcon,
+  severityLabel,
 } from '../ui/report-model.ts';
 
 function parseArgs(): { reportPath: string; failOn: string } {
@@ -23,13 +23,15 @@ function parseArgs(): { reportPath: string; failOn: string } {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--fail-on' && i + 1 < args.length) {
       failOn = args[++i]!;
-    } else if (!args[i]!.startsWith('--')) {
+    } else if (!args[i]?.startsWith('--')) {
       reportPath = args[i]!;
     }
   }
 
   if (!reportPath) {
-    console.error('Usage: report-check.ts <report.json> [--fail-on critical|high|medium|never]');
+    console.error(
+      'Usage: report-check.ts <report.json> [--fail-on critical|high|medium|never]',
+    );
     process.exit(2);
   }
 
@@ -45,10 +47,7 @@ function escapeFilePath(p: string): string {
 }
 
 function escapeWorkflowCommandData(value: string): string {
-  return value
-    .replace(/%/g, '%25')
-    .replace(/\r/g, '%0D')
-    .replace(/\n/g, '%0A');
+  return value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
 }
 
 function escapeWorkflowCommandProperty(value: string): string {
@@ -57,7 +56,10 @@ function escapeWorkflowCommandProperty(value: string): string {
     .replace(/,/g, '%2C');
 }
 
-function emitAnnotations(findings: ReportFinding[], failOnRank: number): boolean {
+function emitAnnotations(
+  findings: ReportFinding[],
+  failOnRank: number,
+): boolean {
   let blocked = false;
 
   for (const { finding: f } of findings) {
@@ -94,7 +96,9 @@ function buildComment(
   const totalCount = findings.length;
 
   lines.push('\x3C!-- quorum:report --\x3E');
-  lines.push(`## \u{1F9ED} Quorum Review — \`${escapeFilePath(report.pipeline.id)}\``);
+  lines.push(
+    `## \u{1F9ED} Quorum Review — \`${escapeFilePath(report.pipeline.id)}\``,
+  );
   lines.push('');
 
   if (report.errors.length > 0 && reviewerCount === 0) {
@@ -111,8 +115,12 @@ function buildComment(
   }
 
   if (blocked) {
-    const blockedCount = findings.filter(({ finding: f }) => SEVERITY_RANK[f.severity] >= failOnRank).length;
-    lines.push(`\u274C **BLOCKED** — ${blockedCount} finding(s) at or above **${failOnLabel}** severity`);
+    const blockedCount = findings.filter(
+      ({ finding: f }) => SEVERITY_RANK[f.severity] >= failOnRank,
+    ).length;
+    lines.push(
+      `\u274C **BLOCKED** — ${blockedCount} finding(s) at or above **${failOnLabel}** severity`,
+    );
   } else if (totalCount > 0) {
     lines.push('\u2705 **PASSED** — no blocking findings');
   } else {
@@ -138,7 +146,9 @@ function buildComment(
 
   const counts = countBySeverity(findings.map(({ finding }) => finding));
 
-  const headers = SEVERITY_ORDER.map((s) => `${severityIcon(s)} ${severityLabel(s)}`).join(' | ');
+  const headers = SEVERITY_ORDER.map(
+    (s) => `${severityIcon(s)} ${severityLabel(s)}`,
+  ).join(' | ');
   const divider = SEVERITY_ORDER.map(() => '---:').join(' | ');
   const row = SEVERITY_ORDER.map((s) => String(counts[s])).join(' | ');
 
@@ -152,26 +162,37 @@ function buildComment(
     if (items.length === 0) continue;
 
     const open = severity === 'critical' || severity === 'high';
-    lines.push(`### ${severityIcon(severity)} ${severityLabel(severity)} (${items.length})`);
+    lines.push(
+      `### ${severityIcon(severity)} ${severityLabel(severity)} (${items.length})`,
+    );
     lines.push('');
 
     for (const { finding: f, agreement } of items) {
       const openTag = open ? ' open' : '';
-      const agreementText = agreement != null
-        ? `\u{1F91D} ${agreement}/${reviewerCount} agreement`
-        : '\u{1F464} single reviewer';
+      const agreementText =
+        agreement != null
+          ? `\u{1F91D} ${agreement}/${reviewerCount} agreement`
+          : '\u{1F464} single reviewer';
       const loc = `${escapeFilePath(f.file)}:${f.lineRange.start}-${f.lineRange.end}`;
 
-      lines.push(`<details${openTag}><summary><strong>${escapeMd(f.title)}</strong> — \`${loc}\`</summary>`);
+      lines.push(
+        `<details${openTag}><summary><strong>${escapeMd(f.title)}</strong> — \`${loc}\`</summary>`,
+      );
       lines.push('');
-      lines.push(`${categoryIcon(f.category)} ${f.category} \u00B7 ${agreementText}`);
+      lines.push(
+        `${categoryIcon(f.category)} ${f.category} \u00B7 ${agreementText}`,
+      );
       lines.push('');
       const body = f.body;
       let maxTicks = 0;
       let curTicks = 0;
       for (const ch of body) {
-        if (ch === '`') { curTicks++; if (curTicks > maxTicks) maxTicks = curTicks; }
-        else { curTicks = 0; }
+        if (ch === '`') {
+          curTicks++;
+          if (curTicks > maxTicks) maxTicks = curTicks;
+        } else {
+          curTicks = 0;
+        }
       }
       const fence = '`'.repeat(Math.max(3, maxTicks + 1));
       lines.push(fence);
@@ -221,7 +242,10 @@ const failOnRank = rankForFailOn(failOn);
 const commentFile = process.env.QUORUM_COMMENT_FILE ?? '.quorum/pr-comment.md';
 
 if (!existsSync(reportPath)) {
-  writeErrorComment(commentFile, 'report file not found — review may have failed');
+  writeErrorComment(
+    commentFile,
+    'report file not found — review may have failed',
+  );
   process.exit(2);
 }
 

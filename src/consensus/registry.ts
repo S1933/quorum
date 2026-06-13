@@ -1,19 +1,24 @@
-import type { ReviewResult } from '../core/task.ts';
-import type { ConsensusResult, ConsensusConfig } from '../core/pipeline.ts';
 import { ConfigError } from '../core/errors.ts';
+import type { ConsensusConfig, ConsensusResult } from '../core/pipeline.ts';
+import type { ReviewResult } from '../core/task.ts';
 
 export interface MetaReviewContext {
   signal: AbortSignal;
 }
 
-export type MetaReviewFn = (prompt: string, ctx: MetaReviewContext) => Promise<string>;
+export type MetaReviewFn = (
+  prompt: string,
+  ctx: MetaReviewContext,
+) => Promise<string>;
 
 export interface ConsensusContext {
   metaReview?: MetaReviewFn;
   signal?: AbortSignal;
 }
 
-export interface ConsensusStrategy<C extends ConsensusConfig = ConsensusConfig> {
+export interface ConsensusStrategy<
+  C extends ConsensusConfig = ConsensusConfig,
+> {
   id: C['strategy'];
   aggregate(
     reviews: ReviewResult[],

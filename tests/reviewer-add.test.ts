@@ -1,8 +1,8 @@
+import { describe, expect, test } from 'bun:test';
 import { mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
-import { describe, expect, test } from 'bun:test';
 import { parse as parseYaml } from 'yaml';
-import { main, type CliDeps } from '../src/cli/index.ts';
+import { type CliDeps, main } from '../src/cli/index.ts';
 import { loadConfigFromString } from '../src/config/loader.ts';
 
 describe('reviewer add', () => {
@@ -11,7 +11,16 @@ describe('reviewer add', () => {
     const io = captureIo();
 
     const code = await main(
-      ['reviewer', 'add', '--provider', 'claude-code', '--persona', 'security', '--config', configPath],
+      [
+        'reviewer',
+        'add',
+        '--provider',
+        'claude-code',
+        '--persona',
+        'security',
+        '--config',
+        configPath,
+      ],
       deps,
       io,
     );
@@ -25,7 +34,17 @@ describe('reviewer add', () => {
     const io = captureIo();
 
     const code = await main(
-      ['reviewer', 'add', '--provider', 'claude-code', '--persona', 'security', '--model=', '--config', configPath],
+      [
+        'reviewer',
+        'add',
+        '--provider',
+        'claude-code',
+        '--persona',
+        'security',
+        '--model=',
+        '--config',
+        configPath,
+      ],
       deps,
       io,
     );
@@ -94,11 +113,15 @@ describe('reviewer add', () => {
     expect(code).toBe(0);
     expect(configPath).toBe(join(root, 'quorum.yaml'));
     expect(await Bun.file(configPath).exists()).toBe(true);
-    expect(io.stdoutText()).toContain(`inited quorum config from example: ${configPath}`);
+    expect(io.stdoutText()).toContain(
+      `inited quorum config from example: ${configPath}`,
+    );
 
     const id = addedReviewerId(io);
     const updated = parseYaml(await Bun.file(configPath).text());
-    expect(updated.personas.security.description).toBe('Adversarial security review');
+    expect(updated.personas.security.description).toBe(
+      'Adversarial security review',
+    );
     expect(updated.reviewers[id]).toEqual({
       persona: 'security',
       provider: {
@@ -339,7 +362,9 @@ describe('reviewer add', () => {
     );
 
     expect(code).toBe(0);
-    expect(io.stdoutText()).toContain('Reviewer "security-claude-code" already exists');
+    expect(io.stdoutText()).toContain(
+      'Reviewer "security-claude-code" already exists',
+    );
 
     const updated = parseYaml(await Bun.file(configPath).text());
     expect(Object.keys(updated.reviewers)).toEqual(['security-claude-code']);
@@ -373,14 +398,20 @@ describe('reviewer add', () => {
     );
 
     expect(code).toBe(0);
-    expect(io.stdoutText()).toContain('Reviewer "alice-security-claude-code" already exists');
+    expect(io.stdoutText()).toContain(
+      'Reviewer "alice-security-claude-code" already exists',
+    );
 
     const updated = parseYaml(await Bun.file(configPath).text());
-    expect(Object.keys(updated.reviewers)).toEqual(['alice-security-claude-code']);
+    expect(Object.keys(updated.reviewers)).toEqual([
+      'alice-security-claude-code',
+    ]);
   });
 });
 
-async function repoDeps(reviewers = 'reviewers: {}'): Promise<{ configPath: string; deps: CliDeps }> {
+async function repoDeps(
+  reviewers = 'reviewers: {}',
+): Promise<{ configPath: string; deps: CliDeps }> {
   const root = await mkdtemp(join('/tmp', 'quorum-reviewer-add-'));
   const configPath = join(root, 'quorum.yaml');
   await Bun.write(configPath, configText(reviewers));
@@ -388,7 +419,8 @@ async function repoDeps(reviewers = 'reviewers: {}'): Promise<{ configPath: stri
   return {
     configPath,
     deps: {
-      loadConfigFromPath: async (path) => loadConfigFromString(await Bun.file(path).text()),
+      loadConfigFromPath: async (path) =>
+        loadConfigFromString(await Bun.file(path).text()),
       findConfigPath: () => configPath,
       inferRepoRoot: async () => root,
       probeWorkspace: async () => ({ root }),
@@ -403,7 +435,11 @@ async function repoDeps(reviewers = 'reviewers: {}'): Promise<{ configPath: stri
   };
 }
 
-async function repoDepsWithoutConfig(): Promise<{ root: string; configPath: string; deps: CliDeps }> {
+async function repoDepsWithoutConfig(): Promise<{
+  root: string;
+  configPath: string;
+  deps: CliDeps;
+}> {
   const root = await mkdtemp(join('/tmp', 'quorum-reviewer-add-empty-'));
   const configPath = join(root, 'quorum.yaml');
 
@@ -411,7 +447,8 @@ async function repoDepsWithoutConfig(): Promise<{ root: string; configPath: stri
     root,
     configPath,
     deps: {
-      loadConfigFromPath: async (path) => loadConfigFromString(await Bun.file(path).text()),
+      loadConfigFromPath: async (path) =>
+        loadConfigFromString(await Bun.file(path).text()),
       findConfigPath: () => configPath,
       inferRepoRoot: async () => root,
       probeWorkspace: async () => ({ root }),
@@ -450,15 +487,27 @@ function captureIo() {
   let stdout = '';
   let stderr = '';
   return {
-    stdout: { write(chunk: unknown) { stdout += String(chunk); } },
-    stderr: { write(chunk: unknown) { stderr += String(chunk); } },
-    stdoutText() { return stdout; },
-    stderrText() { return stderr; },
+    stdout: {
+      write(chunk: unknown) {
+        stdout += String(chunk);
+      },
+    },
+    stderr: {
+      write(chunk: unknown) {
+        stderr += String(chunk);
+      },
+    },
+    stdoutText() {
+      return stdout;
+    },
+    stderrText() {
+      return stderr;
+    },
   };
 }
 
 function addedReviewerId(io: ReturnType<typeof captureIo>): string {
   const match = io.stdoutText().match(/added reviewer "([^"]+)"/);
   expect(match).not.toBeNull();
-  return match![1]!;
+  return match?.[1]!;
 }

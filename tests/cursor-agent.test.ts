@@ -1,15 +1,17 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { chmod, mkdtemp, rm } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createRuntime } from '../src/runtime/runtime.ts';
+import { join } from 'node:path';
 import { cursorAgentFactory } from '../src/providers/cursor-agent/index.ts';
-import { task, captureBus, tokenText } from './helpers/subprocess.ts';
+import { createRuntime } from '../src/runtime/runtime.ts';
+import { captureBus, task, tokenText } from './helpers/subprocess.ts';
 
 const tmpRoots: string[] = [];
 
 afterAll(async () => {
-  await Promise.all(tmpRoots.map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    tmpRoots.map((root) => rm(root, { recursive: true, force: true })),
+  );
 });
 
 describe('cursor-agent provider', () => {
@@ -17,7 +19,10 @@ describe('cursor-agent provider', () => {
     const root = await mkdtemp(join(tmpdir(), 'quorum-cursor-'));
     tmpRoots.push(root);
     const binary = join(root, 'cursor-agent');
-    await Bun.write(binary, '#!/bin/sh\nprintf \'{"findings":\'\nsleep 0.01\nprintf \'[]}\\n\'\n');
+    await Bun.write(
+      binary,
+      "#!/bin/sh\nprintf '{\"findings\":'\nsleep 0.01\nprintf '[]}\\n'\n",
+    );
     await chmod(binary, 0o755);
     const events: unknown[] = [];
 
@@ -35,7 +40,7 @@ describe('cursor-agent provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    const result = await provider.review!(task(root, 'security-cursor'), {
+    const result = await provider.review?.(task(root, 'security-cursor'), {
       bus: captureBus(events),
       signal: new AbortController().signal,
       workspace: { root },
@@ -60,7 +65,8 @@ describe('cursor-agent provider', () => {
     await chmod(binary, 0o755);
 
     const reviewTask = task(root, 'security-cursor');
-    reviewTask.instruction = 'Review this diff.\n--force\n$(touch /tmp/should-not-run)';
+    reviewTask.instruction =
+      'Review this diff.\n--force\n$(touch /tmp/should-not-run)';
     const provider = await cursorAgentFactory.create(
       'cursor-local',
       {
@@ -76,7 +82,7 @@ describe('cursor-agent provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    await provider.review!(reviewTask, {
+    await provider.review?.(reviewTask, {
       bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
@@ -86,7 +92,9 @@ describe('cursor-agent provider', () => {
     const args = (await Bun.file(argsFile).text()).split('\0').filter(Boolean);
     const stdin = await Bun.file(stdinFile).text();
     expect(args).toContain('--print');
-    expect(args.some((arg) => arg.includes(reviewTask.instruction))).toBe(false);
+    expect(args.some((arg) => arg.includes(reviewTask.instruction))).toBe(
+      false,
+    );
     expect(stdin).toContain(reviewTask.instruction);
     expect(args).toContain('--output-format');
     expect(args).toContain('json');
@@ -121,7 +129,7 @@ describe('cursor-agent provider', () => {
       { workspaceRoot: root, env: { OPENAI_API_KEY: 'ambient-openai-secret' } },
     );
 
-    await provider.review!(task(root, 'security-cursor'), {
+    await provider.review?.(task(root, 'security-cursor'), {
       bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
@@ -158,7 +166,10 @@ describe('cursor-agent provider', () => {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: { type: 'cursor-agent', extra_args: ['--force'] } },
+          sec: {
+            persona: 'security',
+            provider: { type: 'cursor-agent', extra_args: ['--force'] },
+          },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },

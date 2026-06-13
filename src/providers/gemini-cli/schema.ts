@@ -1,8 +1,6 @@
 import { z } from 'zod';
 
-const SafeExtraArgSchema = z.enum([
-  '--screen-reader',
-]);
+const SafeExtraArgSchema = z.enum(['--screen-reader']);
 
 export const GeminiCliConfigSchema = z
   .object({

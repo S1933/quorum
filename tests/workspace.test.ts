@@ -1,10 +1,16 @@
-import { mkdtemp, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { describe, expect, test } from 'bun:test';
-import { probeWorkspace, filterDiffByFiles, enforceDiffBudget, applyDiffLimits, globMatch } from '../src/runtime/workspace.ts';
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { DiffBudgetError } from '../src/core/errors.ts';
 import type { WorkspaceInfo } from '../src/core/task.ts';
+import {
+  applyDiffLimits,
+  enforceDiffBudget,
+  filterDiffByFiles,
+  globMatch,
+  probeWorkspace,
+} from '../src/runtime/workspace.ts';
 
 describe('probeWorkspace', () => {
   test('returns no diff for a clean repository', async () => {
@@ -153,13 +159,21 @@ describe('globMatch', () => {
 
 describe('filterDiffByFiles', () => {
   test('returns workspace unchanged when no filters provided', () => {
-    const ws = makeWorkspace(MULTI_FILE_DIFF, ['src/app.ts', 'tests/app.test.ts', 'README.md']);
+    const ws = makeWorkspace(MULTI_FILE_DIFF, [
+      'src/app.ts',
+      'tests/app.test.ts',
+      'README.md',
+    ]);
     const result = filterDiffByFiles(ws);
     expect(result).toBe(ws);
   });
 
   test('includeFiles keeps only matching files', () => {
-    const ws = makeWorkspace(MULTI_FILE_DIFF, ['src/app.ts', 'tests/app.test.ts', 'README.md']);
+    const ws = makeWorkspace(MULTI_FILE_DIFF, [
+      'src/app.ts',
+      'tests/app.test.ts',
+      'README.md',
+    ]);
     const result = filterDiffByFiles(ws, ['**/*.ts']);
     expect(result.files).toEqual(['src/app.ts', 'tests/app.test.ts']);
     expect(result.diff).toContain('src/app.ts');
@@ -168,7 +182,11 @@ describe('filterDiffByFiles', () => {
   });
 
   test('excludeFiles removes matching files', () => {
-    const ws = makeWorkspace(MULTI_FILE_DIFF, ['src/app.ts', 'tests/app.test.ts', 'README.md']);
+    const ws = makeWorkspace(MULTI_FILE_DIFF, [
+      'src/app.ts',
+      'tests/app.test.ts',
+      'README.md',
+    ]);
     const result = filterDiffByFiles(ws, undefined, ['**/*.test.ts']);
     expect(result.files).toEqual(['src/app.ts', 'README.md']);
     expect(result.diff).not.toContain('tests/app.test.ts');
@@ -177,7 +195,11 @@ describe('filterDiffByFiles', () => {
   });
 
   test('include and exclude combine correctly', () => {
-    const ws = makeWorkspace(MULTI_FILE_DIFF, ['src/app.ts', 'tests/app.test.ts', 'README.md']);
+    const ws = makeWorkspace(MULTI_FILE_DIFF, [
+      'src/app.ts',
+      'tests/app.test.ts',
+      'README.md',
+    ]);
     const result = filterDiffByFiles(ws, ['**/*.ts'], ['**/*.test.ts']);
     expect(result.files).toEqual(['src/app.ts']);
     expect(result.diff).toContain('src/app.ts');
@@ -186,7 +208,11 @@ describe('filterDiffByFiles', () => {
   });
 
   test('returns undefined diff when all files are excluded', () => {
-    const ws = makeWorkspace(MULTI_FILE_DIFF, ['src/app.ts', 'tests/app.test.ts', 'README.md']);
+    const ws = makeWorkspace(MULTI_FILE_DIFF, [
+      'src/app.ts',
+      'tests/app.test.ts',
+      'README.md',
+    ]);
     const result = filterDiffByFiles(ws, ['**/*.py']);
     expect(result.diff).toBeUndefined();
     expect(result.files).toEqual([]);
@@ -206,7 +232,9 @@ describe('enforceDiffBudget', () => {
 
   test('throws DiffBudgetError when diff exceeds budget', () => {
     const diff = 'x'.repeat(2000);
-    expect(() => enforceDiffBudget(diff, 1024, ['a.ts', 'b.ts'])).toThrow(DiffBudgetError);
+    expect(() => enforceDiffBudget(diff, 1024, ['a.ts', 'b.ts'])).toThrow(
+      DiffBudgetError,
+    );
   });
 
   test('error message includes size, budget, and file count', () => {
@@ -229,7 +257,9 @@ describe('enforceDiffBudget', () => {
     const diff = '🔴'.repeat(300);
     const byteLen = Buffer.byteLength(diff, 'utf8');
     expect(() => enforceDiffBudget(diff, byteLen, [])).not.toThrow();
-    expect(() => enforceDiffBudget(diff, byteLen - 1, [])).toThrow(DiffBudgetError);
+    expect(() => enforceDiffBudget(diff, byteLen - 1, [])).toThrow(
+      DiffBudgetError,
+    );
   });
 });
 
@@ -254,7 +284,9 @@ describe('applyDiffLimits', () => {
 
   test('throws budget error after filtering if still too large', () => {
     const ws = makeWorkspace('x'.repeat(2000), ['a.ts']);
-    expect(() => applyDiffLimits(ws, { maxDiffBytes: 100 })).toThrow(DiffBudgetError);
+    expect(() => applyDiffLimits(ws, { maxDiffBytes: 100 })).toThrow(
+      DiffBudgetError,
+    );
   });
 
   test('passes through when no limits are set', () => {

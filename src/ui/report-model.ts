@@ -2,7 +2,13 @@ import type { Finding, FindingGroup, Severity } from '../core/finding.ts';
 import type { PipelineResult, ReviewerError } from '../core/pipeline.ts';
 import type { PlanReviewVerdict } from '../core/task.ts';
 
-export const SEVERITY_ORDER: readonly Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
+export const SEVERITY_ORDER: readonly Severity[] = [
+  'critical',
+  'high',
+  'medium',
+  'low',
+  'info',
+];
 
 export const SEVERITY_RANK: Record<Severity, number> = {
   critical: 4,
@@ -80,7 +86,7 @@ export function categoryIcon(category: Finding['category']): string {
 }
 
 export function severityLabel(severity: Severity): string {
-  return severity[0]!.toUpperCase() + severity.slice(1);
+  return severity[0]?.toUpperCase() + severity.slice(1);
 }
 
 export function formatDuration(ms: number): string {
@@ -88,22 +94,32 @@ export function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-export function collectPipelineFindings(groups: FindingGroup[], unique: Finding[]): Finding[] {
+export function collectPipelineFindings(
+  groups: FindingGroup[],
+  unique: Finding[],
+): Finding[] {
   return [...groups.flatMap((group) => group.members), ...unique];
 }
 
 export function countBySeverity(findings: Finding[]): Record<Severity, number> {
-  const counts = Object.fromEntries(SEVERITY_ORDER.map((severity) => [severity, 0])) as Record<Severity, number>;
+  const counts = Object.fromEntries(
+    SEVERITY_ORDER.map((severity) => [severity, 0]),
+  ) as Record<Severity, number>;
   for (const finding of findings) counts[finding.severity]++;
   return counts;
 }
 
-export function buildSeverityBuckets(groups: FindingGroup[], unique: Finding[]): SeverityBucket[] {
+export function buildSeverityBuckets(
+  groups: FindingGroup[],
+  unique: Finding[],
+): SeverityBucket[] {
   return SEVERITY_ORDER.map((severity) => {
     const severityGroups = groups
       .filter((group) => group.representative.severity === severity)
       .sort((a, b) => b.reviewers.length - a.reviewers.length);
-    const severityUnique = unique.filter((finding) => finding.severity === severity);
+    const severityUnique = unique.filter(
+      (finding) => finding.severity === severity,
+    );
     return {
       severity,
       groups: severityGroups,
@@ -137,7 +153,8 @@ export function toJsonReport(result: PipelineResult): JsonReport {
       strategyId: result.consensus.strategyId,
       groups: result.consensus.groups.map((group) => ({
         ...group,
-        agreement: result.consensus.agreement[group.id] ?? group.reviewers.length,
+        agreement:
+          result.consensus.agreement[group.id] ?? group.reviewers.length,
       })),
       unique: result.consensus.unique,
       contradictions: result.consensus.contradictions,

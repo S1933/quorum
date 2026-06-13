@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { ConfigError } from '../src/core/errors.ts';
+import {
+  interpolateDeep,
+  interpolateString,
+  isLazyEnvRef,
+  resolveLazy,
+} from '../src/config/interpolate.ts';
 import { loadConfigFromString } from '../src/config/loader.ts';
-import { interpolateString, interpolateDeep, resolveLazy, isLazyEnvRef } from '../src/config/interpolate.ts';
+import { ConfigError } from '../src/core/errors.ts';
 import { createRuntime } from '../src/runtime/runtime.ts';
 
 const MINIMAL_YAML = `
@@ -41,17 +46,21 @@ describe('loadConfigFromString', () => {
   });
 
   test('parses quorum.yaml.example', async () => {
-    const cfg = await loadConfigFromString(await Bun.file('quorum.yaml.example').text());
+    const cfg = await loadConfigFromString(
+      await Bun.file('quorum.yaml.example').text(),
+    );
     expect(cfg.defaults?.pipeline).toBe('default');
     expect(cfg.reviewers).toEqual({});
     expect(cfg.pipelines.default?.reviewers).toEqual([]);
   });
 
   test('accepts reviewer file extension filters', async () => {
-    const cfg = await loadConfigFromString(MINIMAL_YAML.replace(
-      '      model: test-model',
-      '      model: test-model\n    fileExtensions: [go, ts, .tsx]',
-    ));
+    const cfg = await loadConfigFromString(
+      MINIMAL_YAML.replace(
+        '      model: test-model',
+        '      model: test-model\n    fileExtensions: [go, ts, .tsx]',
+      ),
+    );
     expect(cfg.reviewers.sec?.fileExtensions).toEqual(['go', 'ts', '.tsx']);
   });
 
@@ -61,25 +70,37 @@ describe('loadConfigFromString', () => {
   });
 
   test('rejects defaults.pipeline referencing nonexistent pipeline', async () => {
-    await expect(loadConfigFromString(withDefaults('  pipeline: nonexistent'))).rejects.toThrow(ConfigError);
+    await expect(
+      loadConfigFromString(withDefaults('  pipeline: nonexistent')),
+    ).rejects.toThrow(ConfigError);
   });
 
   test('accepts defaults with maxDiffBytes and file filters', async () => {
-    const cfg = await loadConfigFromString(withDefaults(`  pipeline: default
+    const cfg = await loadConfigFromString(
+      withDefaults(`  pipeline: default
   maxDiffBytes: 50000
   includeFiles: ["src/**/*.ts"]
-  excludeFiles: ["*.test.ts"]`));
+  excludeFiles: ["*.test.ts"]`),
+    );
     expect(cfg.defaults?.maxDiffBytes).toBe(50000);
     expect(cfg.defaults?.includeFiles).toEqual(['src/**/*.ts']);
     expect(cfg.defaults?.excludeFiles).toEqual(['*.test.ts']);
   });
 
   test('rejects negative maxDiffBytes', async () => {
-    await expect(loadConfigFromString(withDefaults('  pipeline: default\n  maxDiffBytes: -1'))).rejects.toThrow(ConfigError);
+    await expect(
+      loadConfigFromString(
+        withDefaults('  pipeline: default\n  maxDiffBytes: -1'),
+      ),
+    ).rejects.toThrow(ConfigError);
   });
 
   test('rejects fractional maxDiffBytes', async () => {
-    await expect(loadConfigFromString(withDefaults('  pipeline: default\n  maxDiffBytes: 3.14'))).rejects.toThrow(ConfigError);
+    await expect(
+      loadConfigFromString(
+        withDefaults('  pipeline: default\n  maxDiffBytes: 3.14'),
+      ),
+    ).rejects.toThrow(ConfigError);
   });
 
   test('rejects reviewer referencing unknown persona', async () => {
@@ -92,7 +113,9 @@ reviewers:
 pipelines:
   default: { reviewers: [r] }
 `;
-    await expect(loadConfigFromString(source)).rejects.toThrow(/unknown persona/);
+    await expect(loadConfigFromString(source)).rejects.toThrow(
+      /unknown persona/,
+    );
   });
 
   test('rejects pipeline referencing unknown reviewer', async () => {
@@ -105,7 +128,9 @@ reviewers:
 pipelines:
   default: { reviewers: [ghost] }
 `;
-    await expect(loadConfigFromString(source)).rejects.toThrow(/unknown reviewer/);
+    await expect(loadConfigFromString(source)).rejects.toThrow(
+      /unknown reviewer/,
+    );
   });
 
   test('rejects consensus.requireAgreement exceeding reviewer count', async () => {
@@ -122,11 +147,15 @@ pipelines:
       strategy: overlap-v1
       requireAgreement: 5
 `;
-    await expect(loadConfigFromString(source)).rejects.toThrow(/requireAgreement.*exceeds/);
+    await expect(loadConfigFromString(source)).rejects.toThrow(
+      /requireAgreement.*exceeds/,
+    );
   });
 
   test('rejects invalid YAML', async () => {
-    await expect(loadConfigFromString('{ invalid: yaml: :')).rejects.toThrow(ConfigError);
+    await expect(loadConfigFromString('{ invalid: yaml: :')).rejects.toThrow(
+      ConfigError,
+    );
   });
 
   test('rejects missing version field', async () => {
@@ -152,7 +181,7 @@ pipelines:
   default: { reviewers: [] }
 `;
     const cfg = await loadConfigFromString(source);
-    expect(cfg.pipelines.default!.reviewers).toEqual([]);
+    expect(cfg.pipelines.default?.reviewers).toEqual([]);
   });
 
   test('accepts pipeline with maxConcurrency', async () => {
@@ -168,11 +197,13 @@ pipelines:
     maxConcurrency: 3
 `;
     const cfg = await loadConfigFromString(source);
-    expect(cfg.pipelines.default!.maxConcurrency).toBe(3);
+    expect(cfg.pipelines.default?.maxConcurrency).toBe(3);
   });
 
   test('rejects invalid YAML', async () => {
-    await expect(loadConfigFromString('{ invalid: yaml: :')).rejects.toThrow(ConfigError);
+    await expect(loadConfigFromString('{ invalid: yaml: :')).rejects.toThrow(
+      ConfigError,
+    );
   });
 
   test('accepts empty reviewers array in pipeline', async () => {
@@ -186,7 +217,7 @@ pipelines:
   default: { reviewers: [] }
 `;
     const cfg = await loadConfigFromString(source);
-    expect(cfg.pipelines.default!.reviewers).toEqual([]);
+    expect(cfg.pipelines.default?.reviewers).toEqual([]);
   });
 
   test('accepts pipeline with maxConcurrency', async () => {
@@ -202,7 +233,7 @@ pipelines:
     maxConcurrency: 3
 `;
     const cfg = await loadConfigFromString(source);
-    expect(cfg.pipelines.default!.maxConcurrency).toBe(3);
+    expect(cfg.pipelines.default?.maxConcurrency).toBe(3);
   });
 
   test('propagates maxConcurrency from config to resolved pipeline', async () => {
@@ -236,7 +267,9 @@ reviewers:
 pipelines:
   default: { reviewers: [ghost] }
 `;
-    await expect(loadConfigFromString(source)).rejects.toThrow(/unknown reviewer/);
+    await expect(loadConfigFromString(source)).rejects.toThrow(
+      /unknown reviewer/,
+    );
   });
 
   test('rejects consensus.requireAgreement exceeding reviewer count', async () => {
@@ -253,7 +286,9 @@ pipelines:
       strategy: overlap-v1
       requireAgreement: 5
 `;
-    await expect(loadConfigFromString(source)).rejects.toThrow(/requireAgreement.*exceeds/);
+    await expect(loadConfigFromString(source)).rejects.toThrow(
+      /requireAgreement.*exceeds/,
+    );
   });
 
   test('accepts typed strategy-specific consensus config', async () => {
@@ -298,7 +333,9 @@ pipelines:
       strategy: semantic-v2
       enableContradiction: true
 `;
-    await expect(loadConfigFromString(source)).rejects.toThrow(/enableContradiction/);
+    await expect(loadConfigFromString(source)).rejects.toThrow(
+      /enableContradiction/,
+    );
   });
 
   test('rejects invalid consensus strategy-specific values', async () => {
@@ -320,14 +357,22 @@ pipelines:
   });
 
   test('resolves env:VAR lazily during config parse', async () => {
-    const source = MINIMAL_YAML.replace('api_key: test-key', 'api_key: env:MY_API_KEY');
-    const cfg = await loadConfigFromString(source, { env: { MY_API_KEY: 'secret-123' } });
+    const source = MINIMAL_YAML.replace(
+      'api_key: test-key',
+      'api_key: env:MY_API_KEY',
+    );
+    const cfg = await loadConfigFromString(source, {
+      env: { MY_API_KEY: 'secret-123' },
+    });
     const provider = cfg.reviewers.sec?.provider as Record<string, unknown>;
     expect(isLazyEnvRef(provider.api_key)).toBe(true);
   });
 
   test('resolves ${VAR} template during config parse', async () => {
-    const source = MINIMAL_YAML.replace('api_key: test-key', 'api_key: prefix-${MY_KEY}-suffix');
+    const source = MINIMAL_YAML.replace(
+      'api_key: test-key',
+      'api_key: prefix-${MY_KEY}-suffix',
+    );
     const cfg = await loadConfigFromString(source, { env: { MY_KEY: 'abc' } });
     const provider = cfg.reviewers.sec?.provider as Record<string, unknown>;
     expect(provider.api_key).toBe('prefix-abc-suffix');
@@ -340,19 +385,28 @@ describe('interpolateString', () => {
   });
 
   test('replaces env:VAR with environment value', () => {
-    expect(interpolateString('env:TEST_VAR', { env: { TEST_VAR: 'val' } })).toBe('val');
+    expect(
+      interpolateString('env:TEST_VAR', { env: { TEST_VAR: 'val' } }),
+    ).toBe('val');
   });
 
   test('throws on missing env:VAR', () => {
-    expect(() => interpolateString('env:MISSING', { env: {} })).toThrow(ConfigError);
+    expect(() => interpolateString('env:MISSING', { env: {} })).toThrow(
+      ConfigError,
+    );
   });
 
   test('throws on empty env:VAR', () => {
-    expect(() => interpolateString('env:EMPTY', { env: { EMPTY: '' } })).toThrow(ConfigError);
+    expect(() =>
+      interpolateString('env:EMPTY', { env: { EMPTY: '' } }),
+    ).toThrow(ConfigError);
   });
 
   test('returns lazy ref in lazy mode', () => {
-    const result = interpolateString('env:MY_KEY', { env: { MY_KEY: 'secret' }, lazy: true });
+    const result = interpolateString('env:MY_KEY', {
+      env: { MY_KEY: 'secret' },
+      lazy: true,
+    });
     expect(isLazyEnvRef(result)).toBe(true);
     expect((result as { resolve(): string }).resolve()).toBe('secret');
   });
@@ -360,19 +414,27 @@ describe('interpolateString', () => {
   test('lazy ref throws when env var is missing at resolve time', () => {
     const result = interpolateString('env:MISSING', { env: {}, lazy: true });
     expect(isLazyEnvRef(result)).toBe(true);
-    expect(() => (result as { resolve(): string }).resolve()).toThrow(ConfigError);
+    expect(() => (result as { resolve(): string }).resolve()).toThrow(
+      ConfigError,
+    );
   });
 
   test('replaces ${VAR} template', () => {
-    expect(interpolateString('${FOO}-bar', { env: { FOO: 'hello' } })).toBe('hello-bar');
+    expect(interpolateString('${FOO}-bar', { env: { FOO: 'hello' } })).toBe(
+      'hello-bar',
+    );
   });
 
   test('replaces multiple ${VAR} templates', () => {
-    expect(interpolateString('${A}_${B}', { env: { A: 'x', B: 'y' } })).toBe('x_y');
+    expect(interpolateString('${A}_${B}', { env: { A: 'x', B: 'y' } })).toBe(
+      'x_y',
+    );
   });
 
   test('throws on missing ${VAR}', () => {
-    expect(() => interpolateString('${NOPE}', { env: {} })).toThrow(ConfigError);
+    expect(() => interpolateString('${NOPE}', { env: {} })).toThrow(
+      ConfigError,
+    );
   });
 });
 

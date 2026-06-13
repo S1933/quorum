@@ -49,18 +49,29 @@ describe('OllamaClient', () => {
   });
 
   test('streams tokens and usage from newline-delimited JSON chunks', async () => {
-    globalThis.fetch = (async (_input, _init) => new Response(
-      new ReadableStream({
-        start(controller) {
-          const enc = new TextEncoder();
-          controller.enqueue(enc.encode('{"message":{"content":"{\\"findings\\":"},"done":false}\n'));
-          controller.enqueue(enc.encode('{"message":{"content":"[]}"},"done":false}\n'));
-          controller.enqueue(enc.encode('{"done":true,"prompt_eval_count":10,"eval_count":2}\n'));
-          controller.close();
-        },
-      }),
-      { status: 200 },
-    )) as typeof fetch;
+    globalThis.fetch = (async (_input, _init) =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            const enc = new TextEncoder();
+            controller.enqueue(
+              enc.encode(
+                '{"message":{"content":"{\\"findings\\":"},"done":false}\n',
+              ),
+            );
+            controller.enqueue(
+              enc.encode('{"message":{"content":"[]}"},"done":false}\n'),
+            );
+            controller.enqueue(
+              enc.encode(
+                '{"done":true,"prompt_eval_count":10,"eval_count":2}\n',
+              ),
+            );
+            controller.close();
+          },
+        }),
+        { status: 200 },
+      )) as typeof fetch;
 
     const client = new OllamaClient(
       {

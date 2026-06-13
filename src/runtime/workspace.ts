@@ -1,7 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { DiffBudgetError, ProviderRuntimeError } from '../core/errors.ts';
 import type { WorkspaceInfo } from '../core/task.ts';
-import { ProviderRuntimeError, DiffBudgetError } from '../core/errors.ts';
 
 export interface WorkspaceProbeOptions {
   root: string;
@@ -10,7 +10,9 @@ export interface WorkspaceProbeOptions {
 
 const MAX_UNTRACKED_BYTES = 24 * 1024;
 
-export async function probeWorkspace(opts: WorkspaceProbeOptions): Promise<WorkspaceInfo> {
+export async function probeWorkspace(
+  opts: WorkspaceProbeOptions,
+): Promise<WorkspaceInfo> {
   const { root } = opts;
   const baseRef = opts.baseRef ?? (await defaultBaseRef(root));
 
@@ -24,7 +26,8 @@ export async function probeWorkspace(opts: WorkspaceProbeOptions): Promise<Works
     gitUntrackedInfo(root),
     gitDiffFileList(root, mergeBase),
   ]);
-  const combinedDiff = [diff, untracked.diff].filter(Boolean).join('\n\n') || undefined;
+  const combinedDiff =
+    [diff, untracked.diff].filter(Boolean).join('\n\n') || undefined;
   const files = [...new Set([...changedFiles, ...untracked.files])];
   const ws: WorkspaceInfo = { root, files };
   if (baseRef) ws.baseRef = baseRef;
@@ -75,7 +78,10 @@ async function runGit(root: string, args: string[]): Promise<GitResult> {
     proc.exited,
   ]);
   if (code !== 0) {
-    return { ok: false, err: err.trim() || `git ${args.join(' ')} failed with code ${code}` };
+    return {
+      ok: false,
+      err: err.trim() || `git ${args.join(' ')} failed with code ${code}`,
+    };
   }
   const trimmed = out.trim();
   return { ok: true, out: trimmed ? trimmed : '' };
@@ -88,7 +94,10 @@ async function runGitNul(root: string, args: string[]): Promise<string[]> {
   return result.out.split('\0').filter(Boolean);
 }
 
-async function gitDiff(root: string, mergeBase: string | undefined): Promise<string | undefined> {
+async function gitDiff(
+  root: string,
+  mergeBase: string | undefined,
+): Promise<string | undefined> {
   if (mergeBase) {
     const result = await runGit(root, ['diff', mergeBase]);
     if (!result.ok) throw new ProviderRuntimeError('workspace', result.err);
@@ -100,26 +109,37 @@ async function gitDiff(root: string, mergeBase: string | undefined): Promise<str
     runGit(root, ['diff', '--cached']),
     runGit(root, ['diff']),
   ]);
-  if (!stagedResult.ok) throw new ProviderRuntimeError('workspace', stagedResult.err);
-  if (!worktreeResult.ok) throw new ProviderRuntimeError('workspace', worktreeResult.err);
+  if (!stagedResult.ok)
+    throw new ProviderRuntimeError('workspace', stagedResult.err);
+  if (!worktreeResult.ok)
+    throw new ProviderRuntimeError('workspace', worktreeResult.err);
   if (stagedResult.out) chunks.push(stagedResult.out);
   if (worktreeResult.out) chunks.push(worktreeResult.out);
 
   return chunks.length > 0 ? chunks.join('\n') : undefined;
 }
 
-async function getMergeBase(root: string, baseRef: string): Promise<string | undefined> {
+async function getMergeBase(
+  root: string,
+  baseRef: string,
+): Promise<string | undefined> {
   const proc = Bun.spawn({
     cmd: ['git', 'merge-base', baseRef, 'HEAD'],
     cwd: root,
     stdout: 'pipe',
     stderr: 'pipe',
   });
-  const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+  const [out, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    proc.exited,
+  ]);
   return code === 0 ? out.trim() : undefined;
 }
 
-async function gitDiffFileList(root: string, mergeBase: string | undefined): Promise<string[]> {
+async function gitDiffFileList(
+  root: string,
+  mergeBase: string | undefined,
+): Promise<string[]> {
   if (mergeBase) {
     return runGitNul(root, ['diff', '--name-only', '-z', mergeBase]);
   }
@@ -137,7 +157,12 @@ interface UntrackedInfo {
 }
 
 async function gitUntrackedInfo(root: string): Promise<UntrackedInfo> {
-  const files = await runGitNul(root, ['ls-files', '--others', '--exclude-standard', '-z']);
+  const files = await runGitNul(root, [
+    'ls-files',
+    '--others',
+    '--exclude-standard',
+    '-z',
+  ]);
   if (files.length === 0) return { files: [] };
 
   const chunks: string[] = [];
@@ -149,15 +174,32 @@ async function gitUntrackedInfo(root: string): Promise<UntrackedInfo> {
   return out;
 }
 
-async function formatUntrackedFile(root: string, file: string): Promise<string> {
-  const header = [`diff --git a/${file} b/${file}`, 'new file mode 100644', '--- /dev/null', `+++ b/${file}`];
+async function formatUntrackedFile(
+  root: string,
+  file: string,
+): Promise<string> {
+  const header = [
+    `diff --git a/${file} b/${file}`,
+    'new file mode 100644',
+    '--- /dev/null',
+    `+++ b/${file}`,
+  ];
   const absolute = join(root, file);
 
   try {
     const info = await stat(absolute);
-    if (!info.isFile()) return [...header, `@@ -0,0 +1 @@`, `+(skipped: not a regular file)`].join('\n');
+    if (!info.isFile())
+      return [
+        ...header,
+        `@@ -0,0 +1 @@`,
+        `+(skipped: not a regular file)`,
+      ].join('\n');
     if (info.size > MAX_UNTRACKED_BYTES) {
-      return [...header, '@@ -0,0 +1 @@', `+(skipped: ${info.size} bytes exceeds ${MAX_UNTRACKED_BYTES} byte limit)`].join('\n');
+      return [
+        ...header,
+        '@@ -0,0 +1 @@',
+        `+(skipped: ${info.size} bytes exceeds ${MAX_UNTRACKED_BYTES} byte limit)`,
+      ].join('\n');
     }
 
     const data = await readFile(absolute);
@@ -165,12 +207,23 @@ async function formatUntrackedFile(root: string, file: string): Promise<string> 
       return [...header, '@@ -0,0 +1 @@', '+(skipped: binary file)'].join('\n');
     }
 
-    const text = data.toString('utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    const lines = text.endsWith('\n') ? text.slice(0, -1).split('\n') : text.split('\n');
+    const text = data
+      .toString('utf8')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+    const lines = text.endsWith('\n')
+      ? text.slice(0, -1).split('\n')
+      : text.split('\n');
     const lineCount = text.length === 0 ? 0 : lines.length;
-    return [...header, `@@ -0,0 +1,${lineCount} @@`, ...lines.map((line) => `+${line}`)].join('\n');
+    return [
+      ...header,
+      `@@ -0,0 +1,${lineCount} @@`,
+      ...lines.map((line) => `+${line}`),
+    ].join('\n');
   } catch {
-    return [...header, '@@ -0,0 +1 @@', '+(skipped: unreadable file)'].join('\n');
+    return [...header, '@@ -0,0 +1 @@', '+(skipped: unreadable file)'].join(
+      '\n',
+    );
   }
 }
 
@@ -185,7 +238,10 @@ export interface DiffLimits {
   excludeFiles?: string[];
 }
 
-export function applyDiffLimits(workspace: WorkspaceInfo, limits: DiffLimits): WorkspaceInfo {
+export function applyDiffLimits(
+  workspace: WorkspaceInfo,
+  limits: DiffLimits,
+): WorkspaceInfo {
   let ws = workspace;
   if (limits.includeFiles?.length || limits.excludeFiles?.length) {
     ws = filterDiffByFiles(ws, limits.includeFiles, limits.excludeFiles);
@@ -206,8 +262,10 @@ export function filterDiffByFiles(
 
   const sections = splitDiffSections(workspace.diff);
   const kept = sections.filter(({ file }) => {
-    if (include?.length && !include.some((p) => globMatch(p, file))) return false;
-    if (exclude?.length && exclude.some((p) => globMatch(p, file))) return false;
+    if (include?.length && !include.some((p) => globMatch(p, file)))
+      return false;
+    if (exclude?.length && exclude.some((p) => globMatch(p, file)))
+      return false;
     return true;
   });
 
@@ -219,7 +277,11 @@ export function filterDiffByFiles(
   return out;
 }
 
-export function enforceDiffBudget(diff: string, maxBytes: number, files: string[]): void {
+export function enforceDiffBudget(
+  diff: string,
+  maxBytes: number,
+  files: string[],
+): void {
   const actual = Buffer.byteLength(diff, 'utf8');
   if (actual > maxBytes) {
     throw new DiffBudgetError(actual, maxBytes, files.length);
@@ -241,13 +303,19 @@ function splitDiffSections(diff: string): DiffSection[] {
     const m = headerRe.exec(lines[i]!);
     if (m) {
       if (current) {
-        sections.push({ file: current.file, raw: lines.slice(current.startIdx, i).join('\n') });
+        sections.push({
+          file: current.file,
+          raw: lines.slice(current.startIdx, i).join('\n'),
+        });
       }
       current = { file: m[2]!, startIdx: i };
     }
   }
   if (current) {
-    sections.push({ file: current.file, raw: lines.slice(current.startIdx).join('\n') });
+    sections.push({
+      file: current.file,
+      raw: lines.slice(current.startIdx).join('\n'),
+    });
   }
   return sections;
 }
@@ -279,16 +347,24 @@ function globToRegex(pattern: string): RegExp {
   return new RegExp(`^${src}$`);
 }
 
-export async function inferRepoRoot(start: string = process.cwd()): Promise<string> {
+export async function inferRepoRoot(
+  start: string = process.cwd(),
+): Promise<string> {
   const proc = Bun.spawn({
     cmd: ['git', 'rev-parse', '--show-toplevel'],
     cwd: start,
     stdout: 'pipe',
     stderr: 'pipe',
   });
-  const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+  const [out, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    proc.exited,
+  ]);
   if (code !== 0) {
-    throw new ProviderRuntimeError('workspace', `Not inside a git repository (cwd=${start})`);
+    throw new ProviderRuntimeError(
+      'workspace',
+      `Not inside a git repository (cwd=${start})`,
+    );
   }
   return out.trim();
 }

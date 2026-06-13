@@ -1,6 +1,13 @@
-import { readdir, readlink, symlink, stat, mkdir, unlink } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import {
+  mkdir,
+  readdir,
+  readlink,
+  stat,
+  symlink,
+  unlink,
+} from 'node:fs/promises';
 import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 const root = resolve(import.meta.dir, '..');
 const home = homedir();

@@ -1,24 +1,31 @@
+import { isAbsolute, resolve } from 'node:path';
 import type { QuorumConfig, ReviewerConfig } from '../../config/schema.ts';
-import { defaultPluginCtx } from '../../runtime/plugin.ts';
-import { applyDiffLimits, type DiffLimits } from '../../runtime/workspace.ts';
-import { PipelineExecutor, type PipelineRunInput } from '../../pipelines/executor.ts';
-import { TerminalRenderer } from '../../ui/terminal.ts';
-import { renderMarkdownReport } from '../../ui/markdown.ts';
-import { renderJsonReport } from '../../ui/json.ts';
 import { ConfigError } from '../../core/errors.ts';
 import type { PipelineResult } from '../../core/pipeline.ts';
-import type { CliDeps, CliIo } from '../types.ts';
-import { assertPathInside, writeArchivedReport, writeReport } from '../report.ts';
-import {
-  QUESTIONS_PROMPT,
-  buildFindingsWithQAInstruction,
-} from '../../reviewers/output.ts';
 import {
   collectQuestions,
   deduplicateQuestions,
   promptQuestions,
 } from '../../interactive/qa.ts';
-import { isAbsolute, resolve } from 'node:path';
+import {
+  PipelineExecutor,
+  type PipelineRunInput,
+} from '../../pipelines/executor.ts';
+import {
+  buildFindingsWithQAInstruction,
+  QUESTIONS_PROMPT,
+} from '../../reviewers/output.ts';
+import { defaultPluginCtx } from '../../runtime/plugin.ts';
+import { applyDiffLimits, type DiffLimits } from '../../runtime/workspace.ts';
+import { renderJsonReport } from '../../ui/json.ts';
+import { renderMarkdownReport } from '../../ui/markdown.ts';
+import { TerminalRenderer } from '../../ui/terminal.ts';
+import {
+  assertPathInside,
+  writeArchivedReport,
+  writeReport,
+} from '../report.ts';
+import type { CliDeps, CliIo } from '../types.ts';
 
 export async function cmdReview(
   positional: string[],
@@ -27,14 +34,22 @@ export async function cmdReview(
   io: CliIo,
 ): Promise<number> {
   if (positional.length > 1) {
-    throw new ConfigError(`Unexpected review arguments: ${positional.slice(1).join(' ')}`);
+    throw new ConfigError(
+      `Unexpected review arguments: ${positional.slice(1).join(' ')}`,
+    );
   }
-  const configPath = typeof flags.config === 'string' ? flags.config : deps.findConfigPath();
+  const configPath =
+    typeof flags.config === 'string' ? flags.config : deps.findConfigPath();
   const config = await deps.loadConfigFromPath(configPath);
   const format = reviewOutputFormat(flags);
   const pipelineId =
-    (typeof flags.pipeline === 'string' && flags.pipeline) || positional[0] || config.defaults?.pipeline;
-  if (!pipelineId) throw new ConfigError('No pipeline specified and no defaults.pipeline configured');
+    (typeof flags.pipeline === 'string' && flags.pipeline) ||
+    positional[0] ||
+    config.defaults?.pipeline;
+  if (!pipelineId)
+    throw new ConfigError(
+      'No pipeline specified and no defaults.pipeline configured',
+    );
 
   const root = await deps.inferRepoRoot();
   const rawWorkspace = await deps.probeWorkspace({
@@ -55,14 +70,24 @@ export async function cmdReview(
 
   const pipeline = runtime.resolvePipeline(pipelineId);
   if (pipeline.reviewers.length === 0) {
-    io.stderr.write('No reviewers configured in pipeline "' + pipelineId + '". Run \'quorum reviewer add\' to add your first reviewer.\n');
+    io.stderr.write(
+      'No reviewers configured in pipeline "' +
+        pipelineId +
+        "\". Run 'quorum reviewer add' to add your first reviewer.\n",
+    );
     await runtime.dispose();
     return 0;
   }
 
-  const reviewerIds = filterReviewersByChangedFiles(pipeline.reviewers, config.reviewers, workspace.files ?? []);
+  const reviewerIds = filterReviewersByChangedFiles(
+    pipeline.reviewers,
+    config.reviewers,
+    workspace.files ?? [],
+  );
   if (reviewerIds.length === 0) {
-    io.stderr.write('No reviewers matched the changed file extensions — nothing to review.\n');
+    io.stderr.write(
+      'No reviewers matched the changed file extensions — nothing to review.\n',
+    );
     await runtime.dispose();
     return 0;
   }
@@ -88,26 +113,35 @@ export async function cmdReview(
       : () => undefined;
 
   const executor = new PipelineExecutor();
-  const instruction = buildReviewInstruction(workspace.diff, workspace.files ?? []);
+  const instruction = buildReviewInstruction(
+    workspace.diff,
+    workspace.files ?? [],
+  );
   const interactive = flags.interactive === true;
 
   try {
     if (filteredPipeline.maxTotalCostUsd && format === 'text') {
-      io.stderr.write(`💰  pipeline budget: $${filteredPipeline.maxTotalCostUsd.toFixed(2)}\n`);
+      io.stderr.write(
+        `💰  pipeline budget: $${filteredPipeline.maxTotalCostUsd.toFixed(2)}\n`,
+      );
     }
 
     const result = interactive
-      ? await runInteractive(executor, {
-          pipeline: filteredPipeline,
-          reviewers,
-          workspace,
-          instruction,
-          taskId: `review-${deps.now()}`,
-          bus: runtime.bus,
-          consensus: runtime.consensus,
-          providers: runtime.providers,
-          pluginCtx: runtime.pluginCtx,
-        }, io)
+      ? await runInteractive(
+          executor,
+          {
+            pipeline: filteredPipeline,
+            reviewers,
+            workspace,
+            instruction,
+            taskId: `review-${deps.now()}`,
+            bus: runtime.bus,
+            consensus: runtime.consensus,
+            providers: runtime.providers,
+            pluginCtx: runtime.pluginCtx,
+          },
+          io,
+        )
       : await executor.run({
           pipeline: filteredPipeline,
           reviewers,
@@ -128,16 +162,19 @@ export async function cmdReview(
       }
       io.stdout.write(json);
     } else {
-      const reportPath = typeof flags.report === 'string'
-        ? resolveReportPath(root, flags.report, flags)
-        : `${root}/.quorum/last-review.md`;
+      const reportPath =
+        typeof flags.report === 'string'
+          ? resolveReportPath(root, flags.report, flags)
+          : `${root}/.quorum/last-review.md`;
       const md = renderMarkdownReport(result);
       await writeReport(reportPath, md);
       await writeArchivedReport(root, 'review', filteredPipeline.id, md);
       io.stdout.write(`\nreport: ${reportPath}\n`);
       if (result.totalCostUsd) {
         const over = result.budgetExceeded ? ' (budget exceeded)' : '';
-        io.stdout.write(`💰  total cost: $${result.totalCostUsd.toFixed(4)}${over}\n`);
+        io.stdout.write(
+          `💰  total cost: $${result.totalCostUsd.toFixed(4)}${over}\n`,
+        );
       }
     }
     return result.errors.length > 0 && result.reviews.length === 0 ? 1 : 0;
@@ -152,7 +189,9 @@ export function resolveReportPath(
   reportPath: string,
   flags: Record<string, string | boolean>,
 ): string {
-  const resolved = isAbsolute(reportPath) ? reportPath : resolve(root, reportPath);
+  const resolved = isAbsolute(reportPath)
+    ? reportPath
+    : resolve(root, reportPath);
   if (flags['allow-report-outside-root'] !== true) {
     assertPathInside(root, resolved);
   }
@@ -164,7 +203,7 @@ export async function runInteractive(
   input: PipelineRunInput,
   io: CliIo,
 ): Promise<PipelineResult> {
-  if (!io.stdin || !io.stdin.isTTY) {
+  if (!io.stdin?.isTTY) {
     throw new ConfigError(
       'Interactive mode requires a TTY (stdin is not a terminal). Run without --interactive or redirect stdin from a terminal.',
     );
@@ -191,10 +230,16 @@ export async function runInteractive(
   input.bus.emit({ type: 'questions.answered', count: answers.size });
 
   const qaList = deduped
-    .map((q) => ({ question: q.question, answer: answers.get(q.question) ?? '' }))
+    .map((q) => ({
+      question: q.question,
+      answer: answers.get(q.question) ?? '',
+    }))
     .filter((qa) => qa.answer.length > 0);
 
-  const findingsInstruction = buildFindingsWithQAInstruction(input.instruction, qaList);
+  const findingsInstruction = buildFindingsWithQAInstruction(
+    input.instruction,
+    qaList,
+  );
 
   return executor.run({
     ...input,
@@ -222,14 +267,20 @@ export function resolveDiffLimits(
 
   const flagInclude = flags.include;
   if (typeof flagInclude === 'string') {
-    limits.includeFiles = flagInclude.split(',').map((s) => s.trim()).filter(Boolean);
+    limits.includeFiles = flagInclude
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   } else if (config.defaults?.includeFiles?.length) {
     limits.includeFiles = config.defaults.includeFiles;
   }
 
   const flagExclude = flags.exclude;
   if (typeof flagExclude === 'string') {
-    limits.excludeFiles = flagExclude.split(',').map((s) => s.trim()).filter(Boolean);
+    limits.excludeFiles = flagExclude
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   } else if (config.defaults?.excludeFiles?.length) {
     limits.excludeFiles = config.defaults.excludeFiles;
   }
@@ -252,7 +303,10 @@ export function buildSafeFence(content: string): string {
 }
 
 export function buildReviewInstruction(diff: string, files: string[]): string {
-  const fileList = files.length > 0 ? `Changed files:\n${files.map((f) => `  - ${f}`).join('\n')}\n\n` : '';
+  const fileList =
+    files.length > 0
+      ? `Changed files:\n${files.map((f) => `  - ${f}`).join('\n')}\n\n`
+      : '';
   const fence = buildSafeFence(diff);
   return [
     fileList,
@@ -275,7 +329,9 @@ export function filterReviewersByChangedFiles(
   return reviewerIds.filter((id) => {
     const extensions = reviewers[id]?.fileExtensions;
     if (!extensions?.length) return true;
-    return files.some((file) => extensions.some((extension) => fileExtensionMatches(file, extension)));
+    return files.some((file) =>
+      extensions.some((extension) => fileExtensionMatches(file, extension)),
+    );
   });
 }
 
@@ -291,9 +347,13 @@ function normaliseExtension(extension: string): string {
   return trimmed.startsWith('.') ? trimmed : `.${trimmed}`;
 }
 
-export function reviewOutputFormat(flags: Record<string, string | boolean>): 'text' | 'json' {
+export function reviewOutputFormat(
+  flags: Record<string, string | boolean>,
+): 'text' | 'json' {
   if (flags.json === true) return 'json';
   if (flags.format === undefined) return 'text';
   if (flags.format === 'text' || flags.format === 'json') return flags.format;
-  throw new ConfigError(`Unsupported review format "${String(flags.format)}"; expected "text" or "json"`);
+  throw new ConfigError(
+    `Unsupported review format "${String(flags.format)}"; expected "text" or "json"`,
+  );
 }

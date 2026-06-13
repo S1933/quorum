@@ -1,5 +1,5 @@
-import type { OllamaConfig } from './schema.ts';
 import { ProviderRuntimeError } from '../../core/errors.ts';
+import type { OllamaConfig } from './schema.ts';
 
 export interface OllamaMessage {
   role: 'system' | 'user' | 'assistant';
@@ -39,19 +39,32 @@ export class OllamaClient {
     private readonly providerId: string,
   ) {}
 
-  async chat(req: OllamaChatRequest, signal: AbortSignal): Promise<OllamaChatResponse> {
+  async chat(
+    req: OllamaChatRequest,
+    signal: AbortSignal,
+  ): Promise<OllamaChatResponse> {
     const res = await this.post({ ...req, stream: false }, signal);
     try {
       return (await res.json()) as OllamaChatResponse;
     } catch (err) {
-      throw new ProviderRuntimeError(this.providerId, `Invalid JSON response: ${(err as Error).message}`, err);
+      throw new ProviderRuntimeError(
+        this.providerId,
+        `Invalid JSON response: ${(err as Error).message}`,
+        err,
+      );
     }
   }
 
-  async *chatStream(req: OllamaChatRequest, signal: AbortSignal): AsyncIterable<OllamaStreamEvent> {
+  async *chatStream(
+    req: OllamaChatRequest,
+    signal: AbortSignal,
+  ): AsyncIterable<OllamaStreamEvent> {
     const res = await this.post({ ...req, stream: true }, signal);
     if (!res.body) {
-      throw new ProviderRuntimeError(this.providerId, 'HTTP response had no body');
+      throw new ProviderRuntimeError(
+        this.providerId,
+        'HTTP response had no body',
+      );
     }
 
     const reader = res.body.getReader();
@@ -75,7 +88,10 @@ export class OllamaClient {
     if (event) yield event;
   }
 
-  private async post(req: OllamaChatRequest, signal: AbortSignal): Promise<Response> {
+  private async post(
+    req: OllamaChatRequest,
+    signal: AbortSignal,
+  ): Promise<Response> {
     const url = `${this.cfg.base_url.replace(/\/$/, '')}/api/chat`;
     let res: Response;
     try {
@@ -87,7 +103,11 @@ export class OllamaClient {
       });
     } catch (err) {
       if ((err as Error).name === 'AbortError') throw err;
-      throw new ProviderRuntimeError(this.providerId, `Network error: ${(err as Error).message}`, err);
+      throw new ProviderRuntimeError(
+        this.providerId,
+        `Network error: ${(err as Error).message}`,
+        err,
+      );
     }
 
     if (!res.ok) {

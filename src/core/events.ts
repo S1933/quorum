@@ -1,6 +1,6 @@
+import type { PipelineResult, ReviewerError } from './pipeline.ts';
 import type { ProviderEvent } from './provider.ts';
 import type { ReviewResult } from './task.ts';
-import type { PipelineResult, ReviewerError } from './pipeline.ts';
 
 export type QuorumEvent =
   | { type: 'pipeline.started'; pipelineId: string; reviewers: string[] }

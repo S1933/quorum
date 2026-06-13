@@ -1,11 +1,17 @@
 import type { MetaReviewFn } from '../../consensus/registry.ts';
-import { normaliseSubprocessOutput, createSubprocessMetaReviewer } from '../subprocess.ts';
 import { createSubprocessProvider, STDIN_PROMPT } from '../base-subprocess.ts';
-import { OpenCodeConfigSchema, type OpenCodeConfig } from './schema.ts';
+import {
+  createSubprocessMetaReviewer,
+  normaliseSubprocessOutput,
+} from '../subprocess.ts';
+import { type OpenCodeConfig, OpenCodeConfigSchema } from './schema.ts';
 
 const mkBuilder = () => ({
   processOutput: (raw: string) => normaliseSubprocessOutput(raw),
-  buildArgs: (cfg: OpenCodeConfig, ctx: import('../../core/provider.ts').ExecCtx) => {
+  buildArgs: (
+    cfg: OpenCodeConfig,
+    ctx: import('../../core/provider.ts').ExecCtx,
+  ) => {
     const model = ctx.modelOverride?.model ?? cfg.model;
     if (cfg.command_style === 'run') {
       const args = ['run', ...cfg.extra_args];
@@ -22,12 +28,29 @@ const mkBuilder = () => ({
     if (cfg.quiet) args.push('-q');
     return args;
   },
-  createMetaReviewer: (config: unknown, ctx: import('../../runtime/plugin.ts').PluginCtx): MetaReviewFn | undefined => {
+  createMetaReviewer: (
+    config: unknown,
+    ctx: import('../../runtime/plugin.ts').PluginCtx,
+  ): MetaReviewFn | undefined => {
     const c = config as OpenCodeConfig;
-    const args = c.command_style === 'run'
-      ? ['run', ...(c.quiet ? ['--log-level', 'ERROR'] : []), 'Read stdin and respond with JSON.']
-      : ['--prompt', 'Read stdin and respond with JSON.', ...(c.quiet ? ['-q'] : [])];
-    return createSubprocessMetaReviewer(c.binary, () => args, c.cwd ?? ctx.workspaceRoot, c.timeout_ms);
+    const args =
+      c.command_style === 'run'
+        ? [
+            'run',
+            ...(c.quiet ? ['--log-level', 'ERROR'] : []),
+            'Read stdin and respond with JSON.',
+          ]
+        : [
+            '--prompt',
+            'Read stdin and respond with JSON.',
+            ...(c.quiet ? ['-q'] : []),
+          ];
+    return createSubprocessMetaReviewer(
+      c.binary,
+      () => args,
+      c.cwd ?? ctx.workspaceRoot,
+      c.timeout_ms,
+    );
   },
 });
 

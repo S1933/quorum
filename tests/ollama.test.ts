@@ -16,7 +16,10 @@ describe('ollama provider', () => {
     globalThis.fetch = (async (_input, init) => {
       requestBody = JSON.parse(String(init?.body));
       return streamResponse([
-        { message: { role: 'assistant', content: '{"findings":' }, done: false },
+        {
+          message: { role: 'assistant', content: '{"findings":' },
+          done: false,
+        },
         { message: { role: 'assistant', content: '[]}' }, done: false },
         { done: true, prompt_eval_count: 7, eval_count: 2 },
       ]);
@@ -47,7 +50,7 @@ describe('ollama provider', () => {
       workspace: { root: '/tmp/quorum' },
     };
 
-    const result = await provider.review!(task, {
+    const result = await provider.review?.(task, {
       bus,
       signal: new AbortController().signal,
       workspace: { root: '/tmp/quorum' },
@@ -83,7 +86,9 @@ describe('ollama provider', () => {
     let requestBody: unknown;
     globalThis.fetch = (async (_input, init) => {
       requestBody = JSON.parse(String(init?.body));
-      return streamResponse([{ message: { content: '{"findings":[]}' }, done: true }]);
+      return streamResponse([
+        { message: { content: '{"findings":[]}' }, done: true },
+      ]);
     }) as typeof fetch;
 
     const provider = await ollamaFactory.create(
@@ -97,7 +102,7 @@ describe('ollama provider', () => {
       { workspaceRoot: '/tmp/quorum', env: {} },
     );
 
-    await provider.review!(
+    await provider.review?.(
       {
         kind: 'review',
         id: 'task-1',
@@ -110,7 +115,11 @@ describe('ollama provider', () => {
         bus: captureBus(),
         signal: new AbortController().signal,
         workspace: { root: '/tmp/quorum' },
-        modelOverride: { model: 'qwen2.5-coder', temperature: 0.1, maxTokens: 256 },
+        modelOverride: {
+          model: 'qwen2.5-coder',
+          temperature: 0.1,
+          maxTokens: 256,
+        },
       },
     );
 
@@ -137,7 +146,11 @@ describe('ollama provider', () => {
         reviewers: {
           'sec-ollama': {
             persona: 'security',
-            provider: { type: 'ollama', model: 'llama3.1', base_url: 'http://ollama.test' },
+            provider: {
+              type: 'ollama',
+              model: 'llama3.1',
+              base_url: 'http://ollama.test',
+            },
           },
         },
         pipelines: {

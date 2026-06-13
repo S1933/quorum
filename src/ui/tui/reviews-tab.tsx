@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box, Text } from 'ink';
 import type { ReviewRecord } from './utils.ts';
 
@@ -9,12 +8,18 @@ interface Props {
 
 function sevColor(sev: string): string {
   switch (sev) {
-    case 'Critical': return 'red';
-    case 'High': return 'red';
-    case 'Medium': return 'yellow';
-    case 'Low': return 'blue';
-    case 'Info': return 'green';
-    default: return 'white';
+    case 'Critical':
+      return 'red';
+    case 'High':
+      return 'red';
+    case 'Medium':
+      return 'yellow';
+    case 'Low':
+      return 'blue';
+    case 'Info':
+      return 'green';
+    default:
+      return 'white';
   }
 }
 
@@ -30,7 +35,9 @@ export function ReviewsTab({ reviews, selectedIndex }: Props) {
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold underline>Review History</Text>
+        <Text bold underline>
+          Review History
+        </Text>
       </Box>
 
       {reviews.map((r, i) => {
@@ -44,18 +51,16 @@ export function ReviewsTab({ reviews, selectedIndex }: Props) {
             <Box>
               {isSelected ? (
                 <Text color="cyan">
-                  <Text bold>{borderChar}</Text>
-                  {' '}
+                  <Text bold>{borderChar}</Text>{' '}
                   <Text color="blue">{dateStr}</Text>
-                  <Text dimColor>  </Text>
+                  <Text dimColor> </Text>
                   <Text bold>{r.pipelineId}</Text>
                 </Text>
               ) : (
                 <Text>
-                  <Text bold>{borderChar}</Text>
-                  {' '}
+                  <Text bold>{borderChar}</Text>{' '}
                   <Text color="blue">{dateStr}</Text>
-                  <Text dimColor>  </Text>
+                  <Text dimColor> </Text>
                   <Text>{r.pipelineId}</Text>
                 </Text>
               )}
@@ -78,9 +83,10 @@ export function ReviewsTab({ reviews, selectedIndex }: Props) {
                     {Object.entries(r.summary.severity).map(([sev, count]) =>
                       count > 0 ? (
                         <Text key={sev} color={sevColor(sev)}>
-                          {sev[0]}{count}
+                          {sev[0]}
+                          {count}
                         </Text>
-                      ) : null
+                      ) : null,
                     )}
                   </Box>
                 ) : null}

@@ -1,7 +1,10 @@
 import { isLazyEnvRef } from './interpolate.ts';
 import { getSensitiveFields } from './sensitive-fields.ts';
 
-function isProviderSensitiveField(providerType: string | undefined, key: string): boolean {
+function isProviderSensitiveField(
+  providerType: string | undefined,
+  key: string,
+): boolean {
   if (!providerType) return false;
   const fields = getSensitiveFields(providerType);
   return fields?.has(key) ?? false;

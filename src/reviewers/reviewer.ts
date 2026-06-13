@@ -1,11 +1,14 @@
-import type { Persona } from '../core/persona.ts';
-import type { Provider, ExecCtx } from '../core/provider.ts';
-import type { ReviewTask, ReviewResult, ModelConfig } from '../core/task.ts';
-import type { ReviewerRef } from '../core/pipeline.ts';
 import { CapabilityError, ReviewerOutputError } from '../core/errors.ts';
+import type { Persona } from '../core/persona.ts';
+import type { ReviewerRef } from '../core/pipeline.ts';
+import type { ExecCtx, Provider } from '../core/provider.ts';
+import type { ModelConfig, ReviewResult, ReviewTask } from '../core/task.ts';
 import { RETRY_REMINDER } from './output.ts';
 
-type BoundReviewerTask = Omit<ReviewTask, 'systemPrompt' | 'reviewerId' | 'kind'> & {
+type BoundReviewerTask = Omit<
+  ReviewTask,
+  'systemPrompt' | 'reviewerId' | 'kind'
+> & {
   kind?: ReviewTask['kind'];
 };
 
@@ -14,7 +17,10 @@ export interface BoundReviewer {
   persona: Persona;
   provider: Provider;
   overrides?: ModelConfig;
-  run(task: BoundReviewerTask, ctx: Omit<ExecCtx, 'modelOverride'>): Promise<ReviewResult>;
+  run(
+    task: BoundReviewerTask,
+    ctx: Omit<ExecCtx, 'modelOverride'>,
+  ): Promise<ReviewResult>;
 }
 
 export function bindReviewer(
@@ -56,7 +62,8 @@ export function bindReviewer(
         // (seen with high-thinking models that narrate a clean pass). Retry once
         // with a corrective reminder appended — every provider places the
         // instruction last, so the reminder is the final thing the model sees.
-        if (!(err instanceof ReviewerOutputError) || execCtx.signal.aborted) throw err;
+        if (!(err instanceof ReviewerOutputError) || execCtx.signal.aborted)
+          throw err;
         const retryTask: ReviewTask = {
           ...fullTask,
           instruction: `${fullTask.instruction}\n\n${RETRY_REMINDER}`,

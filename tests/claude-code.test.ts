@@ -1,15 +1,17 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { chmod, mkdtemp, rm } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createRuntime } from '../src/runtime/runtime.ts';
+import { join } from 'node:path';
 import { claudeCodeFactory } from '../src/providers/claude-code/index.ts';
-import { task, captureBus, tokenText } from './helpers/subprocess.ts';
+import { createRuntime } from '../src/runtime/runtime.ts';
+import { captureBus, task, tokenText } from './helpers/subprocess.ts';
 
 const tmpRoots: string[] = [];
 
 afterAll(async () => {
-  await Promise.all(tmpRoots.map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    tmpRoots.map((root) => rm(root, { recursive: true, force: true })),
+  );
 });
 
 describe('claude-code provider', () => {
@@ -17,7 +19,10 @@ describe('claude-code provider', () => {
     const root = await mkdtemp(join(tmpdir(), 'quorum-'));
     tmpRoots.push(root);
     const binary = join(root, 'claude');
-    await Bun.write(binary, '#!/bin/sh\nprintf \'{"findings":\'\nsleep 0.01\nprintf \'[]}\'\n');
+    await Bun.write(
+      binary,
+      "#!/bin/sh\nprintf '{\"findings\":'\nsleep 0.01\nprintf '[]}'\n",
+    );
     await chmod(binary, 0o755);
 
     const provider = await claudeCodeFactory.create(
@@ -34,7 +39,7 @@ describe('claude-code provider', () => {
     );
 
     const events: unknown[] = [];
-    const result = await provider.review!(task(root, 'security-claude'), {
+    const result = await provider.review?.(task(root, 'security-claude'), {
       bus: captureBus(events),
       signal: new AbortController().signal,
       workspace: { root },
@@ -55,7 +60,11 @@ describe('claude-code provider', () => {
         reviewers: {
           sec: {
             persona: 'security',
-            provider: { type: 'claude-code', model: 'sonnet', extra_args: ['--dangerously-skip-permissions'] },
+            provider: {
+              type: 'claude-code',
+              model: 'sonnet',
+              extra_args: ['--dangerously-skip-permissions'],
+            },
           },
         },
         pipelines: {
@@ -65,7 +74,9 @@ describe('claude-code provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveReviewer('sec')).rejects.toThrow('extra_args.0');
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow(
+      'extra_args.0',
+    );
   });
 
   test('passes effort variant to claude code', async () => {
@@ -73,7 +84,10 @@ describe('claude-code provider', () => {
     tmpRoots.push(root);
     const binary = join(root, 'claude');
     const argsFile = join(root, 'args.txt');
-    await Bun.write(binary, `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\nprintf '{"findings":[]}'\n`);
+    await Bun.write(
+      binary,
+      `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\nprintf '{"findings":[]}'\n`,
+    );
     await chmod(binary, 0o755);
 
     const provider = await claudeCodeFactory.create(
@@ -90,7 +104,7 @@ describe('claude-code provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    await provider.review!(task(root, 'security-claude'), {
+    await provider.review?.(task(root, 'security-claude'), {
       bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
@@ -146,7 +160,7 @@ describe('claude-code provider', () => {
     );
 
     await expect(
-      provider.review!(task(root, 'security-claude'), {
+      provider.review?.(task(root, 'security-claude'), {
         bus: captureBus(),
         signal: new AbortController().signal,
         workspace: { root },

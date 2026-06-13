@@ -1,17 +1,27 @@
-import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provider.ts';
-import type { ReviewTask, ReviewResult, UsageInfo } from '../../core/task.ts';
-import type { ProviderFactory } from '../registry.ts';
 import type { MetaReviewFn } from '../../consensus/registry.ts';
-import { OpenRouterConfigSchema, type OpenRouterConfig } from './schema.ts';
-import { OpenRouterClient, type ChatMessage } from './client.ts';
-import { outputInstructionsForTask, parseReviewOutput } from '../../reviewers/output.ts';
+import type {
+  ExecCtx,
+  Provider,
+  ProviderCapabilities,
+} from '../../core/provider.ts';
+import type { ReviewResult, ReviewTask, UsageInfo } from '../../core/task.ts';
+import {
+  outputInstructionsForTask,
+  parseReviewOutput,
+} from '../../reviewers/output.ts';
+import type { ProviderFactory } from '../registry.ts';
+import { type ChatMessage, OpenRouterClient } from './client.ts';
+import { type OpenRouterConfig, OpenRouterConfigSchema } from './schema.ts';
 
 const PROVIDER_TYPE = 'openrouter';
 
 class OpenRouterProvider implements Provider {
   private readonly client: OpenRouterClient;
 
-  constructor(readonly id: string, private readonly cfg: OpenRouterConfig) {
+  constructor(
+    readonly id: string,
+    private readonly cfg: OpenRouterConfig,
+  ) {
     this.client = new OpenRouterClient(cfg, id);
   }
 
@@ -28,7 +38,10 @@ class OpenRouterProvider implements Provider {
   async review(task: ReviewTask, ctx: ExecCtx): Promise<ReviewResult> {
     const started = Date.now();
     const messages: ChatMessage[] = [
-      { role: 'system', content: `${task.systemPrompt}\n\n${outputInstructionsForTask(task)}` },
+      {
+        role: 'system',
+        content: `${task.systemPrompt}\n\n${outputInstructionsForTask(task)}`,
+      },
       { role: 'user', content: task.instruction },
     ];
 
@@ -49,7 +62,11 @@ class OpenRouterProvider implements Provider {
         ctx.bus.emit({
           type: 'reviewer.event',
           reviewerId: task.reviewerId,
-          event: { type: 'log', level: 'warn', msg: `skipped malformed chunk: ${event.raw}` },
+          event: {
+            type: 'log',
+            level: 'warn',
+            msg: `skipped malformed chunk: ${event.raw}`,
+          },
         });
       } else if (event.usage) {
         const costUsd = event.usage.cost;
@@ -58,7 +75,12 @@ class OpenRouterProvider implements Provider {
           outputTokens: event.usage.completion_tokens,
         };
         if (costUsd !== undefined) usage.costUsd = costUsd;
-        const usageEvent: { type: 'usage'; inputTokens: number; outputTokens: number; costUsd?: number } = {
+        const usageEvent: {
+          type: 'usage';
+          inputTokens: number;
+          outputTokens: number;
+          costUsd?: number;
+        } = {
           type: 'usage',
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,

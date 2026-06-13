@@ -6,9 +6,9 @@ import {
   collectPipelineFindings,
   countBySeverity,
   formatDuration,
+  SEVERITY_ORDER,
   severityIcon,
   severityLabel,
-  SEVERITY_ORDER,
 } from './report-model.ts';
 
 const COLORS = {
@@ -23,7 +23,8 @@ const COLORS = {
   gray: '\x1b[90m',
 };
 
-const ANSI_SEQUENCE = /\x1B(?:\][^\x07]*(?:\x07|\x1B\\)|\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])/g;
+const ANSI_SEQUENCE =
+  /\x1B(?:\][^\x07]*(?:\x07|\x1B\\)|\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])/g;
 const CONTROL_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g;
 
 function severityColor(severity: Severity): keyof typeof COLORS {
@@ -72,14 +73,23 @@ export class TerminalRenderer {
 
     unsubs.push(
       bus.on('pipeline.started', (e) => {
-        this.line(`${this.c('cyan', '🧭')}  pipeline ${this.c('bold', this.safe(e.pipelineId))} · ${e.reviewers.length} reviewer(s)`);
-        this.line(this.c('dim', `    ${e.reviewers.map((id) => this.safe(id)).join(', ')}`));
+        this.line(
+          `${this.c('cyan', '🧭')}  pipeline ${this.c('bold', this.safe(e.pipelineId))} · ${e.reviewers.length} reviewer(s)`,
+        );
+        this.line(
+          this.c(
+            'dim',
+            `    ${e.reviewers.map((id) => this.safe(id)).join(', ')}`,
+          ),
+        );
         this.line('');
       }),
     );
     unsubs.push(
       bus.on('reviewer.started', (e) => {
-        this.line(`${this.c('dim', '  ⏳')} ${this.safe(e.reviewerId)} started`);
+        this.line(
+          `${this.c('dim', '  ⏳')} ${this.safe(e.reviewerId)} started`,
+        );
       }),
     );
     unsubs.push(
@@ -87,22 +97,30 @@ export class TerminalRenderer {
         if (e.event.type === 'token' && this.showTokens) {
           this.renderPreview(e.reviewerId, e.event.text);
         } else if (e.event.type === 'finding') {
-          this.line(`${this.c('dim', '   ·')} ${this.safe(e.reviewerId)}: ${this.severityIcon(e.event.finding.severity)} ${this.safe(e.event.finding.title)} ${this.c('dim', `(${this.safe(e.event.finding.file)}:${e.event.finding.lineRange.start})`)}`);
+          this.line(
+            `${this.c('dim', '   ·')} ${this.safe(e.reviewerId)}: ${this.severityIcon(e.event.finding.severity)} ${this.safe(e.event.finding.title)} ${this.c('dim', `(${this.safe(e.event.finding.file)}:${e.event.finding.lineRange.start})`)}`,
+          );
         } else if (e.event.type === 'log') {
-          this.line(`${this.c('gray', `   [${this.safe(e.reviewerId)}]`)} ${this.safe(e.event.msg)}`);
+          this.line(
+            `${this.c('gray', `   [${this.safe(e.reviewerId)}]`)} ${this.safe(e.event.msg)}`,
+          );
         }
       }),
     );
     unsubs.push(
       bus.on('reviewer.finished', (e) => {
         const n = e.result.findings.length;
-        this.line(`${this.c('green', '  ✅')} ${this.safe(e.reviewerId)} finished · ${n} finding${n === 1 ? '' : 's'} ${this.c('dim', `(${formatDuration(e.result.durationMs)})`)}`);
+        this.line(
+          `${this.c('green', '  ✅')} ${this.safe(e.reviewerId)} finished · ${n} finding${n === 1 ? '' : 's'} ${this.c('dim', `(${formatDuration(e.result.durationMs)})`)}`,
+        );
         this.line('');
       }),
     );
     unsubs.push(
       bus.on('reviewer.failed', (e) => {
-        this.line(`${this.c('red', '  ❌')} ${this.safe(e.reviewerId)} failed: ${this.safe(e.error.message)}`);
+        this.line(
+          `${this.c('red', '  ❌')} ${this.safe(e.reviewerId)} failed: ${this.safe(e.error.message)}`,
+        );
         this.line('');
       }),
     );
@@ -113,24 +131,40 @@ export class TerminalRenderer {
     );
     unsubs.push(
       bus.on('pipeline.budget_exceeded', (e) => {
-        this.line(`${this.c('red', '💰')}  budget exceeded: $${e.spent.toFixed(4)} / $${e.limit.toFixed(2)} — cancelling remaining reviewers`);
+        this.line(
+          `${this.c('red', '💰')}  budget exceeded: $${e.spent.toFixed(4)} / $${e.limit.toFixed(2)} — cancelling remaining reviewers`,
+        );
         this.line('');
       }),
     );
     unsubs.push(
       bus.on('pipeline.finished', (e) => {
         this.line('');
-        this.renderSummary(e.result.consensus.groups, e.result.consensus.unique, e.result.errors.length);
+        this.renderSummary(
+          e.result.consensus.groups,
+          e.result.consensus.unique,
+          e.result.errors.length,
+        );
         this.line('');
         this.line(this.c('bold', '── 🔎 Findings by priority ──'));
-        this.renderConsensus(e.result.consensus.groups, e.result.consensus.unique);
+        this.renderConsensus(
+          e.result.consensus.groups,
+          e.result.consensus.unique,
+        );
         this.line('');
-        this.line(this.c('dim', `pipeline ${this.safe(e.result.pipelineId)} done in ${formatDuration(e.result.durationMs)} (${e.result.reviews.length} reviews, ${e.result.errors.length} errors)`));
+        this.line(
+          this.c(
+            'dim',
+            `pipeline ${this.safe(e.result.pipelineId)} done in ${formatDuration(e.result.durationMs)} (${e.result.reviews.length} reviews, ${e.result.errors.length} errors)`,
+          ),
+        );
       }),
     );
     unsubs.push(
       bus.on('questions.collected', (e) => {
-        this.line(`${this.c('cyan', '❓')}  ${e.count} question(s) from reviewers`);
+        this.line(
+          `${this.c('cyan', '❓')}  ${e.count} question(s) from reviewers`,
+        );
         this.line('');
       }),
     );
@@ -153,24 +187,37 @@ export class TerminalRenderer {
   }
 
   private renderSummary(
-    groups: Array<{ id: string; representative: Finding; members: Finding[]; reviewers: string[] }>,
+    groups: Array<{
+      id: string;
+      representative: Finding;
+      members: Finding[];
+      reviewers: string[];
+    }>,
     unique: Finding[],
     errors: number,
   ): void {
     const allFindings = collectPipelineFindings(groups, unique);
     const total = allFindings.length;
     const severityCounts = countBySeverity(allFindings);
-    const counts = SEVERITY_ORDER
-      .map((priority) => `${this.severityIcon(priority)} ${priority}:${severityCounts[priority]}`)
-      .join('  ');
+    const counts = SEVERITY_ORDER.map(
+      (priority) =>
+        `${this.severityIcon(priority)} ${priority}:${severityCounts[priority]}`,
+    ).join('  ');
 
     this.line(this.c('bold', '── 📊 Review summary ──'));
-    this.line(`   ${total} finding${total === 1 ? '' : 's'} · ${groups.length} agreement group${groups.length === 1 ? '' : 's'} · ${unique.length} single-reviewer · ${errors} error${errors === 1 ? '' : 's'}`);
+    this.line(
+      `   ${total} finding${total === 1 ? '' : 's'} · ${groups.length} agreement group${groups.length === 1 ? '' : 's'} · ${unique.length} single-reviewer · ${errors} error${errors === 1 ? '' : 's'}`,
+    );
     this.line(`   ${counts}`);
   }
 
   private renderConsensus(
-    groups: Array<{ id: string; representative: Finding; members: Finding[]; reviewers: string[] }>,
+    groups: Array<{
+      id: string;
+      representative: Finding;
+      members: Finding[];
+      reviewers: string[];
+    }>,
     unique: Finding[],
   ): void {
     if (groups.length === 0 && unique.length === 0) {
@@ -182,24 +229,55 @@ export class TerminalRenderer {
       if (bucket.count === 0) continue;
 
       this.line('');
-      this.line(this.c('bold', `${this.severityIcon(bucket.severity)} ${severityLabel(bucket.severity)} (${bucket.count})`));
+      this.line(
+        this.c(
+          'bold',
+          `${this.severityIcon(bucket.severity)} ${severityLabel(bucket.severity)} (${bucket.count})`,
+        ),
+      );
       for (const g of bucket.groups) {
         const f = g.representative;
         const badge = this.c('magenta', `🤝 ${g.reviewers.length} agreed`);
-        this.line(`  ${this.severityIcon(f.severity)} ${this.c('bold', this.safe(f.title))} ${badge}`);
-        this.line(this.c('dim', `     ${this.safe(f.file)}:${f.lineRange.start}-${f.lineRange.end}`));
+        this.line(
+          `  ${this.severityIcon(f.severity)} ${this.c('bold', this.safe(f.title))} ${badge}`,
+        );
+        this.line(
+          this.c(
+            'dim',
+            `     ${this.safe(f.file)}:${f.lineRange.start}-${f.lineRange.end}`,
+          ),
+        );
         if (f.body) this.line(`     ${this.safeBlock(f.body)}`);
         this.line('');
-        this.line(this.c('dim', `     ${categoryIcon(f.category)} ${f.category}`));
-        this.line(this.c('dim', `     reviewers: ${g.reviewers.map((id) => this.safe(id)).join(', ')}`));
+        this.line(
+          this.c('dim', `     ${categoryIcon(f.category)} ${f.category}`),
+        );
+        this.line(
+          this.c(
+            'dim',
+            `     reviewers: ${g.reviewers.map((id) => this.safe(id)).join(', ')}`,
+          ),
+        );
         this.line('');
       }
       for (const f of bucket.unique) {
-        this.line(`  ${this.severityIcon(f.severity)} ${this.c('bold', this.safe(f.title))}`);
-        this.line(this.c('dim', `     ${this.safe(f.file)}:${f.lineRange.start}-${f.lineRange.end}`));
+        this.line(
+          `  ${this.severityIcon(f.severity)} ${this.c('bold', this.safe(f.title))}`,
+        );
+        this.line(
+          this.c(
+            'dim',
+            `     ${this.safe(f.file)}:${f.lineRange.start}-${f.lineRange.end}`,
+          ),
+        );
         if (f.body) this.line(`     ${this.safeBlock(f.body)}`);
         this.line('');
-        this.line(this.c('dim', `     ${categoryIcon(f.category)} ${f.category} · ${this.safe(f.reviewer)}`));
+        this.line(
+          this.c(
+            'dim',
+            `     ${categoryIcon(f.category)} ${f.category} · ${this.safe(f.reviewer)}`,
+          ),
+        );
         this.line('');
       }
     }
@@ -218,10 +296,7 @@ export class TerminalRenderer {
     if (now - last < 500 && next.length < 240) return;
     this.lastPreviewAt.set(reviewerId, now);
 
-    const preview = next
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(-220);
+    const preview = next.replace(/\s+/g, ' ').trim().slice(-220);
     if (!preview) return;
     this.line(`${this.c('gray', `   [${this.safe(reviewerId)}]`)} ${preview}`);
   }

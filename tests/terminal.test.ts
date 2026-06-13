@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import { InMemoryEventBus } from '../src/runtime/bus.ts';
-import { TerminalRenderer, sanitizeTerminalText } from '../src/ui/terminal.ts';
+import { sanitizeTerminalText, TerminalRenderer } from '../src/ui/terminal.ts';
 
 describe('terminal output hardening', () => {
   test('strips ansi and control characters from untrusted text', () => {
-    expect(sanitizeTerminalText('\x1b[31mred\x1b[0m\x07\x1b]0;title\x07plain')).toBe('redplain');
+    expect(
+      sanitizeTerminalText('\x1b[31mred\x1b[0m\x07\x1b]0;title\x07plain'),
+    ).toBe('redplain');
   });
 
   test('sanitizes streamed token previews before rendering', () => {
@@ -13,7 +15,11 @@ describe('terminal output hardening', () => {
     const renderer = new TerminalRenderer({
       color: false,
       showTokens: true,
-      stream: { write(chunk) { output += chunk; } },
+      stream: {
+        write(chunk) {
+          output += chunk;
+        },
+      },
     });
     const detach = renderer.attach(bus);
 

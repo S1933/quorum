@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { buildSubprocessEnv, readLimitedText, readPreviewedStdout, runSubprocess } from '../src/providers/subprocess.ts';
+import {
+  buildSubprocessEnv,
+  readLimitedText,
+  readPreviewedStdout,
+  runSubprocess,
+} from '../src/providers/subprocess.ts';
 
 describe('subprocess security boundaries', () => {
   test('caps previewed stdout before buffering unbounded provider output', async () => {
@@ -10,11 +15,13 @@ describe('subprocess security boundaries', () => {
       },
     });
 
-    await expect(readPreviewedStdout(stream, {
-      maxBytes: 5,
-      onToken() {},
-      limitLabel: 'provider stdout',
-    })).rejects.toThrow('provider stdout exceeded 5 bytes');
+    await expect(
+      readPreviewedStdout(stream, {
+        maxBytes: 5,
+        onToken() {},
+        limitLabel: 'provider stdout',
+      }),
+    ).rejects.toThrow('provider stdout exceeded 5 bytes');
   });
 
   test('caps stderr before buffering unbounded provider output', async () => {
@@ -25,10 +32,12 @@ describe('subprocess security boundaries', () => {
       },
     });
 
-    await expect(readLimitedText(stream, {
-      maxBytes: 5,
-      limitLabel: 'provider stderr',
-    })).rejects.toThrow('provider stderr exceeded 5 bytes');
+    await expect(
+      readLimitedText(stream, {
+        maxBytes: 5,
+        limitLabel: 'provider stderr',
+      }),
+    ).rejects.toThrow('provider stderr exceeded 5 bytes');
   });
 
   test('builds subprocess env from an allowlist plus explicit provider env', () => {
@@ -43,18 +52,20 @@ describe('subprocess security boundaries', () => {
   });
 
   test('refuses project-local provider binaries unless explicitly allowed', async () => {
-    await expect(runSubprocess({
-      providerId: 'local-provider',
-      providerLabel: 'local',
-      reviewerId: 'reviewer',
-      binary: './tool',
-      args: [],
-      cwd: '/repo',
-      stdin: '',
-      timeoutMs: 1000,
-      signal: new AbortController().signal,
-      bus: captureBus(),
-    })).rejects.toThrow('Refusing to execute project-local provider binary');
+    await expect(
+      runSubprocess({
+        providerId: 'local-provider',
+        providerLabel: 'local',
+        reviewerId: 'reviewer',
+        binary: './tool',
+        args: [],
+        cwd: '/repo',
+        stdin: '',
+        timeoutMs: 1000,
+        signal: new AbortController().signal,
+        bus: captureBus(),
+      }),
+    ).rejects.toThrow('Refusing to execute project-local provider binary');
   });
 });
 

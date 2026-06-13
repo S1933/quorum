@@ -49,7 +49,9 @@ const MajorityV1ConsensusConfigSchema = ConsensusBaseConfigSchema.extend({
 
 const SeverityAwareV1ConsensusConfigSchema = ConsensusBaseConfigSchema.extend({
   strategy: z.literal('severity-aware-v1'),
-  severityThresholds: z.record(SeveritySchema, z.number().int().positive()).optional(),
+  severityThresholds: z
+    .record(SeveritySchema, z.number().int().positive())
+    .optional(),
 }).strict();
 
 const SemanticV2ConsensusConfigSchema = ConsensusBaseConfigSchema.extend({

@@ -81,13 +81,19 @@ export async function resolveContradictions(
   return resolved;
 }
 
-function parseMetaReviewResponse(raw: string): { resolution: string; explanation: string } {
+function parseMetaReviewResponse(raw: string): {
+  resolution: string;
+  explanation: string;
+} {
   const text = raw.trim();
   if (!text) throw new Error('Empty meta-review response');
 
   const fenceStart = text.startsWith('```');
   const fenceEnd = text.endsWith('```');
-  const inner = fenceStart && fenceEnd ? text.slice(text.indexOf('\n') + 1, text.lastIndexOf('\n')).trim() : text;
+  const inner =
+    fenceStart && fenceEnd
+      ? text.slice(text.indexOf('\n') + 1, text.lastIndexOf('\n')).trim()
+      : text;
 
   let parsed: unknown;
   try {
@@ -105,6 +111,9 @@ function parseMetaReviewResponse(raw: string): { resolution: string; explanation
   const obj = parsed as { resolution?: unknown; explanation?: unknown };
   return {
     resolution: typeof obj.resolution === 'string' ? obj.resolution : 'unknown',
-    explanation: typeof obj.explanation === 'string' ? obj.explanation : 'No explanation provided',
+    explanation:
+      typeof obj.explanation === 'string'
+        ? obj.explanation
+        : 'No explanation provided',
   };
 }

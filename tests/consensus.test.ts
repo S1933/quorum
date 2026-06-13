@@ -1,13 +1,16 @@
 import { describe, expect, test } from 'bun:test';
+import { detectContradictions } from '../src/consensus/contradictions.ts';
+import { buildSemanticGroups } from '../src/consensus/grouping-v2.ts';
+import { majorityV1 } from '../src/consensus/majority-v1.ts';
+import { overlapV1 } from '../src/consensus/overlap-v1.ts';
+import { semanticV2 } from '../src/consensus/semantic-v2.ts';
+import { severityAwareV1 } from '../src/consensus/severity-aware-v1.ts';
+import {
+  findingSimilarity,
+  textToBigrams,
+} from '../src/consensus/similarity.ts';
 import type { Category, Finding, Severity } from '../src/core/finding.ts';
 import type { ReviewResult } from '../src/core/task.ts';
-import { overlapV1 } from '../src/consensus/overlap-v1.ts';
-import { majorityV1 } from '../src/consensus/majority-v1.ts';
-import { severityAwareV1 } from '../src/consensus/severity-aware-v1.ts';
-import { semanticV2 } from '../src/consensus/semantic-v2.ts';
-import { textToBigrams, findingSimilarity } from '../src/consensus/similarity.ts';
-import { buildSemanticGroups } from '../src/consensus/grouping-v2.ts';
-import { detectContradictions } from '../src/consensus/contradictions.ts';
 
 describe('overlap-v1', () => {
   test('keeps only groups that satisfy requireAgreement and returns non-passing findings as unique', async () => {
@@ -71,9 +74,27 @@ describe('overlap-v1', () => {
   });
 
   test('groups findings regardless of iteration order via member matching', async () => {
-    const a = finding({ reviewer: 'r-a', lineStart: 10, lineEnd: 12, severity: 'low', title: 'A' });
-    const b = finding({ reviewer: 'r-b', lineStart: 12, lineEnd: 14, severity: 'critical', title: 'B' });
-    const c = finding({ reviewer: 'r-c', lineStart: 10, lineEnd: 11, severity: 'medium', title: 'C' });
+    const a = finding({
+      reviewer: 'r-a',
+      lineStart: 10,
+      lineEnd: 12,
+      severity: 'low',
+      title: 'A',
+    });
+    const b = finding({
+      reviewer: 'r-b',
+      lineStart: 12,
+      lineEnd: 14,
+      severity: 'critical',
+      title: 'B',
+    });
+    const c = finding({
+      reviewer: 'r-c',
+      lineStart: 10,
+      lineEnd: 11,
+      severity: 'medium',
+      title: 'C',
+    });
 
     const result = await overlapV1.aggregate(
       [review('r-a', [a]), review('r-b', [b]), review('r-c', [c])],
@@ -105,7 +126,11 @@ describe('overlap-v1', () => {
     });
 
     const result = await overlapV1.aggregate(
-      [review('perf-a', [low]), review('perf-b', [critical]), review('perf-c', [medium])],
+      [
+        review('perf-a', [low]),
+        review('perf-b', [critical]),
+        review('perf-c', [medium]),
+      ],
       { strategy: 'overlap-v1' },
     );
 
@@ -171,8 +196,12 @@ describe('majority-v1', () => {
       [
         review('a', [finding({ reviewer: 'a', lineStart: 10 })]),
         review('b', [finding({ reviewer: 'b', lineStart: 11 })]),
-        review('c', [finding({ reviewer: 'c', file: 'src/x.ts', lineStart: 80 })]),
-        review('d', [finding({ reviewer: 'd', file: 'src/y.ts', lineStart: 90 })]),
+        review('c', [
+          finding({ reviewer: 'c', file: 'src/x.ts', lineStart: 80 }),
+        ]),
+        review('d', [
+          finding({ reviewer: 'd', file: 'src/y.ts', lineStart: 90 }),
+        ]),
       ],
       { strategy: 'majority-v1' },
     );
@@ -184,8 +213,12 @@ describe('majority-v1', () => {
         review('a', [finding({ reviewer: 'a', lineStart: 10 })]),
         review('b', [finding({ reviewer: 'b', lineStart: 11 })]),
         review('c', [finding({ reviewer: 'c', lineStart: 12 })]),
-        review('d', [finding({ reviewer: 'd', file: 'src/x.ts', lineStart: 80 })]),
-        review('e', [finding({ reviewer: 'e', file: 'src/y.ts', lineStart: 90 })]),
+        review('d', [
+          finding({ reviewer: 'd', file: 'src/x.ts', lineStart: 80 }),
+        ]),
+        review('e', [
+          finding({ reviewer: 'e', file: 'src/y.ts', lineStart: 90 }),
+        ]),
       ],
       { strategy: 'majority-v1' },
     );
@@ -198,7 +231,9 @@ describe('majority-v1', () => {
     const a = finding({ reviewer: 'a', lineStart: 10 });
     const b = finding({ reviewer: 'a', lineStart: 50, file: 'src/b.ts' });
 
-    const result = await majorityV1.aggregate([review('a', [a, b])], { strategy: 'majority-v1' });
+    const result = await majorityV1.aggregate([review('a', [a, b])], {
+      strategy: 'majority-v1',
+    });
 
     // 1 reviewer -> majority would be 1, but the floor of 2 blocks promotion
     expect(result.groups).toEqual([]);
@@ -207,8 +242,18 @@ describe('majority-v1', () => {
 
   test('uses the highest severity finding as the group representative', async () => {
     const low = finding({ reviewer: 'a', severity: 'low', title: 'Low' });
-    const critical = finding({ reviewer: 'b', severity: 'critical', title: 'Critical', lineStart: 9 });
-    const medium = finding({ reviewer: 'c', severity: 'medium', title: 'Medium', lineStart: 11 });
+    const critical = finding({
+      reviewer: 'b',
+      severity: 'critical',
+      title: 'Critical',
+      lineStart: 9,
+    });
+    const medium = finding({
+      reviewer: 'c',
+      severity: 'medium',
+      title: 'Medium',
+      lineStart: 11,
+    });
 
     const result = await majorityV1.aggregate(
       [review('a', [low]), review('b', [critical]), review('c', [medium])],
@@ -236,7 +281,11 @@ describe('majority-v1', () => {
 
 describe('severity-aware-v1', () => {
   test('promotes a lone reviewer critical finding (threshold 1 for critical)', async () => {
-    const lone = finding({ reviewer: 'a', severity: 'critical', lineStart: 10 });
+    const lone = finding({
+      reviewer: 'a',
+      severity: 'critical',
+      lineStart: 10,
+    });
 
     const result = await severityAwareV1.aggregate(
       [review('a', [lone]), review('b', [])],
@@ -284,7 +333,11 @@ describe('severity-aware-v1', () => {
     // A lone reviewer flags it as low, but another flags the same spot critical:
     // representative is critical -> threshold 1 -> promoted.
     const low = finding({ reviewer: 'a', severity: 'low', lineStart: 10 });
-    const critical = finding({ reviewer: 'b', severity: 'critical', lineStart: 11 });
+    const critical = finding({
+      reviewer: 'b',
+      severity: 'critical',
+      lineStart: 11,
+    });
 
     const result = await severityAwareV1.aggregate(
       [review('a', [low]), review('b', [critical])],
@@ -296,7 +349,11 @@ describe('severity-aware-v1', () => {
   });
 
   test('requireAgreement raises the floor even for critical findings', async () => {
-    const lone = finding({ reviewer: 'a', severity: 'critical', lineStart: 10 });
+    const lone = finding({
+      reviewer: 'a',
+      severity: 'critical',
+      lineStart: 10,
+    });
 
     const result = await severityAwareV1.aggregate(
       [review('a', [lone]), review('b', [])],
@@ -308,7 +365,11 @@ describe('severity-aware-v1', () => {
   });
 
   test('severityThresholds overrides the per-severity default', async () => {
-    const lone = finding({ reviewer: 'a', severity: 'critical', lineStart: 10 });
+    const lone = finding({
+      reviewer: 'a',
+      severity: 'critical',
+      lineStart: 10,
+    });
 
     const result = await severityAwareV1.aggregate(
       [review('a', [lone]), review('b', [])],
@@ -322,20 +383,42 @@ describe('severity-aware-v1', () => {
 
 describe('similarity', () => {
   test('identical texts produce jaccard of 1', () => {
-    const a = finding({ reviewer: 'a', title: 'Hardcoded API key in login handler', body: 'The login handler exposes a hardcoded API key.' });
-    const b = finding({ reviewer: 'b', title: 'Hardcoded API key in login handler', body: 'The login handler exposes a hardcoded API key.' });
+    const a = finding({
+      reviewer: 'a',
+      title: 'Hardcoded API key in login handler',
+      body: 'The login handler exposes a hardcoded API key.',
+    });
+    const b = finding({
+      reviewer: 'b',
+      title: 'Hardcoded API key in login handler',
+      body: 'The login handler exposes a hardcoded API key.',
+    });
     expect(findingSimilarity(a, b)).toBe(1);
   });
 
   test('semantically similar titles produce high similarity', () => {
-    const a = finding({ reviewer: 'a', title: 'Hardcoded API key in login handler' });
-    const b = finding({ reviewer: 'b', title: 'Hardcoded API key exposed in login handler' });
+    const a = finding({
+      reviewer: 'a',
+      title: 'Hardcoded API key in login handler',
+    });
+    const b = finding({
+      reviewer: 'b',
+      title: 'Hardcoded API key exposed in login handler',
+    });
     expect(findingSimilarity(a, b)).toBeGreaterThan(0.5);
   });
 
   test('unrelated findings produce low similarity', () => {
-    const a = finding({ reviewer: 'a', title: 'Hardcoded API key in login handler', body: 'Secret exposure' });
-    const b = finding({ reviewer: 'b', title: 'Missing index on users table', body: 'Performance concern' });
+    const a = finding({
+      reviewer: 'a',
+      title: 'Hardcoded API key in login handler',
+      body: 'Secret exposure',
+    });
+    const b = finding({
+      reviewer: 'b',
+      title: 'Missing index on users table',
+      body: 'Performance concern',
+    });
     expect(findingSimilarity(a, b)).toBeLessThan(0.3);
   });
 
@@ -355,8 +438,18 @@ describe('similarity', () => {
 
 describe('buildSemanticGroups', () => {
   test('groups cross-file findings with similar titles', () => {
-    const auth = finding({ reviewer: 'a', file: 'src/auth.ts', title: 'Hardcoded API key in login handler', body: 'Secret exposed' });
-    const payments = finding({ reviewer: 'b', file: 'src/payments.ts', title: 'Hardcoded API key in payment handler', body: 'Secret exposed' });
+    const auth = finding({
+      reviewer: 'a',
+      file: 'src/auth.ts',
+      title: 'Hardcoded API key in login handler',
+      body: 'Secret exposed',
+    });
+    const payments = finding({
+      reviewer: 'b',
+      file: 'src/payments.ts',
+      title: 'Hardcoded API key in payment handler',
+      body: 'Secret exposed',
+    });
 
     const groups = buildSemanticGroups(
       [review('a', [auth]), review('b', [payments])],
@@ -369,8 +462,17 @@ describe('buildSemanticGroups', () => {
   });
 
   test('keeps unrelated findings in separate groups', () => {
-    const auth = finding({ reviewer: 'a', file: 'src/auth.ts', title: 'Hardcoded API key' });
-    const perf = finding({ reviewer: 'b', file: 'src/perf.ts', title: 'Missing index on users table', body: 'Slow query' });
+    const auth = finding({
+      reviewer: 'a',
+      file: 'src/auth.ts',
+      title: 'Hardcoded API key',
+    });
+    const perf = finding({
+      reviewer: 'b',
+      file: 'src/perf.ts',
+      title: 'Missing index on users table',
+      body: 'Slow query',
+    });
 
     const groups = buildSemanticGroups(
       [review('a', [auth]), review('b', [perf])],
@@ -381,9 +483,24 @@ describe('buildSemanticGroups', () => {
   });
 
   test('merges structurally similar groups with semantic match', () => {
-    const authA = finding({ reviewer: 'a', file: 'src/auth.ts', lineStart: 10, title: 'Hardcoded API key' });
-    const authB = finding({ reviewer: 'b', file: 'src/auth.ts', lineStart: 11, title: 'Hardcoded API key exposed in auth' });
-    const paymentsC = finding({ reviewer: 'c', file: 'src/payments.ts', lineStart: 50, title: 'Hardcoded API key in payment handler' });
+    const authA = finding({
+      reviewer: 'a',
+      file: 'src/auth.ts',
+      lineStart: 10,
+      title: 'Hardcoded API key',
+    });
+    const authB = finding({
+      reviewer: 'b',
+      file: 'src/auth.ts',
+      lineStart: 11,
+      title: 'Hardcoded API key exposed in auth',
+    });
+    const paymentsC = finding({
+      reviewer: 'c',
+      file: 'src/payments.ts',
+      lineStart: 50,
+      title: 'Hardcoded API key in payment handler',
+    });
 
     const groups = buildSemanticGroups(
       [review('a', [authA]), review('b', [authB]), review('c', [paymentsC])],
@@ -403,10 +520,23 @@ describe('buildSemanticGroups', () => {
 
 describe('detectContradictions', () => {
   test('detects significant severity gap as contradiction', () => {
-    const low = finding({ reviewer: 'a', severity: 'low', file: 'src/x.ts', title: 'Low issue' });
-    const critical = finding({ reviewer: 'b', severity: 'critical', file: 'src/x.ts', title: 'Critical issue' });
+    const low = finding({
+      reviewer: 'a',
+      severity: 'low',
+      file: 'src/x.ts',
+      title: 'Low issue',
+    });
+    const critical = finding({
+      reviewer: 'b',
+      severity: 'critical',
+      file: 'src/x.ts',
+      title: 'Critical issue',
+    });
 
-    const groups = buildSemanticGroups([review('a', [low]), review('b', [critical])]);
+    const groups = buildSemanticGroups([
+      review('a', [low]),
+      review('b', [critical]),
+    ]);
     const contradictions = detectContradictions(groups);
 
     expect(contradictions).toHaveLength(1);
@@ -416,8 +546,20 @@ describe('detectContradictions', () => {
   });
 
   test('detects different categories on overlapping lines as contradiction', () => {
-    const sec = finding({ reviewer: 'a', category: 'security', file: 'src/x.ts', lineStart: 10, title: 'Input validation gap' });
-    const style = finding({ reviewer: 'b', category: 'style', file: 'src/x.ts', lineStart: 10, title: 'Input validation gap' });
+    const sec = finding({
+      reviewer: 'a',
+      category: 'security',
+      file: 'src/x.ts',
+      lineStart: 10,
+      title: 'Input validation gap',
+    });
+    const style = finding({
+      reviewer: 'b',
+      category: 'style',
+      file: 'src/x.ts',
+      lineStart: 10,
+      title: 'Input validation gap',
+    });
 
     const groups = buildSemanticGroups(
       [review('a', [sec]), review('b', [style])],
@@ -431,8 +573,20 @@ describe('detectContradictions', () => {
   });
 
   test('no contradictions when findings agree on severity and category', () => {
-    const a = finding({ reviewer: 'a', severity: 'medium', category: 'correctness', file: 'src/x.ts', lineStart: 10 });
-    const b = finding({ reviewer: 'b', severity: 'medium', category: 'correctness', file: 'src/x.ts', lineStart: 11 });
+    const a = finding({
+      reviewer: 'a',
+      severity: 'medium',
+      category: 'correctness',
+      file: 'src/x.ts',
+      lineStart: 10,
+    });
+    const b = finding({
+      reviewer: 'b',
+      severity: 'medium',
+      category: 'correctness',
+      file: 'src/x.ts',
+      lineStart: 11,
+    });
 
     const groups = buildSemanticGroups([review('a', [a]), review('b', [b])]);
     const contradictions = detectContradictions(groups);
@@ -448,10 +602,25 @@ describe('detectContradictions', () => {
   });
 
   test('different files on different categories are not contradictions', () => {
-    const sec = finding({ reviewer: 'a', category: 'security', file: 'src/a.ts', lineStart: 10, title: 'A' });
-    const style = finding({ reviewer: 'b', category: 'style', file: 'src/b.ts', lineStart: 10, title: 'B' });
+    const sec = finding({
+      reviewer: 'a',
+      category: 'security',
+      file: 'src/a.ts',
+      lineStart: 10,
+      title: 'A',
+    });
+    const style = finding({
+      reviewer: 'b',
+      category: 'style',
+      file: 'src/b.ts',
+      lineStart: 10,
+      title: 'B',
+    });
 
-    const groups = buildSemanticGroups([review('a', [sec]), review('b', [style])]);
+    const groups = buildSemanticGroups([
+      review('a', [sec]),
+      review('b', [style]),
+    ]);
     const contradictions = detectContradictions(groups);
 
     expect(contradictions).toHaveLength(0);
@@ -460,9 +629,27 @@ describe('detectContradictions', () => {
 
 describe('semantic-v2', () => {
   test('groups semantically similar findings across files', async () => {
-    const authA = finding({ reviewer: 'a', file: 'src/auth.ts', lineStart: 10, title: 'Hardcoded API key', body: 'Secret exposed' });
-    const authB = finding({ reviewer: 'b', file: 'src/auth.ts', lineStart: 11, title: 'Hardcoded API key in auth', body: 'Secret exposed' });
-    const payments = finding({ reviewer: 'c', file: 'src/payments.ts', lineStart: 50, title: 'Hardcoded API key in payments', body: 'Secret exposed' });
+    const authA = finding({
+      reviewer: 'a',
+      file: 'src/auth.ts',
+      lineStart: 10,
+      title: 'Hardcoded API key',
+      body: 'Secret exposed',
+    });
+    const authB = finding({
+      reviewer: 'b',
+      file: 'src/auth.ts',
+      lineStart: 11,
+      title: 'Hardcoded API key in auth',
+      body: 'Secret exposed',
+    });
+    const payments = finding({
+      reviewer: 'c',
+      file: 'src/payments.ts',
+      lineStart: 50,
+      title: 'Hardcoded API key in payments',
+      body: 'Secret exposed',
+    });
 
     const result = await semanticV2.aggregate(
       [review('a', [authA]), review('b', [authB]), review('c', [payments])],
@@ -488,8 +675,19 @@ describe('semantic-v2', () => {
   });
 
   test('detects contradictions when enabled', async () => {
-    const low = finding({ reviewer: 'a', severity: 'low', file: 'src/x.ts', title: 'Low concern' });
-    const critical = finding({ reviewer: 'b', severity: 'critical', file: 'src/x.ts', title: 'Critical concern', lineStart: 9 });
+    const low = finding({
+      reviewer: 'a',
+      severity: 'low',
+      file: 'src/x.ts',
+      title: 'Low concern',
+    });
+    const critical = finding({
+      reviewer: 'b',
+      severity: 'critical',
+      file: 'src/x.ts',
+      title: 'Critical concern',
+      lineStart: 9,
+    });
 
     const result = await semanticV2.aggregate(
       [review('a', [low]), review('b', [critical])],
@@ -500,8 +698,19 @@ describe('semantic-v2', () => {
   });
 
   test('no contradictions when not enabled', async () => {
-    const low = finding({ reviewer: 'a', severity: 'low', file: 'src/x.ts', title: 'Low concern' });
-    const critical = finding({ reviewer: 'b', severity: 'critical', file: 'src/x.ts', title: 'Critical concern', lineStart: 9 });
+    const low = finding({
+      reviewer: 'a',
+      severity: 'low',
+      file: 'src/x.ts',
+      title: 'Low concern',
+    });
+    const critical = finding({
+      reviewer: 'b',
+      severity: 'critical',
+      file: 'src/x.ts',
+      title: 'Critical concern',
+      lineStart: 9,
+    });
 
     const result = await semanticV2.aggregate(
       [review('a', [low]), review('b', [critical])],
@@ -512,11 +721,26 @@ describe('semantic-v2', () => {
   });
 
   test('resolves contradictions with meta-reviewer when provided', async () => {
-    const low = finding({ reviewer: 'a', severity: 'low', file: 'src/x.ts', title: 'Low concern' });
-    const critical = finding({ reviewer: 'b', severity: 'critical', file: 'src/x.ts', title: 'Critical concern', lineStart: 9 });
+    const low = finding({
+      reviewer: 'a',
+      severity: 'low',
+      file: 'src/x.ts',
+      title: 'Low concern',
+    });
+    const critical = finding({
+      reviewer: 'b',
+      severity: 'critical',
+      file: 'src/x.ts',
+      title: 'Critical concern',
+      lineStart: 9,
+    });
 
     const metaReview = async (_prompt: string): Promise<string> =>
-      JSON.stringify({ resolution: 'both_partial', explanation: 'Both reviewers have valid points about different aspects.' });
+      JSON.stringify({
+        resolution: 'both_partial',
+        explanation:
+          'Both reviewers have valid points about different aspects.',
+      });
 
     const result = await semanticV2.aggregate(
       [review('a', [low]), review('b', [critical])],
@@ -525,8 +749,12 @@ describe('semantic-v2', () => {
     );
 
     expect(result.contradictions).toHaveLength(1);
-    expect(result.contradictions[0]?.note).toInclude('Meta-review: both_partial');
-    expect(result.contradictions[0]?.note).toInclude('Both reviewers have valid points');
+    expect(result.contradictions[0]?.note).toInclude(
+      'Meta-review: both_partial',
+    );
+    expect(result.contradictions[0]?.note).toInclude(
+      'Both reviewers have valid points',
+    );
   });
 });
 

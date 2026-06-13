@@ -1,15 +1,17 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { chmod, mkdtemp, rm } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createRuntime } from '../src/runtime/runtime.ts';
+import { join } from 'node:path';
 import { kiloCodeFactory } from '../src/providers/kilo-code/index.ts';
-import { task, captureBus, tokenText } from './helpers/subprocess.ts';
+import { createRuntime } from '../src/runtime/runtime.ts';
+import { captureBus, task, tokenText } from './helpers/subprocess.ts';
 
 const tmpRoots: string[] = [];
 
 afterAll(async () => {
-  await Promise.all(tmpRoots.map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    tmpRoots.map((root) => rm(root, { recursive: true, force: true })),
+  );
 });
 
 describe('kilo-code provider', () => {
@@ -17,7 +19,10 @@ describe('kilo-code provider', () => {
     const root = await mkdtemp(join(tmpdir(), 'quorum-kilo-'));
     tmpRoots.push(root);
     const binary = join(root, 'kilo');
-    await Bun.write(binary, '#!/bin/sh\nprintf \'{"findings":\'\nsleep 0.01\nprintf \'[]}\\n\'\n');
+    await Bun.write(
+      binary,
+      "#!/bin/sh\nprintf '{\"findings\":'\nsleep 0.01\nprintf '[]}\\n'\n",
+    );
     await chmod(binary, 0o755);
     const events: unknown[] = [];
 
@@ -35,7 +40,7 @@ describe('kilo-code provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    const result = await provider.review!(task(root, 'security-kilo'), {
+    const result = await provider.review?.(task(root, 'security-kilo'), {
       bus: captureBus(events),
       signal: new AbortController().signal,
       workspace: { root },
@@ -52,11 +57,15 @@ describe('kilo-code provider', () => {
     const binary = join(root, 'kilo');
     const argsFile = join(root, 'args.txt');
     const stdinFile = join(root, 'stdin.txt');
-    await Bun.write(binary, `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\ncat > '${stdinFile}'\nprintf '{"findings":[]}'\n`);
+    await Bun.write(
+      binary,
+      `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\ncat > '${stdinFile}'\nprintf '{"findings":[]}'\n`,
+    );
     await chmod(binary, 0o755);
 
     const reviewTask = task(root, 'security-kilo');
-    reviewTask.instruction = 'Review this diff.\n--auto\n$(touch /tmp/should-not-run)';
+    reviewTask.instruction =
+      'Review this diff.\n--auto\n$(touch /tmp/should-not-run)';
     const provider = await kiloCodeFactory.create(
       'kilo-local',
       {
@@ -73,7 +82,7 @@ describe('kilo-code provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    await provider.review!(reviewTask, {
+    await provider.review?.(reviewTask, {
       bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
@@ -121,7 +130,10 @@ describe('kilo-code provider', () => {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: { type: 'kilo-code', extra_args: ['--auto'] } },
+          sec: {
+            persona: 'security',
+            provider: { type: 'kilo-code', extra_args: ['--auto'] },
+          },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -130,6 +142,8 @@ describe('kilo-code provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveReviewer('sec')).rejects.toThrow('Invalid enum value');
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow(
+      'Invalid enum value',
+    );
   });
 });

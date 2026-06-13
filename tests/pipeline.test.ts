@@ -1,15 +1,15 @@
 import { describe, expect, test } from 'bun:test';
+import { overlapV1 } from '../src/consensus/overlap-v1.ts';
+import { ConsensusRegistry } from '../src/consensus/registry.ts';
+import { semanticV2 } from '../src/consensus/semantic-v2.ts';
 import type { QuorumEvent } from '../src/core/events.ts';
 import type { Finding } from '../src/core/finding.ts';
 import type { Pipeline } from '../src/core/pipeline.ts';
 import type { Provider } from '../src/core/provider.ts';
 import type { ReviewResult, UsageInfo } from '../src/core/task.ts';
-import { overlapV1 } from '../src/consensus/overlap-v1.ts';
-import { semanticV2 } from '../src/consensus/semantic-v2.ts';
-import { ConsensusRegistry } from '../src/consensus/registry.ts';
 import { PipelineExecutor } from '../src/pipelines/executor.ts';
-import type { BoundReviewer } from '../src/reviewers/reviewer.ts';
 import { ProviderRegistry } from '../src/providers/registry.ts';
+import type { BoundReviewer } from '../src/reviewers/reviewer.ts';
 import { InMemoryEventBus } from '../src/runtime/bus.ts';
 import { defaultPluginCtx } from '../src/runtime/plugin.ts';
 
@@ -90,7 +90,9 @@ describe('PipelineExecutor', () => {
     let active = 0;
     let maxActive = 0;
     let release: () => void = () => {};
-    const gate = new Promise<void>((r) => { release = r; });
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
 
     const makeReviewer = (id: string) =>
       reviewer(id, async () => {
@@ -119,15 +121,25 @@ describe('PipelineExecutor', () => {
   test('maxConcurrency greater than reviewer count behaves like unlimited', async () => {
     const started: string[] = [];
     let release: () => void = () => {};
-    const gate = new Promise<void>((r) => { release = r; });
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
 
     const run = runPipeline({
       parallel: true,
       maxConcurrency: 10,
       reviewers: ['a', 'b'],
       boundReviewers: [
-        reviewer('a', async () => { started.push('a'); await gate; return reviewResult('a'); }),
-        reviewer('b', async () => { started.push('b'); await gate; return reviewResult('b'); }),
+        reviewer('a', async () => {
+          started.push('a');
+          await gate;
+          return reviewResult('a');
+        }),
+        reviewer('b', async () => {
+          started.push('b');
+          await gate;
+          return reviewResult('b');
+        }),
       ],
     });
 
@@ -199,17 +211,25 @@ describe('PipelineExecutor', () => {
       maxTotalCostUsd: 0.001,
       reviewers: ['expensive', 'never-runs'],
       boundReviewers: [
-        reviewer('expensive', async () => reviewResultWithUsage('expensive', [], { inputTokens: 1000, outputTokens: 500, costUsd: 0.50 })),
+        reviewer('expensive', async () =>
+          reviewResultWithUsage('expensive', [], {
+            inputTokens: 1000,
+            outputTokens: 500,
+            costUsd: 0.5,
+          }),
+        ),
         reviewer('never-runs', async () => reviewResult('never-runs')),
       ],
       bus,
     });
 
-    expect(events.some((e) => e.type === 'pipeline.budget_exceeded')).toBe(true);
+    expect(events.some((e) => e.type === 'pipeline.budget_exceeded')).toBe(
+      true,
+    );
     expect(result.budgetExceeded).toBe(true);
     expect(result.reviews).toHaveLength(1);
     expect(result.reviews[0]?.reviewerId).toBe('expensive');
-    expect(result.totalCostUsd).toBe(0.50);
+    expect(result.totalCostUsd).toBe(0.5);
   });
 
   test('aborts remaining reviewers when budget exceeded (mid-pipeline)', async () => {
@@ -222,17 +242,25 @@ describe('PipelineExecutor', () => {
       maxTotalCostUsd: 0.001,
       reviewers: ['expensive', 'never-runs'],
       boundReviewers: [
-        reviewer('expensive', async () => reviewResultWithUsage('expensive', [], { inputTokens: 1000, outputTokens: 500, costUsd: 0.50 })),
+        reviewer('expensive', async () =>
+          reviewResultWithUsage('expensive', [], {
+            inputTokens: 1000,
+            outputTokens: 500,
+            costUsd: 0.5,
+          }),
+        ),
         reviewer('never-runs', async () => reviewResult('never-runs')),
       ],
       bus,
     });
 
-    expect(events.some((e) => e.type === 'pipeline.budget_exceeded')).toBe(true);
+    expect(events.some((e) => e.type === 'pipeline.budget_exceeded')).toBe(
+      true,
+    );
     expect(result.budgetExceeded).toBe(true);
     expect(result.reviews).toHaveLength(1);
     expect(result.reviews[0]?.reviewerId).toBe('expensive');
-    expect(result.totalCostUsd).toBe(0.50);
+    expect(result.totalCostUsd).toBe(0.5);
   });
 
   test('reports totalCostUsd on result when cost was tracked', async () => {
@@ -241,8 +269,20 @@ describe('PipelineExecutor', () => {
       maxTotalCostUsd: 5,
       reviewers: ['a', 'b'],
       boundReviewers: [
-        reviewer('a', async () => reviewResultWithUsage('a', [], { inputTokens: 100, outputTokens: 50, costUsd: 0.05 })),
-        reviewer('b', async () => reviewResultWithUsage('b', [], { inputTokens: 200, outputTokens: 75, costUsd: 0.08 })),
+        reviewer('a', async () =>
+          reviewResultWithUsage('a', [], {
+            inputTokens: 100,
+            outputTokens: 50,
+            costUsd: 0.05,
+          }),
+        ),
+        reviewer('b', async () =>
+          reviewResultWithUsage('b', [], {
+            inputTokens: 200,
+            outputTokens: 75,
+            costUsd: 0.08,
+          }),
+        ),
       ],
     });
 
@@ -280,7 +320,10 @@ describe('PipelineExecutor', () => {
         return async (_prompt, ctx) => {
           parent.abort();
           await waitFor(() => ctx.signal.aborted);
-          return JSON.stringify({ resolution: 'both_partial', explanation: 'aborted signal observed' });
+          return JSON.stringify({
+            resolution: 'both_partial',
+            explanation: 'aborted signal observed',
+          });
         };
       },
     });
@@ -327,7 +370,9 @@ describe('PipelineExecutor', () => {
       signal: parent.signal,
     });
 
-    expect(result.consensus.contradictions[0]?.note).toContain('aborted signal observed');
+    expect(result.consensus.contradictions[0]?.note).toContain(
+      'aborted signal observed',
+    );
   });
 });
 
@@ -379,7 +424,10 @@ function reviewer(
   };
 }
 
-function fakeProvider(id: string, capabilities: Partial<ReturnType<Provider['capabilities']>> = {}): Provider {
+function fakeProvider(
+  id: string,
+  capabilities: Partial<ReturnType<Provider['capabilities']>> = {},
+): Provider {
   return {
     id,
     capabilities() {
@@ -395,7 +443,10 @@ function fakeProvider(id: string, capabilities: Partial<ReturnType<Provider['cap
   };
 }
 
-function reviewResult(reviewerId: string, findings: Finding[] = []): ReviewResult {
+function reviewResult(
+  reviewerId: string,
+  findings: Finding[] = [],
+): ReviewResult {
   return {
     taskId: `task:${reviewerId}`,
     reviewerId,
@@ -419,7 +470,8 @@ function reviewResultWithUsage(
 async function waitFor(predicate: () => boolean): Promise<void> {
   const started = Date.now();
   while (!predicate()) {
-    if (Date.now() - started > 1_000) throw new Error('Timed out waiting for condition');
+    if (Date.now() - started > 1_000)
+      throw new Error('Timed out waiting for condition');
     await Bun.sleep(1);
   }
 }

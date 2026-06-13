@@ -1,8 +1,11 @@
 import type { MetaReviewFn } from '../../consensus/registry.ts';
-import { normaliseSubprocessOutput, createSubprocessMetaReviewer } from '../subprocess.ts';
-import { createSubprocessProvider } from '../base-subprocess.ts';
-import { CursorAgentConfigSchema, type CursorAgentConfig } from './schema.ts';
 import type { SubprocessBaseConfig } from '../base-subprocess.ts';
+import { createSubprocessProvider } from '../base-subprocess.ts';
+import {
+  createSubprocessMetaReviewer,
+  normaliseSubprocessOutput,
+} from '../subprocess.ts';
+import { type CursorAgentConfig, CursorAgentConfigSchema } from './schema.ts';
 
 const CURSOR_UNWRAP_KEYS = ['output', 'response', 'text', 'content', 'result'];
 
@@ -21,7 +24,8 @@ export const cursorAgentFactory = createSubprocessProvider({
     const args = [
       '--print',
       'Read the review instructions from stdin and return only the requested output.',
-      '--output-format', c.output_format,
+      '--output-format',
+      c.output_format,
       ...c.extra_args,
     ];
     if (model) args.push('--model', model);
@@ -31,8 +35,14 @@ export const cursorAgentFactory = createSubprocessProvider({
     const c = config as CursorAgentConfig;
     return createSubprocessMetaReviewer(
       c.binary,
-      () => ['--print', 'Read stdin and respond with JSON.', '--output-format', c.output_format],
-      c.cwd ?? ctx.workspaceRoot, c.timeout_ms,
+      () => [
+        '--print',
+        'Read stdin and respond with JSON.',
+        '--output-format',
+        c.output_format,
+      ],
+      c.cwd ?? ctx.workspaceRoot,
+      c.timeout_ms,
       c.api_key ? { CURSOR_API_KEY: c.api_key } : undefined,
     );
   },

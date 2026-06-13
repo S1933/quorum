@@ -1,15 +1,22 @@
 import type { z } from 'zod';
-import type { Provider } from '../core/provider.ts';
-import type { PluginCtx } from '../runtime/plugin.ts';
+import { resolveLazy } from '../config/interpolate.ts';
 import type { MetaReviewFn } from '../consensus/registry.ts';
 import { ConfigError } from '../core/errors.ts';
-import { resolveLazy } from '../config/interpolate.ts';
+import type { Provider } from '../core/provider.ts';
+import type { PluginCtx } from '../runtime/plugin.ts';
 
 export interface ProviderFactory {
   type: string;
   schema: z.ZodTypeAny;
-  create(instanceId: string, config: unknown, ctx: PluginCtx): Promise<Provider>;
-  createMetaReviewer?(config: unknown, ctx: PluginCtx): MetaReviewFn | undefined;
+  create(
+    instanceId: string,
+    config: unknown,
+    ctx: PluginCtx,
+  ): Promise<Provider>;
+  createMetaReviewer?(
+    config: unknown,
+    ctx: PluginCtx,
+  ): MetaReviewFn | undefined;
 }
 
 export class ProviderRegistry {
@@ -17,7 +24,9 @@ export class ProviderRegistry {
 
   register(factory: ProviderFactory): void {
     if (this.factories.has(factory.type)) {
-      throw new ConfigError(`Provider type "${factory.type}" already registered`);
+      throw new ConfigError(
+        `Provider type "${factory.type}" already registered`,
+      );
     }
     this.factories.set(factory.type, factory);
   }
@@ -36,7 +45,9 @@ export class ProviderRegistry {
     }
     const { type } = rawConfig as { type?: string };
     if (typeof type !== 'string') {
-      throw new ConfigError(`Provider "${id}" is missing required "type" field`);
+      throw new ConfigError(
+        `Provider "${id}" is missing required "type" field`,
+      );
     }
     const factory = this.resolve(type);
     if (!factory) {
@@ -51,7 +62,9 @@ export class ProviderRegistry {
       const issues = parsed.error.issues
         .map((i) => `  - ${i.path.join('.') || '<root>'}: ${i.message}`)
         .join('\n');
-      throw new ConfigError(`Provider "${id}" (type ${type}) config invalid:\n${issues}`);
+      throw new ConfigError(
+        `Provider "${id}" (type ${type}) config invalid:\n${issues}`,
+      );
     }
     return factory.create(id, parsed.data, ctx);
   }

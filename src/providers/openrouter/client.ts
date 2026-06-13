@@ -1,5 +1,5 @@
-import type { OpenRouterConfig } from './schema.ts';
 import { ProviderRuntimeError } from '../../core/errors.ts';
+import type { OpenRouterConfig } from './schema.ts';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -46,7 +46,11 @@ function isRetryable(status: number): boolean {
   return status === 429 || status === 502 || status === 503 || status === 504;
 }
 
-function retryDelay(attempt: number, baseMs: number, retryAfterHeader?: string | null): number {
+function retryDelay(
+  attempt: number,
+  baseMs: number,
+  retryAfterHeader?: string | null,
+): number {
   if (retryAfterHeader) {
     const seconds = Number(retryAfterHeader);
     if (Number.isFinite(seconds) && seconds > 0) return seconds * 1000;
@@ -56,9 +60,15 @@ function retryDelay(attempt: number, baseMs: number, retryAfterHeader?: string |
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (signal.aborted) { reject(new DOMException('Aborted', 'AbortError')); return; }
+    if (signal.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
     const timer = setTimeout(resolve, ms);
-    const onAbort = () => { clearTimeout(timer); reject(new DOMException('Aborted', 'AbortError')); };
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
     signal.addEventListener('abort', onAbort, { once: true });
   });
 }
@@ -69,12 +79,16 @@ export class OpenRouterClient {
     private readonly providerId: string,
   ) {}
 
-  private get maxRetries(): number { return this.cfg.maxRetries ?? 3; }
-  private get retryBaseMs(): number { return this.cfg.retryBaseMs ?? 1000; }
+  private get maxRetries(): number {
+    return this.cfg.maxRetries ?? 3;
+  }
+  private get retryBaseMs(): number {
+    return this.cfg.retryBaseMs ?? 1000;
+  }
 
   private buildHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
-      'Authorization': `Bearer ${this.cfg.api_key}`,
+      Authorization: `Bearer ${this.cfg.api_key}`,
       'Content-Type': 'application/json',
     };
     if (this.cfg.referer) headers['HTTP-Referer'] = this.cfg.referer;
@@ -104,13 +118,24 @@ export class OpenRouterClient {
           await sleep(retryDelay(attempt, this.retryBaseMs), signal);
           continue;
         }
-        throw new ProviderRuntimeError(this.providerId, `Network error: ${(err as Error).message}`, err);
+        throw new ProviderRuntimeError(
+          this.providerId,
+          `Network error: ${(err as Error).message}`,
+          err,
+        );
       }
 
       if (!res.ok) {
         const resBody = await res.text().catch(() => '<no body>');
         if (isRetryable(res.status) && attempt < this.maxRetries) {
-          await sleep(retryDelay(attempt, this.retryBaseMs, res.headers.get('retry-after')), signal);
+          await sleep(
+            retryDelay(
+              attempt,
+              this.retryBaseMs,
+              res.headers.get('retry-after'),
+            ),
+            signal,
+          );
           continue;
         }
         throw new ProviderRuntimeError(
@@ -122,14 +147,21 @@ export class OpenRouterClient {
       try {
         return (await res.json()) as ChatResponse;
       } catch (err) {
-        throw new ProviderRuntimeError(this.providerId, `Invalid JSON response: ${(err as Error).message}`, err);
+        throw new ProviderRuntimeError(
+          this.providerId,
+          `Invalid JSON response: ${(err as Error).message}`,
+          err,
+        );
       }
     }
   }
 
-  async *chatStream(req: ChatRequest, signal: AbortSignal): AsyncIterable<ChatStreamEvent> {
+  async *chatStream(
+    req: ChatRequest,
+    signal: AbortSignal,
+  ): AsyncIterable<ChatStreamEvent> {
     const body = JSON.stringify({ ...req, stream: true });
-    const headers = { ...this.buildHeaders(), 'Accept': 'text/event-stream' };
+    const headers = { ...this.buildHeaders(), Accept: 'text/event-stream' };
 
     let res: Response | undefined;
     for (let attempt = 0; ; attempt++) {
@@ -141,13 +173,24 @@ export class OpenRouterClient {
           await sleep(retryDelay(attempt, this.retryBaseMs), signal);
           continue;
         }
-        throw new ProviderRuntimeError(this.providerId, `Network error: ${(err as Error).message}`, err);
+        throw new ProviderRuntimeError(
+          this.providerId,
+          `Network error: ${(err as Error).message}`,
+          err,
+        );
       }
 
       if (!res.ok || !res.body) {
         const resBody = await res.text().catch(() => '<no body>');
         if (isRetryable(res.status) && attempt < this.maxRetries) {
-          await sleep(retryDelay(attempt, this.retryBaseMs, res.headers.get('retry-after')), signal);
+          await sleep(
+            retryDelay(
+              attempt,
+              this.retryBaseMs,
+              res.headers.get('retry-after'),
+            ),
+            signal,
+          );
           continue;
         }
         throw new ProviderRuntimeError(

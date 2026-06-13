@@ -1,13 +1,18 @@
 import type { z } from 'zod';
-import type { Provider, ProviderCapabilities, ExecCtx } from '../core/provider.ts';
-import type { ReviewTask, ReviewResult } from '../core/task.ts';
-import type { ProviderFactory } from './registry.ts';
-import type { PluginCtx } from '../runtime/plugin.ts';
 import type { MetaReviewFn } from '../consensus/registry.ts';
+import type {
+  ExecCtx,
+  Provider,
+  ProviderCapabilities,
+} from '../core/provider.ts';
+import type { ReviewResult, ReviewTask } from '../core/task.ts';
 import { outputInstructionsForTask } from '../reviewers/output.ts';
-import { runSubprocess, buildSubprocessReviewResult } from './subprocess.ts';
+import type { PluginCtx } from '../runtime/plugin.ts';
+import type { ProviderFactory } from './registry.ts';
+import { buildSubprocessReviewResult, runSubprocess } from './subprocess.ts';
 
-export const STDIN_PROMPT = 'Read the review instructions from stdin and return only the requested output.';
+export const STDIN_PROMPT =
+  'Read the review instructions from stdin and return only the requested output.';
 
 export interface SubprocessBaseConfig {
   binary: string;
@@ -21,17 +26,31 @@ export interface SubprocessProviderOpts {
   label: string;
   schema: z.ZodTypeAny;
   maxConcurrentReviews?: number;
-  buildArgs(cfg: SubprocessBaseConfig, ctx: ExecCtx, task: ReviewTask, cwd: string): string[];
+  buildArgs(
+    cfg: SubprocessBaseConfig,
+    ctx: ExecCtx,
+    task: ReviewTask,
+    cwd: string,
+  ): string[];
   buildStdin?(cfg: SubprocessBaseConfig, task: ReviewTask): string;
   processOutput?(raw: string, _cfg: SubprocessBaseConfig): string;
-  env?(cfg: SubprocessBaseConfig): Record<string, string | undefined> | undefined;
-  createMetaReviewer?(config: unknown, ctx: PluginCtx): MetaReviewFn | undefined;
+  env?(
+    cfg: SubprocessBaseConfig,
+  ): Record<string, string | undefined> | undefined;
+  createMetaReviewer?(
+    config: unknown,
+    ctx: PluginCtx,
+  ): MetaReviewFn | undefined;
 }
 
 const DEFAULT_STDIN = (_cfg: SubprocessBaseConfig, task: ReviewTask): string =>
-  [task.systemPrompt, outputInstructionsForTask(task), task.instruction].join('\n\n');
+  [task.systemPrompt, outputInstructionsForTask(task), task.instruction].join(
+    '\n\n',
+  );
 
-export function createSubprocessProvider(opts: SubprocessProviderOpts): ProviderFactory {
+export function createSubprocessProvider(
+  opts: SubprocessProviderOpts,
+): ProviderFactory {
   const buildStdin = opts.buildStdin ?? DEFAULT_STDIN;
   const processOutput = opts.processOutput ?? ((raw: string) => raw);
 
@@ -53,7 +72,9 @@ export function createSubprocessProvider(opts: SubprocessProviderOpts): Provider
         tools: true,
         mcp: true,
         localExecution: true,
-        ...(opts.maxConcurrentReviews ? { maxConcurrentReviews: opts.maxConcurrentReviews } : {}),
+        ...(opts.maxConcurrentReviews
+          ? { maxConcurrentReviews: opts.maxConcurrentReviews }
+          : {}),
       };
     }
 
@@ -78,7 +99,12 @@ export function createSubprocessProvider(opts: SubprocessProviderOpts): Provider
       if (optsEnv) runOpts.env = optsEnv;
 
       const raw = await runSubprocess(runOpts);
-      return buildSubprocessReviewResult(task, processOutput(raw, this.cfg), started, ctx.bus);
+      return buildSubprocessReviewResult(
+        task,
+        processOutput(raw, this.cfg),
+        started,
+        ctx.bus,
+      );
     }
   }
 
@@ -88,6 +114,8 @@ export function createSubprocessProvider(opts: SubprocessProviderOpts): Provider
     async create(instanceId, config, ctx) {
       return new Impl(instanceId, config, ctx);
     },
-    ...(opts.createMetaReviewer ? { createMetaReviewer: opts.createMetaReviewer } : {}),
+    ...(opts.createMetaReviewer
+      ? { createMetaReviewer: opts.createMetaReviewer }
+      : {}),
   };
 }

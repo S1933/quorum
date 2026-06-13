@@ -1,24 +1,24 @@
 #!/usr/bin/env bun
-import { loadConfigFromPath, findConfigPath } from '../config/loader.ts';
-import { createRuntime as createRuntimeDefault } from '../runtime/runtime.ts';
-import { probeWorkspace, inferRepoRoot } from '../runtime/workspace.ts';
+import { findConfigPath, loadConfigFromPath } from '../config/loader.ts';
 import { QuorumError } from '../core/errors.ts';
+import { createRuntime as createRuntimeDefault } from '../runtime/runtime.ts';
+import { inferRepoRoot, probeWorkspace } from '../runtime/workspace.ts';
 import { parseArgs } from './args.ts';
-import { cmdReview } from './commands/review.ts';
-import { cmdPlanReview } from './commands/plan-review.ts';
-import { cmdReviewer } from './commands/reviewer.ts';
 import { cmdDashboard } from './commands/dashboard.ts';
+import { cmdPlanReview } from './commands/plan-review.ts';
+import { cmdReview } from './commands/review.ts';
+import { cmdReviewer } from './commands/reviewer.ts';
 import type { CliDeps, CliIo } from './types.ts';
 
-export type { CliDeps, CliIo } from './types.ts';
 export { redactConfig } from '../config/redact.ts';
+export { buildPlanReviewInstruction } from './commands/plan-review.ts';
 export {
-  buildSafeFence,
   buildReviewInstruction,
+  buildSafeFence,
   filterReviewersByChangedFiles,
   resolveDiffLimits,
 } from './commands/review.ts';
-export { buildPlanReviewInstruction } from './commands/plan-review.ts';
+export type { CliDeps, CliIo } from './types.ts';
 
 const defaultIo: CliIo = {
   stdin: process.stdin,
@@ -39,7 +39,9 @@ const defaultDeps: CliDeps = {
     return true;
   },
   readConfigFile: async (configPath) => await Bun.file(configPath).text(),
-  writeConfigFile: async (configPath, content) => { await Bun.write(configPath, content); },
+  writeConfigFile: async (configPath, content) => {
+    await Bun.write(configPath, content);
+  },
 };
 
 function printHelp(io: CliIo): void {

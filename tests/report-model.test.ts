@@ -13,8 +13,16 @@ import {
 describe('report-model', () => {
   test('builds JSON reports with agreement counts and deduplicates report findings', () => {
     const shared = finding({ reviewer: 'sec-a', severity: 'high' });
-    const paired = finding({ reviewer: 'sec-b', severity: 'high', lineStart: 11 });
-    const unique = finding({ reviewer: 'arch', file: 'src/arch.ts', severity: 'low' });
+    const paired = finding({
+      reviewer: 'sec-b',
+      severity: 'high',
+      lineStart: 11,
+    });
+    const unique = finding({
+      reviewer: 'arch',
+      file: 'src/arch.ts',
+      severity: 'low',
+    });
     const result: PipelineResult = {
       pipelineId: 'default',
       reviews: [
@@ -24,12 +32,14 @@ describe('report-model', () => {
       ],
       consensus: {
         strategyId: 'overlap-v1',
-        groups: [{
-          id: 'group-1',
-          representative: shared,
-          members: [shared, paired],
-          reviewers: ['sec-a', 'sec-b'],
-        }],
+        groups: [
+          {
+            id: 'group-1',
+            representative: shared,
+            members: [shared, paired],
+            reviewers: ['sec-a', 'sec-b'],
+          },
+        ],
         agreement: { 'group-1': 2 },
         unique: [unique],
         contradictions: [],
@@ -40,7 +50,9 @@ describe('report-model', () => {
 
     const report = toJsonReport(result);
     expect(report.consensus.groups[0]?.agreement).toBe(2);
-    expect(collectJsonReportFindings(report).map(({ finding }) => finding)).toEqual([shared, paired, unique]);
+    expect(
+      collectJsonReportFindings(report).map(({ finding }) => finding),
+    ).toEqual([shared, paired, unique]);
   });
 
   test('shares glyphs, duration, and severity counts', () => {
@@ -53,11 +65,18 @@ describe('report-model', () => {
     expect(categoryIcon('security')).toBe('🔐');
     expect(formatDuration(999)).toBe('999ms');
     expect(formatDuration(1250)).toBe('1.3s');
-    expect(countBySeverity(findings)).toMatchObject({ critical: 1, low: 1, high: 0 });
+    expect(countBySeverity(findings)).toMatchObject({
+      critical: 1,
+      low: 1,
+      high: 0,
+    });
   });
 });
 
-function review(reviewerId: string, findings: Finding[]): PipelineResult['reviews'][number] {
+function review(
+  reviewerId: string,
+  findings: Finding[],
+): PipelineResult['reviews'][number] {
   return {
     taskId: `task:${reviewerId}`,
     reviewerId,

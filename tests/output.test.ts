@@ -41,8 +41,12 @@ describe('parseFindings', () => {
 
   test('throws when output is empty, non-JSON, or has the wrong top-level shape', () => {
     expect(() => parseFindings('', 'rev-a')).toThrow(ReviewerOutputError);
-    expect(() => parseFindings('no structured output', 'rev-a')).toThrow(ReviewerOutputError);
-    expect(() => parseFindings('{"issues":[]}', 'rev-a')).toThrow(ReviewerOutputError);
+    expect(() => parseFindings('no structured output', 'rev-a')).toThrow(
+      ReviewerOutputError,
+    );
+    expect(() => parseFindings('{"issues":[]}', 'rev-a')).toThrow(
+      ReviewerOutputError,
+    );
   });
 
   test('throws when a finding lacks required fields', () => {
@@ -79,26 +83,30 @@ describe('parseFindings', () => {
   });
 
   test('recovers JSON when prose contains braces before the JSON object', () => {
-    const output = 'Here is my analysis (see lines {1-5} above):\n{"findings":[]}';
+    const output =
+      'Here is my analysis (see lines {1-5} above):\n{"findings":[]}';
     const findings = parseFindings(output, 'rev-a');
     expect(findings).toEqual([]);
   });
 
   test('recovers JSON when prose contains braces after the JSON object', () => {
-    const output = '{"findings":[]}\nNote: the function doStuff() { return 1; } is fine.';
+    const output =
+      '{"findings":[]}\nNote: the function doStuff() { return 1; } is fine.';
     const findings = parseFindings(output, 'rev-a');
     expect(findings).toEqual([]);
   });
 
   test('recovers JSON from output with multiple brace groups', () => {
-    const output = 'Here is {stuff} and then {"findings":[{"file":"a.ts","lineStart":1,"severity":"low","category":"style","title":"ok","body":"fine"}]} and more {stuff}';
+    const output =
+      'Here is {stuff} and then {"findings":[{"file":"a.ts","lineStart":1,"severity":"low","category":"style","title":"ok","body":"fine"}]} and more {stuff}';
     const findings = parseFindings(output, 'rev-a');
     expect(findings).toHaveLength(1);
     expect(findings[0]?.file).toBe('a.ts');
   });
 
   test('balanced-brace scanner handles escaped quotes inside JSON strings', () => {
-    const json = '{"findings":[{"file":"a\\"b.ts","lineStart":1,"severity":"low","category":"style","title":"has \\"quotes\\"","body":"ok"}]}';
+    const json =
+      '{"findings":[{"file":"a\\"b.ts","lineStart":1,"severity":"low","category":"style","title":"has \\"quotes\\"","body":"ok"}]}';
     const output = `Some prose before. ${json} And after.`;
     const findings = parseFindings(output, 'rev-a');
     expect(findings).toHaveLength(1);

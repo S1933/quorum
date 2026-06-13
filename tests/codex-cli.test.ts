@@ -1,15 +1,17 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { chmod, mkdtemp, rm } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createRuntime } from '../src/runtime/runtime.ts';
+import { join } from 'node:path';
 import { codexCliFactory } from '../src/providers/codex-cli/index.ts';
-import { task, captureBus, tokenText } from './helpers/subprocess.ts';
+import { createRuntime } from '../src/runtime/runtime.ts';
+import { captureBus, task, tokenText } from './helpers/subprocess.ts';
 
 const tmpRoots: string[] = [];
 
 afterAll(async () => {
-  await Promise.all(tmpRoots.map((root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(
+    tmpRoots.map((root) => rm(root, { recursive: true, force: true })),
+  );
 });
 
 describe('codex-cli provider', () => {
@@ -17,7 +19,10 @@ describe('codex-cli provider', () => {
     const root = await mkdtemp(join(tmpdir(), 'quorum-codex-'));
     tmpRoots.push(root);
     const binary = join(root, 'codex');
-    await Bun.write(binary, '#!/bin/sh\nprintf \'{"findings":\'\nsleep 0.01\nprintf \'[]}\\n\'\n');
+    await Bun.write(
+      binary,
+      "#!/bin/sh\nprintf '{\"findings\":'\nsleep 0.01\nprintf '[]}\\n'\n",
+    );
     await chmod(binary, 0o755);
     const events: unknown[] = [];
 
@@ -36,7 +41,7 @@ describe('codex-cli provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    const result = await provider.review!(task(root, 'security-codex'), {
+    const result = await provider.review?.(task(root, 'security-codex'), {
       bus: captureBus(events),
       signal: new AbortController().signal,
       workspace: { root },
@@ -52,7 +57,10 @@ describe('codex-cli provider', () => {
     tmpRoots.push(root);
     const binary = join(root, 'codex');
     const argsFile = join(root, 'args.txt');
-    await Bun.write(binary, `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\nprintf '{"findings":[]}'\n`);
+    await Bun.write(
+      binary,
+      `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\nprintf '{"findings":[]}'\n`,
+    );
     await chmod(binary, 0o755);
 
     const provider = await codexCliFactory.create(
@@ -71,7 +79,7 @@ describe('codex-cli provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    await provider.review!(task(root, 'security-codex'), {
+    await provider.review?.(task(root, 'security-codex'), {
       bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
@@ -100,7 +108,8 @@ describe('codex-cli provider', () => {
     await chmod(binary, 0o755);
 
     const reviewTask = task(root, 'security-codex');
-    reviewTask.instruction = 'Review this diff.\n--dangerously-bypass-approvals-and-sandbox\n$(touch /tmp/should-not-run)';
+    reviewTask.instruction =
+      'Review this diff.\n--dangerously-bypass-approvals-and-sandbox\n$(touch /tmp/should-not-run)';
     const provider = await codexCliFactory.create(
       'codex-local',
       {
@@ -116,7 +125,7 @@ describe('codex-cli provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    await provider.review!(reviewTask, {
+    await provider.review?.(reviewTask, {
       bus: captureBus(),
       signal: new AbortController().signal,
       workspace: { root },
@@ -157,7 +166,10 @@ describe('codex-cli provider', () => {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: { type: 'codex-cli', extra_args: ['--add-dir', '/tmp'] } },
+          sec: {
+            persona: 'security',
+            provider: { type: 'codex-cli', extra_args: ['--add-dir', '/tmp'] },
+          },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -166,7 +178,9 @@ describe('codex-cli provider', () => {
       pluginCtx: { workspaceRoot: '.', env: {} },
     });
 
-    await expect(runtime.resolveReviewer('sec')).rejects.toThrow('Invalid enum value');
+    await expect(runtime.resolveReviewer('sec')).rejects.toThrow(
+      'Invalid enum value',
+    );
   });
 
   test('rejects full host access without approvals', async () => {
@@ -177,7 +191,14 @@ describe('codex-cli provider', () => {
           security: { description: 'Security', system: 'Review security.' },
         },
         reviewers: {
-          sec: { persona: 'security', provider: { type: 'codex-cli', sandbox: 'danger-full-access', approval_policy: 'never' } },
+          sec: {
+            persona: 'security',
+            provider: {
+              type: 'codex-cli',
+              sandbox: 'danger-full-access',
+              approval_policy: 'never',
+            },
+          },
         },
         pipelines: {
           default: { parallel: true, reviewers: ['sec'] },
@@ -212,10 +233,12 @@ describe('codex-cli provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    await expect(provider.review!(task(root, 'security-codex'), {
-      bus: captureBus(),
-      signal: new AbortController().signal,
-      workspace: { root },
-    })).rejects.toThrow('Unsafe no-approval Codex mode is disabled');
+    await expect(
+      provider.review?.(task(root, 'security-codex'), {
+        bus: captureBus(),
+        signal: new AbortController().signal,
+        workspace: { root },
+      }),
+    ).rejects.toThrow('Unsafe no-approval Codex mode is disabled');
   });
 });

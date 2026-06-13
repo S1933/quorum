@@ -1,5 +1,5 @@
-import type { ReviewResult, ModelConfig, PlanReviewVerdict } from './task.ts';
 import type { Finding, FindingGroup, Severity } from './finding.ts';
+import type { ModelConfig, PlanReviewVerdict, ReviewResult } from './task.ts';
 
 export interface ReviewerRef {
   id: string;
@@ -60,7 +60,12 @@ export interface ConsensusResult {
   groups: FindingGroup[];
   agreement: Record<string, number>;
   unique: Finding[];
-  contradictions: Array<{ groupId: string; reviewerA: string; reviewerB: string; note: string }>;
+  contradictions: Array<{
+    groupId: string;
+    reviewerA: string;
+    reviewerB: string;
+    note: string;
+  }>;
   strategyId: string;
 }
 

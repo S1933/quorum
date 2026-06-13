@@ -1,17 +1,31 @@
-import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provider.ts';
-import type { ReviewTask, ReviewResult, UsageInfo } from '../../core/task.ts';
-import type { ProviderFactory } from '../registry.ts';
 import { ProviderRuntimeError } from '../../core/errors.ts';
-import { outputInstructionsForTask, parseReviewOutput } from '../../reviewers/output.ts';
-import { OllamaClient, type OllamaChatRequest, type OllamaMessage } from './client.ts';
-import { OllamaConfigSchema, type OllamaConfig } from './schema.ts';
+import type {
+  ExecCtx,
+  Provider,
+  ProviderCapabilities,
+} from '../../core/provider.ts';
+import type { ReviewResult, ReviewTask, UsageInfo } from '../../core/task.ts';
+import {
+  outputInstructionsForTask,
+  parseReviewOutput,
+} from '../../reviewers/output.ts';
+import type { ProviderFactory } from '../registry.ts';
+import {
+  type OllamaChatRequest,
+  OllamaClient,
+  type OllamaMessage,
+} from './client.ts';
+import { type OllamaConfig, OllamaConfigSchema } from './schema.ts';
 
 const PROVIDER_TYPE = 'ollama';
 
 class OllamaProvider implements Provider {
   private readonly client: OllamaClient;
 
-  constructor(readonly id: string, private readonly cfg: OllamaConfig) {
+  constructor(
+    readonly id: string,
+    private readonly cfg: OllamaConfig,
+  ) {
     this.client = new OllamaClient(cfg, id);
   }
 
@@ -29,7 +43,10 @@ class OllamaProvider implements Provider {
     const started = Date.now();
     const chunks: string[] = [];
     let usage: UsageInfo | undefined;
-    for await (const event of this.client.chatStream(reviewRequest(this.cfg, ctx, messagesFor(task)), ctx.signal)) {
+    for await (const event of this.client.chatStream(
+      reviewRequest(this.cfg, ctx, messagesFor(task)),
+      ctx.signal,
+    )) {
       if (event.type === 'token') {
         chunks.push(event.text);
         ctx.bus.emit({
@@ -41,7 +58,11 @@ class OllamaProvider implements Provider {
         ctx.bus.emit({
           type: 'reviewer.event',
           reviewerId: task.reviewerId,
-          event: { type: 'log', level: 'warn', msg: `skipped malformed chunk: ${event.raw}` },
+          event: {
+            type: 'log',
+            level: 'warn',
+            msg: `skipped malformed chunk: ${event.raw}`,
+          },
         });
       } else {
         usage = {
@@ -51,14 +72,21 @@ class OllamaProvider implements Provider {
         ctx.bus.emit({
           type: 'reviewer.event',
           reviewerId: task.reviewerId,
-          event: { type: 'usage', inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+          event: {
+            type: 'usage',
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+          },
         });
       }
     }
 
     const raw = chunks.join('').trim();
     if (!raw) {
-      throw new ProviderRuntimeError(this.id, 'Ollama returned no message content');
+      throw new ProviderRuntimeError(
+        this.id,
+        'Ollama returned no message content',
+      );
     }
 
     const parsed = parseReviewOutput(raw, task.reviewerId);
@@ -85,7 +113,10 @@ class OllamaProvider implements Provider {
 
 function messagesFor(task: ReviewTask): OllamaMessage[] {
   return [
-    { role: 'system', content: `${task.systemPrompt}\n\n${outputInstructionsForTask(task)}` },
+    {
+      role: 'system',
+      content: `${task.systemPrompt}\n\n${outputInstructionsForTask(task)}`,
+    },
     { role: 'user', content: task.instruction },
   ];
 }
@@ -116,7 +147,10 @@ function reviewRequest(
   };
 }
 
-function toOptions(cfg: OllamaConfig, ctx: ExecCtx): NonNullable<OllamaChatRequest['options']> {
+function toOptions(
+  cfg: OllamaConfig,
+  ctx: ExecCtx,
+): NonNullable<OllamaChatRequest['options']> {
   const options: NonNullable<OllamaChatRequest['options']> = {};
   const temperature = ctx.modelOverride?.temperature ?? cfg.temperature;
   const maxTokens = ctx.modelOverride?.maxTokens ?? cfg.max_tokens;

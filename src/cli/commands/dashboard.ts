@@ -19,7 +19,8 @@ export async function cmdDashboard(
     return 1;
   }
 
-  const configPath = typeof flags.config === 'string' ? flags.config : deps.findConfigPath();
+  const configPath =
+    typeof flags.config === 'string' ? flags.config : deps.findConfigPath();
   const config = await deps.loadConfigFromPath(configPath);
   const root = process.cwd();
 
