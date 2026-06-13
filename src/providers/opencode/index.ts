@@ -29,27 +29,26 @@ const mkBuilder = () => ({
     return args;
   },
   createMetaReviewer: (
-    config: unknown,
+    config: OpenCodeConfig,
     ctx: import('../../runtime/plugin.ts').PluginCtx,
   ): MetaReviewFn | undefined => {
-    const c = OpenCodeConfigSchema.parse(config);
     const args =
-      c.command_style === 'run'
+      config.command_style === 'run'
         ? [
             'run',
-            ...(c.quiet ? ['--log-level', 'ERROR'] : []),
+            ...(config.quiet ? ['--log-level', 'ERROR'] : []),
             'Read stdin and respond with JSON.',
           ]
         : [
             '--prompt',
             'Read stdin and respond with JSON.',
-            ...(c.quiet ? ['-q'] : []),
+            ...(config.quiet ? ['-q'] : []),
           ];
     return createSubprocessMetaReviewer(
-      c.binary,
+      config.binary,
       () => args,
-      c.cwd ?? ctx.workspaceRoot,
-      c.timeout_ms,
+      config.cwd ?? ctx.workspaceRoot,
+      config.timeout_ms,
     );
   },
 });

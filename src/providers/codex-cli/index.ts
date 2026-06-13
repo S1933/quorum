@@ -10,36 +10,34 @@ export const codexCliFactory = createSubprocessProvider({
   schema: CodexCliConfigSchema,
   processOutput: (raw) => raw.trim(),
   buildArgs: (cfg, ctx, _task, cwd) => {
-    const c = CodexCliConfigSchema.parse(cfg);
-    const model = ctx.modelOverride?.model ?? c.model;
+    const model = ctx.modelOverride?.model ?? cfg.model;
     const args = [
       'exec',
       '--sandbox',
-      c.sandbox,
+      cfg.sandbox,
       '--color',
       'never',
       '-C',
       cwd,
-      ...c.extra_args,
+      ...cfg.extra_args,
     ];
-    if (c.approval_policy === 'never') {
+    if (cfg.approval_policy === 'never') {
       throw new ProviderRuntimeError(
         'codex-cli',
         'Unsafe no-approval Codex mode is disabled',
       );
     }
     if (model) args.push('--model', model);
-    if (c.variant) args.push('-c', `model_reasoning_effort=${c.variant}`);
+    if (cfg.variant) args.push('-c', `model_reasoning_effort=${cfg.variant}`);
     args.push('-');
     return args;
   },
   createMetaReviewer: (config, ctx): MetaReviewFn | undefined => {
-    const c = CodexCliConfigSchema.parse(config);
     return createSubprocessMetaReviewer(
-      c.binary,
-      () => ['exec', '--sandbox', c.sandbox, '--color', 'never', '-'],
-      c.cwd ?? ctx.workspaceRoot,
-      c.timeout_ms,
+      config.binary,
+      () => ['exec', '--sandbox', config.sandbox, '--color', 'never', '-'],
+      config.cwd ?? ctx.workspaceRoot,
+      config.timeout_ms,
     );
   },
 });

@@ -21,48 +21,46 @@ export interface SubprocessBaseConfig {
   timeout_ms: number;
 }
 
-export interface SubprocessProviderOpts {
+export interface SubprocessProviderOpts<S extends z.ZodTypeAny> {
   type: string;
   label: string;
-  schema: z.ZodTypeAny;
+  schema: S;
   maxConcurrentReviews?: number;
   buildArgs(
-    cfg: SubprocessBaseConfig,
+    cfg: z.infer<S>,
     ctx: ExecCtx,
     task: ReviewTask,
     cwd: string,
   ): string[];
-  buildStdin?(cfg: SubprocessBaseConfig, task: ReviewTask): string;
-  processOutput?(raw: string, _cfg: SubprocessBaseConfig): string;
-  env?(
-    cfg: SubprocessBaseConfig,
-  ): Record<string, string | undefined> | undefined;
+  buildStdin?(cfg: z.infer<S>, task: ReviewTask): string;
+  processOutput?(raw: string, _cfg: z.infer<S>): string;
+  env?(cfg: z.infer<S>): Record<string, string | undefined> | undefined;
   createMetaReviewer?(
-    config: unknown,
+    config: z.infer<S>,
     ctx: PluginCtx,
   ): MetaReviewFn | undefined;
 }
 
-const DEFAULT_STDIN = (_cfg: SubprocessBaseConfig, task: ReviewTask): string =>
+const DEFAULT_STDIN = (_cfg: unknown, task: ReviewTask): string =>
   [task.systemPrompt, outputInstructionsForTask(task), task.instruction].join(
     '\n\n',
   );
 
-export function createSubprocessProvider(
-  opts: SubprocessProviderOpts,
-): ProviderFactory {
+export function createSubprocessProvider<S extends z.ZodTypeAny>(
+  opts: SubprocessProviderOpts<S>,
+): ProviderFactory<S> {
   const buildStdin = opts.buildStdin ?? DEFAULT_STDIN;
   const processOutput = opts.processOutput ?? ((raw: string) => raw);
 
   class Impl implements Provider {
-    private readonly cfg: SubprocessBaseConfig;
+    private readonly cfg: z.infer<S>;
 
     constructor(
       readonly id: string,
-      config: unknown,
+      config: z.infer<S>,
       private readonly pluginCtx: PluginCtx,
     ) {
-      this.cfg = config as SubprocessBaseConfig;
+      this.cfg = config;
     }
 
     capabilities(): ProviderCapabilities {

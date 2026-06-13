@@ -12,23 +12,21 @@ export const kiloCodeFactory = createSubprocessProvider({
   schema: KiloCodeConfigSchema,
   processOutput: (raw) => normaliseSubprocessOutput(raw),
   buildArgs: (cfg, ctx) => {
-    const c = KiloCodeConfigSchema.parse(cfg);
-    const model = ctx.modelOverride?.model ?? c.model;
-    const args = ['run', ...c.extra_args];
+    const model = ctx.modelOverride?.model ?? cfg.model;
+    const args = ['run', ...cfg.extra_args];
     if (model) args.push('--model', model);
-    if (c.agent) args.push('--agent', c.agent);
-    if (c.variant) args.push('--variant', c.variant);
-    if (c.format === 'json') args.push('--format', 'json');
+    if (cfg.agent) args.push('--agent', cfg.agent);
+    if (cfg.variant) args.push('--variant', cfg.variant);
+    if (cfg.format === 'json') args.push('--format', 'json');
     args.push('--', STDIN_PROMPT);
     return args;
   },
   createMetaReviewer: (config, ctx): MetaReviewFn | undefined => {
-    const c = KiloCodeConfigSchema.parse(config);
     return createSubprocessMetaReviewer(
-      c.binary,
+      config.binary,
       () => ['run', '--', 'Read stdin and respond with JSON.'],
-      c.cwd ?? ctx.workspaceRoot,
-      c.timeout_ms,
+      config.cwd ?? ctx.workspaceRoot,
+      config.timeout_ms,
     );
   },
 });

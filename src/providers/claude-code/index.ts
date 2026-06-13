@@ -11,25 +11,23 @@ export const claudeCodeFactory = createSubprocessProvider({
   buildStdin: (_, task) => task.instruction,
   processOutput: (raw) => raw,
   buildArgs: (cfg, _ctx, task) => {
-    const c = ClaudeCodeConfigSchema.parse(cfg);
     const args = [
       '--print',
       '--model',
-      c.model,
-      ...(c.variant ? ['--effort', c.variant] : []),
-      ...c.extra_args,
+      cfg.model,
+      ...(cfg.variant ? ['--effort', cfg.variant] : []),
+      ...cfg.extra_args,
       '--append-system-prompt',
       `${task.systemPrompt}\n\n${outputInstructionsForTask(task)}`,
     ];
     return args;
   },
   createMetaReviewer: (config, ctx): MetaReviewFn | undefined => {
-    const c = ClaudeCodeConfigSchema.parse(config);
     return createSubprocessMetaReviewer(
-      c.binary,
-      () => ['--print', '--model', c.model],
-      c.cwd ?? ctx.workspaceRoot,
-      c.timeout_ms,
+      config.binary,
+      () => ['--print', '--model', config.model],
+      config.cwd ?? ctx.workspaceRoot,
+      config.timeout_ms,
     );
   },
 });

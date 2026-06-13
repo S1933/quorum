@@ -5,24 +5,24 @@ import { ConfigError } from '../core/errors.ts';
 import type { Provider } from '../core/provider.ts';
 import type { PluginCtx } from '../runtime/plugin.ts';
 
-export interface ProviderFactory {
+export interface ProviderFactory<S extends z.ZodTypeAny = z.ZodTypeAny> {
   type: string;
-  schema: z.ZodTypeAny;
+  schema: S;
   create(
     instanceId: string,
-    config: unknown,
+    config: z.infer<S>,
     ctx: PluginCtx,
   ): Promise<Provider>;
   createMetaReviewer?(
-    config: unknown,
+    config: z.infer<S>,
     ctx: PluginCtx,
   ): MetaReviewFn | undefined;
 }
 
 export class ProviderRegistry {
-  private readonly factories = new Map<string, ProviderFactory>();
+  private readonly factories = new Map<string, ProviderFactory<z.ZodTypeAny>>();
 
-  register(factory: ProviderFactory): void {
+  register(factory: ProviderFactory<z.ZodTypeAny>): void {
     if (this.factories.has(factory.type)) {
       throw new ConfigError(
         `Provider type "${factory.type}" already registered`,
@@ -31,7 +31,7 @@ export class ProviderRegistry {
     this.factories.set(factory.type, factory);
   }
 
-  resolve(type: string): ProviderFactory | undefined {
+  resolve(type: string): ProviderFactory<z.ZodTypeAny> | undefined {
     return this.factories.get(type);
   }
 

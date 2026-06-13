@@ -9,39 +9,37 @@ export const geminiCliFactory = createSubprocessProvider({
   schema: GeminiCliConfigSchema,
   processOutput: (raw) => raw.trim(),
   buildArgs: (cfg, ctx) => {
-    const c = GeminiCliConfigSchema.parse(cfg);
-    const model = ctx.modelOverride?.model ?? c.model;
+    const model = ctx.modelOverride?.model ?? cfg.model;
     const args = [
       '--prompt',
       STDIN_PROMPT,
       '--approval-mode',
-      c.approval_mode,
+      cfg.approval_mode,
       '--output-format',
       'text',
-      ...c.extra_args,
+      ...cfg.extra_args,
     ];
-    if (c.sandbox) args.push('--sandbox');
-    if (c.skip_trust) args.push('--skip-trust');
+    if (cfg.sandbox) args.push('--sandbox');
+    if (cfg.skip_trust) args.push('--skip-trust');
     if (model) args.push('--model', model);
     return args;
   },
   createMetaReviewer: (config, ctx): MetaReviewFn | undefined => {
-    const c = GeminiCliConfigSchema.parse(config);
     return createSubprocessMetaReviewer(
-      c.binary,
+      config.binary,
       () => {
         const args = [
           '--approval-mode',
-          c.approval_mode,
+          config.approval_mode,
           '--output-format',
           'text',
         ];
-        if (c.sandbox) args.push('--sandbox');
-        if (c.skip_trust) args.push('--skip-trust');
+        if (config.sandbox) args.push('--sandbox');
+        if (config.skip_trust) args.push('--skip-trust');
         return args;
       },
-      c.cwd ?? ctx.workspaceRoot,
-      c.timeout_ms,
+      config.cwd ?? ctx.workspaceRoot,
+      config.timeout_ms,
     );
   },
 });
