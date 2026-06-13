@@ -40,7 +40,6 @@ Quorum runs multiple AI reviewers on a git diff and highlights findings they agr
 git clone https://github.com/S1933/quorum.git
 cd quorum
 bun install && bun link
-cp .env.example .env   # then add your API key
 ```
 
 ### 2. Add a reviewer

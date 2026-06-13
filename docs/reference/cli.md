@@ -1,5 +1,13 @@
 # CLI Reference
 
+## Setup
+
+Before using the CLI, copy and configure the environment template:
+
+```bash
+cp .env.example .env   # then add your API key
+```
+
 ## `quorum review`
 
 Run a review pipeline against the current git diff.
