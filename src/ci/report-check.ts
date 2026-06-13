@@ -86,6 +86,7 @@ function buildComment(
   report: JsonReport,
   findings: ReportFinding[],
   failOnLabel: string,
+  failOnRank: number,
   blocked: boolean,
 ): string {
   const lines: string[] = [];
@@ -110,7 +111,7 @@ function buildComment(
   }
 
   if (blocked) {
-    const blockedCount = findings.filter(({ finding: f }) => SEVERITY_RANK[f.severity] >= rankForFailOn(failOnLabel)).length;
+    const blockedCount = findings.filter(({ finding: f }) => SEVERITY_RANK[f.severity] >= failOnRank).length;
     lines.push(`\u274C **BLOCKED** — ${blockedCount} finding(s) at or above **${failOnLabel}** severity`);
   } else if (totalCount > 0) {
     lines.push('\u2705 **PASSED** — no blocking findings');
@@ -234,7 +235,7 @@ try {
 
 const findings = collectJsonReportFindings(report);
 const blocked = emitAnnotations(findings, failOnRank);
-const comment = buildComment(report, findings, failOn, blocked);
+const comment = buildComment(report, findings, failOn, failOnRank, blocked);
 
 const dir = dirname(commentFile);
 if (!existsSync(dir)) mkdirSync(dir, { recursive: true });

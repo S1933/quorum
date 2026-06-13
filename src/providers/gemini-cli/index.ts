@@ -1,9 +1,7 @@
 import type { MetaReviewFn } from '../../consensus/registry.ts';
 import { createSubprocessMetaReviewer } from '../subprocess.ts';
-import { createSubprocessProvider } from '../base-subprocess.ts';
+import { createSubprocessProvider, STDIN_PROMPT } from '../base-subprocess.ts';
 import { GeminiCliConfigSchema, type GeminiCliConfig } from './schema.ts';
-
-const STDIN_PROMPT = 'Read the review instructions from stdin and return only the requested output.';
 
 export const geminiCliFactory = createSubprocessProvider({
   type: 'gemini-cli',

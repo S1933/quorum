@@ -74,14 +74,10 @@ The single load-bearing interface.
 // src/core/provider.ts
 export interface Provider {
   readonly id: string;
-  readonly kind: ProviderKind; // 'http' | 'subprocess' | 'sdk'
 
   capabilities(): ProviderCapabilities;
 
   review?(task: ReviewTask, ctx: ExecCtx): Promise<ReviewResult>;
-
-  // Optional: providers that natively stream emit events; orchestrator falls back to non-streaming.
-  stream?(task: ReviewTask, ctx: ExecCtx): AsyncIterable<ProviderEvent>;
 
   dispose?(): Promise<void>;
 }
@@ -92,8 +88,7 @@ export interface ProviderCapabilities {
   tools: boolean;          // function/tool calling
   mcp: boolean;            // MCP server support
   localExecution: boolean; // runs on-host (ollama, claude-code SDK)
-  backgroundJobs: boolean; // can detach long-running tasks
-  costReporting: boolean;  // returns token/$ usage
+  maxConcurrentReviews?: number;
 }
 
 export interface ExecCtx {
@@ -101,14 +96,15 @@ export interface ExecCtx {
   signal: AbortSignal;
   workspace: WorkspaceInfo;
   modelOverride?: ModelConfig;
+  reviewerId?: string;
 }
 ```
 
 **Design choices:**
 
 - `review` is the load-bearing provider method. Providers may wrap HTTP APIs, local CLIs, or SDKs, but Quorum only asks them for structured review findings.
-- `kind` exposes the *shape* of the adapter (HTTP, subprocess, SDK) so the runtime can apply shape-specific concerns (subprocess providers get spawn budgets; HTTP providers get rate-limit handling).
-- `stream` is optional with a non-streaming fallback. Forces no provider to invent fake streaming.
+- `capabilities.streaming` describes whether review execution emits token previews; streaming is observable through `reviewer.event` events, not a separate provider method.
+- `maxConcurrentReviews` lets local CLI providers constrain parallel pipeline execution when the underlying binary cannot run safely in parallel.
 - `ExecCtx` carries the event bus by reference — providers emit events, they don't return them. Decouples observability from return values.
 
 **ProviderEvent contract:**
@@ -433,7 +429,7 @@ Each milestone gates on the prior one. No provider work before M1's config loade
 |---|---|
 | **Provider interface ossifies too early.** | Build M2 + M3 (HTTP + SDK) before generalizing. Two real implementations beat any amount of upfront design. |
 | **Consensus engine becomes a research project.** | Ship `overlap-v1` and resist embedding work until users ask. The badge is more valuable than the algorithm. |
-| **Subprocess providers have varied I/O.** | Validated. Seven subprocess providers (claude-code, codex-cli, gemini-cli, continue-dev, kilo-code, opencode, cursor-agent) share a common `runSubprocess()` runner with provider-specific args building and output normalization. The `kind: 'subprocess'` abstraction held up well. |
+| **Subprocess providers have varied I/O.** | Validated. Seven subprocess providers (claude-code, codex-cli, gemini-cli, continue-dev, kilo-code, opencode, cursor-agent) share a common `createSubprocessProvider()`/`runSubprocess()` implementation with provider-specific args building and output normalization. |
 | **Streaming is inconsistent across providers.** | Capability flag + fallback. UI must work without streaming; streaming is an upgrade, not a contract. |
 | **Claude Code skill API drift.** | The skill layer is intentionally thin and shells out to `src/cli`. If Claude Code's skill shape changes, only the skill layer is affected. |
 | **Cost runaway with parallel pipelines.** | V1 ships with per-pipeline reviewer count printed up front. V2 adds budget guards. |

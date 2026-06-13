@@ -2,12 +2,6 @@ import type { ProviderEvent } from './provider.ts';
 import type { ReviewResult } from './task.ts';
 import type { PipelineResult, ReviewerError } from './pipeline.ts';
 
-export interface ReviewerQuestion {
-  reviewerId: string;
-  question: string;
-  context?: string;
-}
-
 export type QuorumEvent =
   | { type: 'pipeline.started'; pipelineId: string; reviewers: string[] }
   | { type: 'reviewer.started'; reviewerId: string }

@@ -9,7 +9,6 @@ import { OllamaConfigSchema, type OllamaConfig } from './schema.ts';
 const PROVIDER_TYPE = 'ollama';
 
 class OllamaProvider implements Provider {
-  readonly kind = 'http' as const;
   private readonly client: OllamaClient;
 
   constructor(readonly id: string, private readonly cfg: OllamaConfig) {
@@ -81,27 +80,6 @@ class OllamaProvider implements Provider {
       durationMs: Date.now() - started,
     };
     return usage ? { ...result, usage } : result;
-  }
-
-  async *stream(task: ReviewTask, ctx: ExecCtx) {
-    try {
-      for await (const event of this.client.chatStream(chatRequest(this.cfg, ctx, messagesFor(task)), ctx.signal)) {
-        if (event.type === 'token') {
-          yield { type: 'token' as const, text: event.text };
-        } else if (event.type === 'chunk_parse_error') {
-          yield { type: 'log' as const, level: 'warn' as const, msg: `skipped malformed chunk: ${event.raw}` };
-        } else {
-          yield {
-            type: 'usage' as const,
-            inputTokens: event.prompt_eval_count,
-            outputTokens: event.eval_count,
-          };
-        }
-      }
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return;
-      throw new ProviderRuntimeError(this.id, `stream failed: ${(err as Error).message}`, err);
-    }
   }
 }
 

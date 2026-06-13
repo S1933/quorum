@@ -2,7 +2,6 @@ import type { Provider, ProviderCapabilities, ExecCtx } from '../../core/provide
 import type { ReviewTask, ReviewResult, UsageInfo } from '../../core/task.ts';
 import type { ProviderFactory } from '../registry.ts';
 import type { MetaReviewFn } from '../../consensus/registry.ts';
-import { ProviderRuntimeError } from '../../core/errors.ts';
 import { OpenRouterConfigSchema, type OpenRouterConfig } from './schema.ts';
 import { OpenRouterClient, type ChatMessage } from './client.ts';
 import { outputInstructionsForTask, parseReviewOutput } from '../../reviewers/output.ts';
@@ -10,7 +9,6 @@ import { outputInstructionsForTask, parseReviewOutput } from '../../reviewers/ou
 const PROVIDER_TYPE = 'openrouter';
 
 class OpenRouterProvider implements Provider {
-  readonly kind = 'http' as const;
   private readonly client: OpenRouterClient;
 
   constructor(readonly id: string, private readonly cfg: OpenRouterConfig) {
@@ -95,26 +93,6 @@ class OpenRouterProvider implements Provider {
       durationMs: Date.now() - started,
     };
     return usage ? { ...result, usage } : result;
-  }
-
-  async *stream(task: ReviewTask, ctx: ExecCtx) {
-    const messages: ChatMessage[] = [
-      { role: 'system', content: `${task.systemPrompt}\n\n${outputInstructionsForTask(task)}` },
-      { role: 'user', content: task.instruction },
-    ];
-
-    try {
-      for await (const event of this.client.chatStream(
-        chatRequest(this.cfg, ctx, messages),
-        ctx.signal,
-      )) {
-        if (event.type === 'token') yield { type: 'token' as const, text: event.text };
-        else if (event.type === 'chunk_parse_error') yield { type: 'log' as const, level: 'warn' as const, msg: `skipped malformed chunk: ${event.raw}` };
-      }
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return;
-      throw new ProviderRuntimeError(this.id, `stream failed: ${(err as Error).message}`, err);
-    }
   }
 }
 
