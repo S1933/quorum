@@ -1,6 +1,6 @@
 # Quorum
 
-![Quorum Workflow](docs/assets/quorum-workflow.png)
+![Quorum Workflow](docs/assets/quorum-workflow.jpeg)
 
 [![CI](https://github.com/S1933/quorum/actions/workflows/ci.yml/badge.svg)](https://github.com/S1933/quorum/actions/workflows/ci.yml)
 [![Bun](https://img.shields.io/badge/runtime-Bun-000?logo=bun&logoColor=white)](https://bun.sh)
