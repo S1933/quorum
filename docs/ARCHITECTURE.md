@@ -1,10 +1,10 @@
 # Quorum — Architecture
 
-> Status: **draft v0.1** · scope: design, not implementation · last updated 2026-05-30
+> Status: **implemented v0.1** · scope: architecture and implementation map · last updated 2026-06-13
 
 Quorum is a provider-agnostic review runtime for AI-assisted code changes. Its differentiator is **multi-model consensus review**: when implementation is complete, the same reviewer persona is run across multiple providers, and a consensus engine aggregates and deduplicates findings like a team review meeting made only of LLM reviewers.
 
-This document defines the domain model, layer boundaries, interfaces, and V1 cut. It deliberately defers anything not load-bearing for the first working version.
+This document defines the domain model, layer boundaries, interfaces, shipped surfaces, and deferred work.
 
 Accepted architecture decisions are tracked in [Architecture Decision Records](adr/README.md).
 
@@ -17,7 +17,7 @@ Accepted architecture decisions are tracked in [Architecture Decision Records](a
 3. **Core has no I/O.** `core/` defines types and pure logic. All network, filesystem, and subprocess work lives in `providers/` or `runtime/`.
 4. **Event-driven, not callback soup.** A single event bus carries lifecycle events. UIs subscribe; they do not poll.
 5. **Provider variety validates the seam.** Quorum ships HTTP and local subprocess adapters, but they all satisfy the same review-focused provider interface.
-6. **No premature consensus.** V1 consensus = group findings by file+line overlap and emit an "N agreed" badge. Embedding-based semantic dedup and trust scoring are roadmap, not V1.
+6. **Consensus stays pragmatic.** Default consensus groups findings by file+line overlap and emits an "N agreed" badge. Additional strategies exist, but trust scoring and smart routing remain out of scope.
 7. **Claude Code skill is a *distribution*, not the *runtime*.** The core is a Bun library + CLI; the skill is a thin adapter.
 
 ---
@@ -35,7 +35,7 @@ The vocabulary the rest of the codebase enforces.
 | **ReviewTask** | "Critique this." Diff, files, or prompt + persona-targeted instruction. Producer of `Finding[]`. | An implementation task. |
 | **Finding** | One issue: `{file, lineRange, severity, category, title, body, reviewer}`. | A whole review. |
 | **Pipeline** | A named, ordered or parallel set of `ReviewerRef`s with optional consensus config. | A reviewer. |
-| **Consensus** | Aggregation/dedup/contradiction-detection across `ReviewResult`s. | Voting infrastructure (deferred). |
+| **Consensus** | Aggregation, dedup, optional contradiction detection across `ReviewResult`s. | Persistent reviewer reputation or routing. |
 
 Three-tier hierarchy: **Provider → Reviewer → Pipeline.** Personas hang off Reviewers. Findings flow up through Consensus.
 
@@ -45,13 +45,13 @@ Three-tier hierarchy: **Provider → Reviewer → Pipeline.** Personas hang off 
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Distribution: Claude Code skill · CLI · (future: web UI)    │
+│  Distribution: CLI · Claude Code skill · GitHub Action       │
 ├──────────────────────────────────────────────────────────────┤
-│  UI: terminal renderer · markdown/json reports               │
+│  UI: terminal renderer · TUI · markdown/json reports         │
 ├──────────────────────────────────────────────────────────────┤
-│  Runtime: event bus · plugin lifecycle · config loader       │
+│  Runtime: event bus · provider/consensus registries · config │
 ├──────────────────────────────────────────────────────────────┤
-│  Pipelines: parallel/sequential executor · timeout · retry   │
+│  Pipelines: parallel/sequential executor · timeout · budget  │
 ├──────────────────────────────────────────────────────────────┤
 │  Reviewers (Persona+Provider binding)   Consensus engine     │
 ├──────────────────────────────────────────────────────────────┤
@@ -87,7 +87,7 @@ export interface ProviderCapabilities {
   streaming: boolean;
   tools: boolean;          // function/tool calling
   mcp: boolean;            // MCP server support
-  localExecution: boolean; // runs on-host (ollama, claude-code SDK)
+  localExecution: boolean; // runs on-host (ollama, local CLI providers)
   maxConcurrentReviews?: number;
 }
 
@@ -127,21 +127,23 @@ Bounded, finite event set. Anything new requires a discriminator addition (caugh
 Providers are registered, not imported, so external plugins can drop them in.
 
 ```ts
-// src/runtime/registry.ts
+// src/providers/registry.ts
 export interface ProviderFactory {
   type: string;                                 // 'openrouter', 'claude-code', 'ollama', …
   schema: z.ZodTypeAny;                         // zod schema for this provider's config block
-  create(config: unknown, ctx: PluginCtx): Promise<Provider>;
+  create(instanceId: string, config: unknown, ctx: PluginCtx): Promise<Provider>;
+  createMetaReviewer?(config: unknown, ctx: PluginCtx): MetaReviewFn | undefined;
 }
 
 export class ProviderRegistry {
   register(factory: ProviderFactory): void;
   resolve(type: string): ProviderFactory | undefined;
-  instantiate(type: string, cfg: unknown, ctx: PluginCtx): Promise<Provider>;
+  instantiate(id: string, cfg: unknown, ctx: PluginCtx): Promise<Provider>;
+  list(): string[];
 }
 ```
 
-Lifecycle: `register` → (config load) → `create` → (use) → `dispose`. Built-in providers (openrouter, ollama, claude-code, codex-cli, gemini-cli, kilo-code, opencode, cursor-agent) are registered at runtime boot. External provider plugins are **not yet supported** — the registry API is designed to accommodate them, but no discovery or loading mechanism exists. A future `@quorum/plugin-*` package convention is under consideration for V1.x.
+Lifecycle: `register` → (config load) → `instantiate` → `create` → (use) → `dispose`. Built-in providers (openrouter, ollama, claude-code, codex-cli, gemini-cli, kilo-code, opencode/open-code-go, cursor-agent) are registered at runtime boot. External provider plugins are **not yet supported** — the registry API is designed to accommodate them, but no discovery or loading mechanism exists. A future `@quorum/plugin-*` package convention remains open.
 
 ---
 
@@ -208,18 +210,32 @@ pipelines:
     parallel: true
     reviewers: [sec-opus, perf-opus, arch-opus]
     consensus: { strategy: overlap-v1 }
+    timeoutMs: 300000
+    maxConcurrency: 3
+    maxTotalCostUsd: 1.00
 
   consensus-security:
     parallel: true
     reviewers: [sec-opus, sec-gpt]      # same persona, different providers
     consensus: { strategy: overlap-v1, requireAgreement: 2 }
+
+  semantic:
+    parallel: true
+    reviewers: [sec-opus, perf-opus, arch-opus]
+    consensus:
+      strategy: semantic-v2
+      similarityThreshold: 0.78
+      enableContradictions: true
 ```
 
 **Schema notes:**
 
 - `reviewers.*.provider` embeds the provider config (`type`, `model`, auth, transport options).
+- `reviewers.*.overrides` can override `model`, `temperature`, `maxTokens`, and `topP` without duplicating provider auth.
+- `reviewers.*.fileExtensions` can scope reviewers to changed-file extensions before execution.
 - Pipelines reference reviewers by id; they never embed persona/provider inline.
-- `consensus.strategy` is a registry key; V1 ships `overlap-v1` only.
+- `consensus.strategy` is a registry key; shipped strategies are `overlap-v1`, `majority-v1`, `severity-aware-v1`, and `semantic-v2`.
+- Pipeline guards include `timeoutMs`, `maxConcurrency`, `maxReviewers`, and `maxTotalCostUsd`.
 
 Loader resolves `env:` lazily so missing keys fail at provider instantiation, not at config-parse time — better error locality.
 
@@ -227,47 +243,61 @@ Loader resolves `env:` lazily so missing keys fail at provider instantiation, no
 
 ## 7. Orchestration engine
 
-Two execution modes for V1: **parallel** and **sequential**. No DAG yet.
+Two execution modes: **parallel** and **sequential**. No DAG yet.
 
 ```ts
-// src/pipelines/pipeline.ts
-export interface PipelineExecutor {
-  run(pipeline: Pipeline, task: ReviewTask, ctx: ExecCtx): Promise<PipelineResult>;
-}
-
 export interface PipelineResult {
   pipelineId: string;
   reviews: ReviewResult[];         // one per reviewer
   consensus: ConsensusResult;       // produced by the consensus engine
   durationMs: number;
   errors: ReviewerError[];          // partial-failure tolerated
+  verdictSummary?: {
+    decision: 'approve' | 'revise' | 'block';
+    counts: Record<'approve' | 'revise' | 'block', number>;
+    summaries: Array<{
+      reviewerId: string;
+      decision: 'approve' | 'revise' | 'block';
+      summary: string;
+      confidence?: 'low' | 'medium' | 'high';
+    }>;
+  };
+  budgetExceeded?: boolean;
+  totalCostUsd?: number;
 }
 ```
 
-**Failure policy (V1):** *continue on reviewer failure*, surface the error in the report. Aborting the whole pipeline because one reviewer's API key is bad is the wrong default — the user wants partial signal.
+**Failure policy:** *continue on reviewer failure*, surface the error in the report. Aborting the whole pipeline because one reviewer's API key is bad is the wrong default — the user wants partial signal.
 
 **Cancellation:** Single `AbortSignal` from the entry point propagates to all reviewers via `ExecCtx`. Pipeline-level timeout cancels all in-flight reviewers and emits a `pipeline.timeout` event.
 
-**Backpressure:** Parallel pipelines run all reviewers concurrently. If a user configures 10 reviewers all hitting OpenRouter with the same key, that's their bandwidth problem in V1; rate-limit-aware scheduling is V2.
+**Backpressure:** Parallel pipelines honor `pipeline.maxConcurrency` and provider `maxConcurrentReviews`; the executor uses the lower configured limit. Rate-limit-aware scheduling remains future work.
+
+**Budget guard:** `maxTotalCostUsd` tracks provider-reported usage. Once the limit is exceeded, Quorum emits `pipeline.budget_exceeded`, aborts in-flight work, and returns partial results plus `budgetExceeded`.
 
 ---
 
 ## 8. Consensus engine
 
-The interesting part. Kept deliberately minimal in V1.
+Consensus is pluggable through `ConsensusRegistry`; each strategy consumes `ReviewResult[]` and returns a stable `ConsensusResult` for renderers.
 
 ```ts
-// src/consensus/consensus.ts
-export interface ConsensusStrategy {
-  id: string;
-  aggregate(reviews: ReviewResult[], cfg: unknown): ConsensusResult;
+// src/consensus/registry.ts
+export interface ConsensusStrategy<C extends ConsensusConfig = ConsensusConfig> {
+  id: C['strategy'];
+  aggregate(
+    reviews: ReviewResult[],
+    cfg: C,
+    ctx?: ConsensusContext,
+  ): ConsensusResult | Promise<ConsensusResult>;
 }
 
 export interface ConsensusResult {
   groups: FindingGroup[];           // overlapping/duplicate findings collapsed
   agreement: Record<string, number>; // groupId -> # of reviewers that raised it
   unique: Finding[];                // findings raised by exactly one reviewer
-  contradictions: Contradiction[];  // V2 — empty array in V1
+  contradictions: Contradiction[];
+  strategyId: string;
 }
 
 export interface FindingGroup {
@@ -278,22 +308,27 @@ export interface FindingGroup {
 }
 ```
 
-**V1 strategy: `overlap-v1`**
+**Shipped strategies:**
+
+- `overlap-v1` groups by same file, nearby line range, and same category.
+- `majority-v1` keeps groups that meet `requireAgreement`.
+- `severity-aware-v1` allows per-severity agreement thresholds.
+- `semantic-v2` groups by text similarity and can optionally use a meta-review provider for contradiction notes.
+
+**Default strategy: `overlap-v1`**
 
 Group two findings together iff:
 1. Same file path, *and*
 2. Line ranges overlap (or are within ±2 lines), *and*
 3. Same category (`security` | `performance` | `architecture` | `correctness` | `style`).
 
-Title/body are *not* compared semantically. Lexical near-duplicates may still be split — that's acceptable for V1. The "N reviewers agreed" badge gives the user signal even if grouping isn't perfect.
+Title/body are *not* compared semantically. Lexical near-duplicates may still be split — that's acceptable for the default path. The "N reviewers agreed" badge gives the user signal even if grouping isn't perfect.
 
-**V2 roadmap (not built):**
-- Embedding-based semantic grouping (cosine similarity on title+body).
-- LLM-based meta-reviewer for contradiction detection.
+**Still deferred:**
 - Per-reviewer trust scores from user feedback (👍/👎 in the UI).
 - Weighted voting where reviewers known to hallucinate get downweighted.
 
-**Why this is enough:** the user gets *some* signal about which findings are widely agreed-upon — the central UX promise. Perfect dedup is not required to deliver that.
+**Why this is enough:** the user gets signal about which findings are widely agreed-upon — the central UX promise. Perfect dedup is not required to deliver that.
 
 ---
 
@@ -309,30 +344,40 @@ type QuorumEvent =
   | { type: 'reviewer.finished'; reviewerId: string; result: ReviewResult }
   | { type: 'reviewer.failed';   reviewerId: string; error: ReviewerError }
   | { type: 'pipeline.finished'; result: PipelineResult }
-  | { type: 'pipeline.timeout' };
+  | { type: 'pipeline.timeout' }
+  | { type: 'pipeline.budget_exceeded'; spent: number; limit: number }
+  | { type: 'questions.collected'; count: number }
+  | { type: 'questions.waiting' }
+  | { type: 'questions.answered'; count: number };
 
 export interface EventBus {
   emit(e: QuorumEvent): void;
   on<K extends QuorumEvent['type']>(type: K, fn: (e: Extract<QuorumEvent, {type: K}>) => void): () => void;
+  onAny(fn: (e: QuorumEvent) => void): () => void;
 }
 ```
 
-The terminal renderer subscribes to runtime events for live progress. Markdown and JSON reports render the final `PipelineResult`, keeping report generation deterministic and easy to test.
+The terminal renderer subscribes to runtime events for live progress. Interactive review mode uses the question events to collect clarifications before final findings. Markdown and JSON reports render the final `PipelineResult`, keeping report generation deterministic and easy to test.
 
 ---
 
-## 10. Claude Code skill layer
+## 10. Distribution surfaces
 
-V1 distribution. Lives under `skills/`.
+The CLI is the primary runtime surface. Other integrations shell out to it or reuse `src/cli/index.ts`.
 
-**Skills:**
-- `quorum-review` — Run the configured pipeline on the current diff (`git diff` vs default branch). Renders the consensus report inline.
+**CLI commands:**
 
-**Optional surfaces (V1.x):**
-- A hook that runs `quorum-review` post-commit and writes a markdown report to `.quorum/last-review.md`.
-- An MCP server exposing `quorum.review_diff` as a tool callable from Claude inside Claude Code.
+- `quorum review` — review the current diff and write `.quorum/last-review.md` unless JSON or a custom report path is requested.
+- `quorum plan-review <plan-file>` — review an implementation plan and produce a verdict summary.
+- `quorum reviewer add` — add a reviewer to `quorum.yaml`.
+- `quorum dashboard` — launch the Ink TUI dashboard.
 
-**Boundary contract:** the skill is a *thin* shell — it parses args, loads config, invokes the CLI entry point, subscribes to events, prints. Zero domain logic in the skill file.
+**Integrations:**
+
+- `skills/review/SKILL.md` — Claude Code skill wrapper around the CLI.
+- `action.yml` + `src/ci/report-check.ts` — GitHub Action entry point and report validation.
+
+**Boundary contract:** integrations stay thin. Domain logic belongs in `src/core/`, provider adapters, the pipeline executor, consensus strategies, and renderers.
 
 ---
 
@@ -344,6 +389,30 @@ quorum/
 │   └── review/
 │       └── SKILL.md
 ├── src/
+│   ├── ci/
+│   │   └── report-check.ts
+│   ├── cli/
+│   │   ├── args.ts
+│   │   ├── index.ts              # Bun entry point; reused by integrations
+│   │   ├── report.ts
+│   │   └── commands/
+│   │       ├── dashboard.ts
+│   │       ├── plan-review.ts
+│   │       ├── review.ts
+│   │       └── reviewer.ts
+│   ├── config/
+│   │   ├── schema.ts
+│   │   ├── loader.ts
+│   │   ├── interpolate.ts
+│   │   ├── redact.ts
+│   │   └── sensitive-fields.ts
+│   ├── consensus/
+│   │   ├── registry.ts
+│   │   ├── overlap-v1.ts
+│   │   ├── majority-v1.ts
+│   │   ├── severity-aware-v1.ts
+│   │   ├── semantic-v2.ts
+│   │   └── contradictions.ts
 │   ├── core/                # types, schemas, errors. No I/O.
 │   │   ├── provider.ts
 │   │   ├── task.ts
@@ -352,9 +421,15 @@ quorum/
 │   │   ├── pipeline.ts
 │   │   ├── events.ts
 │   │   └── errors.ts
+│   ├── interactive/
+│   │   └── qa.ts
+│   ├── pipelines/
+│   │   ├── budget.ts
+│   │   └── executor.ts
 │   ├── providers/
 │   │   ├── registry.ts
 │   │   ├── subprocess.ts          # shared runner + output normaliser
+│   │   ├── base-subprocess.ts
 │   │   ├── openrouter/            # HTTP provider
 │   │   ├── ollama/                # HTTP provider
 │   │   ├── claude-code/           # subprocess provider
@@ -364,35 +439,24 @@ quorum/
 │   │   ├── opencode/              # subprocess provider
 │   │   └── cursor-agent/          # subprocess provider
 │   ├── reviewers/
-│   │   └── reviewer.ts     # binding logic; personas defined in quorum.yaml only
-│   ├── pipelines/
-│   │   └── executor.ts
-│   ├── consensus/
-│   │   ├── registry.ts
-│   │   └── overlap-v1.ts
-│   ├── config/
-│   │   ├── schema.ts
-│   │   ├── loader.ts
-│   │   └── interpolate.ts
+│   │   ├── reviewer.ts            # binding logic; personas defined in quorum.yaml
+│   │   └── output.ts
 │   ├── runtime/
 │   │   ├── bus.ts
 │   │   ├── plugin.ts
+│   │   ├── runtime.ts
 │   │   └── workspace.ts
 │   ├── ui/
 │   │   ├── terminal.ts
 │   │   ├── markdown.ts
-│   │   └── json.ts
-│   └── cli/
-│       ├── index.ts              # bun entrypoint; reused by Quorum skill
-│       └── commands/
-│           ├── review.ts
-│           ├── config.ts
-│           ├── setup.ts
-│           ├── reviewers.ts
-│           └── reviewer.ts
+│   │   ├── json.ts
+│   │   ├── report-model.ts
+│   │   └── tui/
+│   └── index.ts
 ├── tests/
 ├── docs/
 │   └── ARCHITECTURE.md     # this doc
+├── action.yml
 ├── quorum.yaml.example
 ├── bunfig.toml
 ├── package.json
@@ -400,25 +464,22 @@ quorum/
 └── README.md
 ```
 
-**Key observation:** `src/cli/index.ts` is the single entry point. The skill shells out to it with stable, scriptable args.
+**Key observation:** `src/cli/index.ts` is the single command entry point. The skill and GitHub Action integration use stable, scriptable CLI behavior instead of duplicating review logic.
 
 ---
 
-## 12. V1 implementation strategy
+## 12. Shipped implementation map
 
-Six milestones, each independently shippable.
+| Area | Shipped state |
+|---|---|
+| **Core + config** | Zod-validated YAML, lazy env interpolation, redaction helpers, strict TypeScript domain types. |
+| **Providers** | OpenRouter and Ollama HTTP adapters; Claude Code, Codex CLI, Gemini CLI, Kilo Code, OpenCode/open-code-go, and Cursor Agent subprocess adapters. |
+| **Pipelines** | Parallel/sequential execution, partial failure tolerance, timeout propagation, provider/pipeline concurrency limits, cost budget aborts. |
+| **Consensus** | `overlap-v1`, `majority-v1`, `severity-aware-v1`, and `semantic-v2` strategies. |
+| **Review surfaces** | Diff review, plan review with verdict summary, interactive Q&A mode, terminal progress, markdown/JSON reports, archived reports. |
+| **Distribution** | Bun CLI, Claude Code skill, GitHub Action metadata, Ink dashboard. |
 
-| # | Milestone | Definition of done |
-|---|---|---|
-| M1 | **Core types + config loader** | `quorum.yaml.example` parses, zod validates, env interpolation works, tests pass. No providers wired. |
-| M2 | **OpenRouter provider** | A review request round-trips through OpenRouter and returns structured findings plus token usage. |
-| M3 | **Claude Code provider** | The same review task runs against Claude Code locally. Validates the abstraction across HTTP vs subprocess shapes. |
-| M4 | **Parallel pipeline + overlap-v1 consensus** | `quorum review` on a diff runs 2 reviewers in parallel, prints grouped findings with "N agreed" badges. |
-| M5 | **Terminal + markdown renderers** | Both renderers subscribe to events, produce live terminal output, and write a final `.quorum/last-review.md`. |
-| M6 | **Claude Code skill** | `quorum-review` works end-to-end inside Claude Code after an implementation is complete. |
-| M7 | **CLI setup + reviewer commands** | `quorum setup`, `quorum reviewers`, `quorum reviewer add` for project integration and config management. |
-
-Each milestone gates on the prior one. No provider work before M1's config loader is solid — fixing config-parsing bugs after providers exist is much more expensive.
+The remaining architecture work is extension and hardening, not bootstrapping.
 
 ---
 
@@ -426,33 +487,30 @@ Each milestone gates on the prior one. No provider work before M1's config loade
 
 | Risk | Mitigation |
 |---|---|
-| **Provider interface ossifies too early.** | Build M2 + M3 (HTTP + SDK) before generalizing. Two real implementations beat any amount of upfront design. |
-| **Consensus engine becomes a research project.** | Ship `overlap-v1` and resist embedding work until users ask. The badge is more valuable than the algorithm. |
+| **Provider interface ossifies too early.** | Keep provider capability flags small; add methods only after two adapters need the same shape. |
+| **Consensus engine becomes a research project.** | Keep `overlap-v1` as the default. More advanced strategies must degrade to deterministic report output. |
 | **Subprocess providers have varied I/O.** | Validated. Six subprocess providers (claude-code, codex-cli, gemini-cli, kilo-code, opencode, cursor-agent) share a common `createSubprocessProvider()`/`runSubprocess()` implementation with provider-specific args building and output normalization. |
 | **Streaming is inconsistent across providers.** | Capability flag + fallback. UI must work without streaming; streaming is an upgrade, not a contract. |
 | **Claude Code skill API drift.** | The skill layer is intentionally thin and shells out to `src/cli`. If Claude Code's skill shape changes, only the skill layer is affected. |
-| **Cost runaway with parallel pipelines.** | V1 ships with per-pipeline reviewer count printed up front. V2 adds budget guards. |
-| **YAML config sprawl.** | Built-in personas + a starter `quorum.yaml.example`. Most users should be able to run a sensible default with no config. |
+| **Cost runaway with parallel pipelines.** | Use `maxReviewers`, `maxConcurrency`, and `maxTotalCostUsd`; render final cost when providers report usage. |
+| **YAML config sprawl.** | Starter `quorum.yaml.example`, `reviewer add`, and strict schemas keep config errors local. |
 
 ---
 
-## 14. Out of scope for V1
+## 14. Out of scope
 
 Explicit deferrals — capture here so they don't sneak in.
 
 - DAG-based pipelines (parallel + sequential only).
-- Embedding-based semantic dedup.
-- Contradiction detection between reviewers.
 - Per-reviewer trust scores and weighted voting.
-- Web dashboard / SaaS UI.
+- SaaS UI.
 - Distributed reviewer execution / remote workers.
 - Provider marketplace / plugin registry.
 - Cost-optimizing smart router.
 - Persistent memory across reviews.
-- GitHub Action / CI integration (planned for V1.x but not V1).
 - Aider and LiteLLM review providers (planned post-V1).
 
-**Implemented since initial draft:** Codex CLI, Cursor Agent, Gemini CLI, Kilo Code, and OpenCode are now shipped as built-in subprocess providers alongside the original OpenRouter, Claude Code, and Ollama adapters.
+Implemented since the initial draft: Codex CLI, Cursor Agent, Gemini CLI, Kilo Code, and OpenCode are built-in subprocess providers; semantic consensus and contradiction notes exist behind `semantic-v2`; budget guards and GitHub Action plumbing are present.
 
 ---
 
@@ -462,6 +520,6 @@ The following questions from the original draft are now resolved by implementati
 
 1. **Reviewer config inheritance** — reviewers can override `temperature`, `maxTokens`, and `topP` via an `overrides` block on the reviewer config (`src/config/schema.ts`).
 2. **Finding parsing** — subprocess providers parse JSON output via the shared normalizer in `src/providers/subprocess.ts`. HTTP providers use structured JSON response formats.
-3. **Workspace context** — Quorum reads diffs via `git` directly (`src/runtime/workspace.ts`). The CLI is usable standalone; the skill passes only the repo root + base ref.
-
-**Implemented since initial draft:** Codex CLI, Cursor Agent, Gemini CLI, Kilo Code, and OpenCode are now shipped as built-in subprocess providers alongside the original OpenRouter, Claude Code, and Ollama adapters. The `skills/` directory replaces `plugin/`. Personas are defined in `quorum.yaml` only; the `src/reviewers/builtin/` directory has been removed. CLI commands are split into `src/cli/commands/` (review, config, setup, reviewers, reviewer).
+3. **Workspace context** — Quorum reads diffs via `git` directly (`src/runtime/workspace.ts`). The CLI is usable standalone; integrations pass only repo root, base ref, and flags.
+4. **CLI shape** — commands are split into `src/cli/commands/` (`review`, `plan-review`, `reviewer`, `dashboard`); setup is handled by config/example files and reviewer mutation.
+5. **Built-ins** — personas are defined in `quorum.yaml`; `src/reviewers/builtin/` has been removed.
