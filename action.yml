@@ -42,6 +42,9 @@ runs:
       env:
         OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
         GITHUB_ACTION_PATH: ${{ github.action_path }}
+        QUORUM_PIPELINE: ${{ inputs.pipeline }}
+        QUORUM_CONFIG: ${{ inputs.config }}
+        QUORUM_MAX_DIFF_BYTES: ${{ inputs.max_diff_bytes }}
       run: |
         if [ -z "$OPENROUTER_API_KEY" ]; then
           mkdir -p .quorum
@@ -65,11 +68,11 @@ runs:
         fi
 
         bun run "$GITHUB_ACTION_PATH/src/cli/index.ts" review \
-          --pipeline '${{ inputs.pipeline }}' \
-          --config '${{ inputs.config }}' \
+          --pipeline "$QUORUM_PIPELINE" \
+          --config "$QUORUM_CONFIG" \
           --json \
           --report .quorum/report.json \
-          --max-diff-bytes '${{ inputs.max_diff_bytes }}'
+          --max-diff-bytes "$QUORUM_MAX_DIFF_BYTES"
 
     - name: Check report
       id: check
@@ -78,6 +81,7 @@ runs:
       env:
         QUORUM_COMMENT_FILE: .quorum/pr-comment.md
         GITHUB_ACTION_PATH: ${{ github.action_path }}
+        QUORUM_FAIL_ON: ${{ inputs.fail_on }}
       run: |
         if [ -f .quorum/.review-skipped ]; then
           cp .quorum/skip-comment.md "$QUORUM_COMMENT_FILE"
@@ -102,7 +106,7 @@ runs:
 
         bun run "$GITHUB_ACTION_PATH/src/ci/report-check.ts" \
           .quorum/report.json \
-          --fail-on '${{ inputs.fail_on }}'
+          --fail-on "$QUORUM_FAIL_ON"
 
     - name: Post PR comment
       if: always()
