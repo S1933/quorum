@@ -40,11 +40,11 @@ describe('cursor-agent provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    const result = await provider.review?.(task(root, 'security-cursor'), {
+    const result = (await provider.review?.(task(root, 'security-cursor'), {
       bus: captureBus(events),
       signal: new AbortController().signal,
       workspace: { root },
-    });
+    }))!;
 
     expect(result.findings).toEqual([]);
     expect(result.rawOutput).toBe('{"findings":[]}');

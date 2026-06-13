@@ -65,9 +65,9 @@ describe('openrouter provider', () => {
       response_format: { type: 'json_object' },
       stream_options: { include_usage: true },
     });
-    expect(result.findings).toEqual([]);
-    expect(result.rawOutput).toBe('{"findings":[]}');
-    expect(result.usage).toEqual({ inputTokens: 5, outputTokens: 2 });
+    expect(result!.findings).toEqual([]);
+    expect(result!.rawOutput).toBe('{"findings":[]}');
+    expect(result!.usage).toEqual({ inputTokens: 5, outputTokens: 2 });
     expect(tokenText(events)).toBe('{"findings":[]}');
   });
 

@@ -67,9 +67,9 @@ describe('ollama provider', () => {
         top_p: 0.9,
       },
     });
-    expect(result.findings).toEqual([]);
-    expect(result.rawOutput).toBe('{"findings":[]}');
-    expect(result.usage).toEqual({ inputTokens: 7, outputTokens: 2 });
+    expect(result!.findings).toEqual([]);
+    expect(result!.rawOutput).toBe('{"findings":[]}');
+    expect(result!.usage).toEqual({ inputTokens: 7, outputTokens: 2 });
     expect(events).toContainEqual({
       type: 'reviewer.event',
       reviewerId: 'security-ollama',

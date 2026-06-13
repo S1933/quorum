@@ -40,11 +40,11 @@ describe('kilo-code provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    const result = await provider.review?.(task(root, 'security-kilo'), {
+    const result = (await provider.review?.(task(root, 'security-kilo'), {
       bus: captureBus(events),
       signal: new AbortController().signal,
       workspace: { root },
-    });
+    }))!;
 
     expect(result.findings).toEqual([]);
     expect(result.rawOutput).toBe('{"findings":[]}');

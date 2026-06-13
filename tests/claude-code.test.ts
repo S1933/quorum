@@ -39,11 +39,11 @@ describe('claude-code provider', () => {
     );
 
     const events: unknown[] = [];
-    const result = await provider.review?.(task(root, 'security-claude'), {
+    const result = (await provider.review?.(task(root, 'security-claude'), {
       bus: captureBus(events),
       signal: new AbortController().signal,
       workspace: { root },
-    });
+    }))!;
 
     expect(result.findings).toEqual([]);
     expect(result.rawOutput).toBe('{"findings":[]}');

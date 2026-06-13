@@ -73,8 +73,8 @@ describe('opencode provider', () => {
       workspace: { root },
     });
 
-    expect(result.findings).toEqual([]);
-    expect(result.rawOutput).toBe('{"findings":[]}');
+    expect(result!.findings).toEqual([]);
+    expect(result!.rawOutput).toBe('{"findings":[]}');
     expect(tokenText(events)).toBe('{"findings":[]}');
   });
 

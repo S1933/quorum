@@ -132,7 +132,7 @@ export async function parseReportSummary(
         const m = line.match(/^\|\s*\S+\s+(.+?)\s+\|\s*(\d+)\s*\|$/);
         if (m) {
           const key = m[1]?.trim();
-          severity[key] = parseInt(m[2]!, 10);
+          if (key) severity[key] = parseInt(m[2]!, 10);
         }
       }
     }

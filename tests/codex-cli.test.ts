@@ -41,11 +41,11 @@ describe('codex-cli provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    const result = await provider.review?.(task(root, 'security-codex'), {
+    const result = (await provider.review?.(task(root, 'security-codex'), {
       bus: captureBus(events),
       signal: new AbortController().signal,
       workspace: { root },
-    });
+    }))!;
 
     expect(result.findings).toEqual([]);
     expect(result.rawOutput).toBe('{"findings":[]}');
