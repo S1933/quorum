@@ -1,4 +1,3 @@
-import { isAbsolute, resolve } from 'node:path';
 import type { QuorumConfig, ReviewerConfig } from '../../config/schema.ts';
 import { ConfigError } from '../../core/errors.ts';
 import type { PipelineResult } from '../../core/pipeline.ts';
@@ -17,14 +16,8 @@ import {
 } from '../../reviewers/output.ts';
 import { defaultPluginCtx } from '../../runtime/plugin.ts';
 import { applyDiffLimits, type DiffLimits } from '../../runtime/workspace.ts';
-import { renderJsonReport } from '../../ui/json.ts';
-import { renderMarkdownReport } from '../../ui/markdown.ts';
 import { TerminalRenderer } from '../../ui/terminal.ts';
-import {
-  assertPathInside,
-  writeArchivedReport,
-  writeReport,
-} from '../report.ts';
+import { writeOutputReport } from '../report-output.ts';
 import type { CliDeps, CliIo } from '../types.ts';
 
 export async function cmdReview(
@@ -154,48 +147,20 @@ export async function cmdReview(
           pluginCtx: runtime.pluginCtx,
         });
 
-    if (format === 'json') {
-      const json = renderJsonReport(result);
-      if (typeof flags.report === 'string') {
-        const reportPath = resolveReportPath(root, flags.report, flags);
-        await writeReport(reportPath, json);
-      }
-      io.stdout.write(json);
-    } else {
-      const reportPath =
-        typeof flags.report === 'string'
-          ? resolveReportPath(root, flags.report, flags)
-          : `${root}/.quorum/last-review.md`;
-      const md = renderMarkdownReport(result);
-      await writeReport(reportPath, md);
-      await writeArchivedReport(root, 'review', filteredPipeline.id, md);
-      io.stdout.write(`\nreport: ${reportPath}\n`);
-      if (result.totalCostUsd) {
-        const over = result.budgetExceeded ? ' (budget exceeded)' : '';
-        io.stdout.write(
-          `💰  total cost: $${result.totalCostUsd.toFixed(4)}${over}\n`,
-        );
-      }
-    }
-    return result.errors.length > 0 && result.reviews.length === 0 ? 1 : 0;
+    return writeOutputReport({
+      result,
+      format,
+      flags,
+      root,
+      io,
+      archiveKind: 'review',
+      defaultReportName: 'last-review.md',
+      pipelineId: filteredPipeline.id,
+    });
   } finally {
     detach();
     await runtime.dispose();
   }
-}
-
-export function resolveReportPath(
-  root: string,
-  reportPath: string,
-  flags: Record<string, string | boolean>,
-): string {
-  const resolved = isAbsolute(reportPath)
-    ? reportPath
-    : resolve(root, reportPath);
-  if (flags['allow-report-outside-root'] !== true) {
-    assertPathInside(root, resolved);
-  }
-  return resolved;
 }
 
 export async function runInteractive(

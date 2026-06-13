@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { ConfigError } from '../core/errors.ts';
 import type { CliDeps } from './types.ts';
 
@@ -46,6 +46,20 @@ export function resolveConfigPath(
 ): string {
   const path = typeof value === 'string' ? value : deps.findConfigPath(root);
   return resolve(root, path);
+}
+
+export function resolveReportPath(
+  root: string,
+  reportPath: string,
+  allowOutside: boolean,
+): string {
+  const resolved = isAbsolute(reportPath)
+    ? reportPath
+    : resolve(root, reportPath);
+  if (!allowOutside) {
+    assertPathInside(root, resolved);
+  }
+  return resolved;
 }
 
 export function assertPathInside(root: string, path: string): void {
