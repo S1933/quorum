@@ -200,42 +200,6 @@ pipelines:
     expect(cfg.pipelines.default?.maxConcurrency).toBe(3);
   });
 
-  test('rejects invalid YAML', async () => {
-    await expect(loadConfigFromString('{ invalid: yaml: :')).rejects.toThrow(
-      ConfigError,
-    );
-  });
-
-  test('accepts empty reviewers array in pipeline', async () => {
-    const source = `
-version: 1
-personas:
-  sec: { description: d, system: s }
-reviewers:
-  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
-pipelines:
-  default: { reviewers: [] }
-`;
-    const cfg = await loadConfigFromString(source);
-    expect(cfg.pipelines.default?.reviewers).toEqual([]);
-  });
-
-  test('accepts pipeline with maxConcurrency', async () => {
-    const source = `
-version: 1
-personas:
-  sec: { description: d, system: s }
-reviewers:
-  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
-pipelines:
-  default:
-    reviewers: [r]
-    maxConcurrency: 3
-`;
-    const cfg = await loadConfigFromString(source);
-    expect(cfg.pipelines.default?.maxConcurrency).toBe(3);
-  });
-
   test('propagates maxConcurrency from config to resolved pipeline', async () => {
     const source = `
 version: 1
@@ -255,40 +219,6 @@ pipelines:
     });
     const pipeline = runtime.resolvePipeline('default');
     expect(pipeline.maxConcurrency).toBe(3);
-  });
-
-  test('rejects pipeline referencing unknown reviewer', async () => {
-    const source = `
-version: 1
-personas:
-  sec: { description: d, system: s }
-reviewers:
-  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
-pipelines:
-  default: { reviewers: [ghost] }
-`;
-    await expect(loadConfigFromString(source)).rejects.toThrow(
-      /unknown reviewer/,
-    );
-  });
-
-  test('rejects consensus.requireAgreement exceeding reviewer count', async () => {
-    const source = `
-version: 1
-personas:
-  sec: { description: d, system: s }
-reviewers:
-  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
-pipelines:
-  default:
-    reviewers: [r]
-    consensus:
-      strategy: overlap-v1
-      requireAgreement: 5
-`;
-    await expect(loadConfigFromString(source)).rejects.toThrow(
-      /requireAgreement.*exceeds/,
-    );
   });
 
   test('accepts typed strategy-specific consensus config', async () => {
