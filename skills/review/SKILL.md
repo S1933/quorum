@@ -24,7 +24,7 @@ Supported forms:
 
 - Optional positional `pipeline-id` (at most one).
 - Value flags: `--pipeline <id>`, `--pipeline=<id>`, `--base <ref>`, `--base=<ref>`, `--config <path>`, `--config=<path>`, `--report <path>`, `--report=<path>`, `--format text|json`, `--format=text|json`, `--max-diff-bytes <n>`, `--max-diff-bytes=<n>`, `--include <glob[,glob]>`, `--include=<glob[,glob]>`, `--exclude <glob[,glob]>`, `--exclude=<glob[,glob]>`.
-- Boolean flags: `--json`, `--no-color`, `--no-preview`.
+- Boolean flags: `--json`, `--no-color`, `--no-preview`, `--interactive`, `--no-cache`, `--allow-report-outside-root`.
 
 Precedence:
 
