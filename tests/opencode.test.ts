@@ -15,7 +15,7 @@ afterAll(async () => {
 });
 
 describe('opencode provider', () => {
-  test('declares single-review concurrency to avoid shared opencode state locks', async () => {
+  test('caps concurrency at two reviews to bound shared opencode state contention', async () => {
     const root = await mkdtemp(join(tmpdir(), 'quorum-opencode-'));
     tmpRoots.push(root);
     const binary = join(root, 'opencode');
@@ -37,7 +37,7 @@ describe('opencode provider', () => {
       { workspaceRoot: root, env: {} },
     );
 
-    expect(provider.capabilities().maxConcurrentReviews).toBe(1);
+    expect(provider.capabilities().maxConcurrentReviews).toBe(2);
   });
 
   test('runs the prompt-style CLI and parses structured findings', async () => {

@@ -86,6 +86,7 @@ export const DefaultsSchema = z
     maxDiffBytes: z.number().int().positive().optional(),
     includeFiles: z.array(z.string().min(1)).optional(),
     excludeFiles: z.array(z.string().min(1)).optional(),
+    maxConcurrency: z.number().int().positive().optional(),
   })
   .strict();
 
