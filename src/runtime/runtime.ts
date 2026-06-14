@@ -76,7 +76,7 @@ export async function createRuntime(
     resolvePipeline(id) {
       const cfg = opts.config.pipelines[id];
       if (!cfg) throw new ConfigError(`Unknown pipeline "${id}"`);
-      return toPipeline(id, cfg);
+      return toPipeline(id, cfg, opts.config.defaults?.maxConcurrency);
     },
     async dispose() {
       for (const p of providerCache.values()) {
@@ -125,7 +125,11 @@ function toPersona(id: string, cfg: PersonaConfig | undefined): Persona {
   return persona;
 }
 
-function toPipeline(id: string, cfg: PipelineConfig): Pipeline {
+function toPipeline(
+  id: string,
+  cfg: PipelineConfig,
+  defaultMaxConcurrency?: number,
+): Pipeline {
   const pipeline: Pipeline = {
     id,
     parallel: cfg.parallel,
@@ -134,7 +138,8 @@ function toPipeline(id: string, cfg: PipelineConfig): Pipeline {
   const consensus = toConsensusConfig(cfg.consensus);
   if (consensus) pipeline.consensus = consensus;
   if (cfg.timeoutMs) pipeline.timeoutMs = cfg.timeoutMs;
-  if (cfg.maxConcurrency) pipeline.maxConcurrency = cfg.maxConcurrency;
+  const maxConcurrency = cfg.maxConcurrency ?? defaultMaxConcurrency;
+  if (maxConcurrency) pipeline.maxConcurrency = maxConcurrency;
   if (cfg.maxReviewers) pipeline.maxReviewers = cfg.maxReviewers;
   if (cfg.maxTotalCostUsd) pipeline.maxTotalCostUsd = cfg.maxTotalCostUsd;
   return pipeline;

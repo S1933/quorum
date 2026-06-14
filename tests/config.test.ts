@@ -221,6 +221,51 @@ pipelines:
     expect(pipeline.maxConcurrency).toBe(3);
   });
 
+  test('applies defaults.maxConcurrency to a pipeline without its own', async () => {
+    const source = `
+version: 1
+defaults:
+  maxConcurrency: 2
+personas:
+  sec: { description: d, system: s }
+reviewers:
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
+pipelines:
+  default:
+    reviewers: [r]
+`;
+    const cfg = await loadConfigFromString(source);
+    const runtime = await createRuntime({
+      config: cfg,
+      pluginCtx: { workspaceRoot: '.', env: {} },
+    });
+    const pipeline = runtime.resolvePipeline('default');
+    expect(pipeline.maxConcurrency).toBe(2);
+  });
+
+  test('pipeline maxConcurrency overrides defaults.maxConcurrency', async () => {
+    const source = `
+version: 1
+defaults:
+  maxConcurrency: 2
+personas:
+  sec: { description: d, system: s }
+reviewers:
+  r: { persona: sec, provider: { type: openrouter, api_key: k, model: m } }
+pipelines:
+  default:
+    reviewers: [r]
+    maxConcurrency: 5
+`;
+    const cfg = await loadConfigFromString(source);
+    const runtime = await createRuntime({
+      config: cfg,
+      pluginCtx: { workspaceRoot: '.', env: {} },
+    });
+    const pipeline = runtime.resolvePipeline('default');
+    expect(pipeline.maxConcurrency).toBe(5);
+  });
+
   test('accepts typed strategy-specific consensus config', async () => {
     const source = `
 version: 1
